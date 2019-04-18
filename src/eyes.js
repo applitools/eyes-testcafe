@@ -10,9 +10,9 @@ class EyesBase {
     this._config = {agentId: `eyes-testcafe/${packageVersion}`};
     this._logger = new Logger(this._config.showLogs, 'eyes-testcafe');
     const clientConfig = {logger: this._logger, ...this._config};
-    clientConfig.apiKey = 'xHXr731030WHHgsnLujyAyH7gdVreHX1vz8lPLQHEoLFI110'; // TODO - remove
+    clientConfig.apiKey = 'xHXr731030WHHgsnLujyAyH7gdVreHX1vz8lPLQHEoLFI110';
     this._client = makeVisualGridClient(clientConfig);
-    this._processPage = ClientFunction(processPageAndSerialize); //  ---> function () {return !!_symbol2.default;} // ReferenceError: _symbol2 is not defined
+    this._processPage = ClientFunction(processPageAndSerialize);
   }
 
   async eyesOpen(config) {
