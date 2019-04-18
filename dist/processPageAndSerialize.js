@@ -55,15 +55,15 @@ module.exports = () => {
   }
 
   function _arrayWithoutHoles(arr) {
-    if (Array.isArray(arr)) {
-      for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
+    if (window.Array.isArray(arr)) {
+      for (var i = 0, arr2 = new window.Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
 
       return arr2;
     }
   }
 
   function _iterableToArray(iter) {
-    if (window.Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
+    if (window.Symbol.iterator in window.Object(iter) || window.Object.prototype.toString.call(iter) === "[object Arguments]") return window.Array.from(iter);
   }
 
   function _nonIterableSpread() {
@@ -128,7 +128,7 @@ module.exports = () => {
           node = {
             nodeType: nodeType,
             nodeName: elementNode.nodeName,
-            attributes: Object.keys(elementNode.attributes || {}).map(key => {
+            attributes: nodeAttributes(elementNode).map(key => {
               let value = elementNode.attributes[key].value;
               const name = elementNode.attributes[key].localName;
 
@@ -161,6 +161,16 @@ module.exports = () => {
               value: elementNode.value
             });
           }
+        } else {
+          node = {
+            nodeType: NODE_TYPES.ELEMENT,
+            nodeName: 'SCRIPT',
+            attributes: nodeAttributes(elementNode).map(key => ({
+              name: elementNode.attributes[key].localName,
+              value: elementNode.attributes[key].value
+            })).filter(attr => attr.name !== 'src'),
+            childNodeIndexes: []
+          };
         }
       } else if (nodeType === NODE_TYPES.TEXT) {
         node = {
@@ -180,6 +190,12 @@ module.exports = () => {
       } else {
         // console.log(`Unknown nodeType: ${nodeType}`);
         return null;
+      }
+
+      function nodeAttributes({
+        attributes = {}
+      }) {
+        return window.Object.keys(attributes).filter(k => attributes[k].localName);
       }
     }
   }
@@ -207,7 +223,7 @@ module.exports = () => {
 
   function uniq(arr) {
     const result = [];
-    new Set(arr).forEach(v => v && result.push(v));
+    new window.Set(arr).forEach(v => v && result.push(v));
     return result;
   }
 
@@ -222,7 +238,7 @@ module.exports = () => {
       blobsObj
     }) => ({
       resourceUrls: uniq_1(allResourceUrls.concat(resourceUrls)),
-      blobsObj: Object.assign(allBlobsObj, blobsObj)
+      blobsObj: window.Object.assign(allBlobsObj, blobsObj)
     }), {
       resourceUrls: [],
       blobsObj: {}
@@ -308,7 +324,7 @@ module.exports = () => {
               blobsObj
             }) => ({
               resourceUrls,
-              blobsObj: Object.assign(blobsObj, {
+              blobsObj: window.Object.assign(blobsObj, {
                 [url]: {
                   type,
                   value
@@ -491,7 +507,7 @@ module.exports = () => {
   }
 
   function blobsObjToArray(blobsObj) {
-    return Object.keys(blobsObj).map(blobUrl => Object.assign({
+    return window.Object.keys(blobsObj).map(blobUrl => window.Object.assign({
       url: blobUrl.replace(/^blob:/, '')
     }, blobsObj[blobUrl]));
   }

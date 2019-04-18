@@ -1,5 +1,5 @@
 import {Selector} from 'testcafe';
-import Eyes from '../src/eyes';
+import Eyes from './src/eyes';
 const eyes = new Eyes();
 
 fixture`Getting Started`.page`https://applitools.com/helloworld`;
@@ -18,7 +18,11 @@ fixture`Getting Started`.page`https://applitools.com/helloworld`;
 test('My App Test', async t => {
   // const button = Selector('body > div.demo-page.center > div.section.button-section > button');
   // await t.click(button);
+
   await eyes.eyesOpen({appName: 'TestCafeApp', testName: 'Cafe'});
   await eyes.checkWindow('some name');
   await eyes.close();
 });
+
+// TODO - DOM SNAPSHOT ADD (domnodestoCDT):
+// .filter(k => elementNode.attributes[k].localName && elementNode.attributes[k].value)

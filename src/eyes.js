@@ -12,11 +12,16 @@ class EyesBase {
     const clientConfig = {logger: this._logger, ...this._config};
     clientConfig.apiKey = 'xHXr731030WHHgsnLujyAyH7gdVreHX1vz8lPLQHEoLFI110';
     this._client = makeVisualGridClient(clientConfig);
-    this._processPage = ClientFunction(processPageAndSerialize);
+    this._processPage = ClientFunction(
+      () =>
+        // TODO - circular JSON not strifiable !!
+        processPageAndSerialize().then(result => JSON.stringify(result)),
+      {dependencies: [processPageAndSerialize]},
+    );
   }
 
   async eyesOpen(config) {
-    return this._client.openEyes(config);
+    // return this._client.openEyes(config);
   }
 
   async checkWindow() {

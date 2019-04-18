@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npx testcafe chrome:headless test/test.js",
-    "test:live": "npx testcafe chrome test/test.js -L",
+    "test": "npx testcafe chrome:headless tmp.js",
+    "test:live": "npx testcafe chrome tmp.js -L",
     "build:ds": "rollup -c rollup.config.js",
     "prepublishOnly": "npm run build:ds && npm version patch"
   },
@@ -13,16 +13,16 @@
   "author": "Daniel Schwartz <daniel.schwartz@applitools.com>",
   "license": "ISC",
   "dependencies": {
-    "@applitools/dom-snapshot": "^1.1.2",
+    "@applitools/dom-snapshot": "^1.1.5",
     "@applitools/eyes-common": "^3.2.0",
-    "@applitools/visual-grid-client": "^12.6.2",
+    "@applitools/visual-grid-client": "^12.6.4",
     "r": "0.0.5"
   },
   "devDependencies": {
     "@babel/core": "^7.4.3",
     "@babel/plugin-transform-spread": "^7.2.2",
     "core-js-pure": "^3.0.1",
-    "eslint": "^5.15.0",
+    "eslint": "^5.16.0",
     "eslint-plugin-mocha-no-only": "^1.1.0",
     "eslint-plugin-node": "^8.0.1",
     "eslint-plugin-prettier": "^2.7.0",
