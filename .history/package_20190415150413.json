@@ -1,0 +1,28 @@
+{
+  "name": "test-cafe",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx testcafe chrome:headless test/test.js",
+    "build:ds": "rollup -c rollup.config.js"
+  },
+  "keywords": [],
+  "author": "Daniel Schwartz <daniel.schwartz@applitools.com>",
+  "license": "ISC",
+  "dependencies": {
+    "@applitools/dom-snapshot": "^1.1.2",
+    "@applitools/eyes-common": "^3.2.0",
+    "@applitools/visual-grid-client": "^12.6.2",
+    "testcafe": "^1.1.0"
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-spread": "^7.2.2",
+    "eslint": "^5.15.0",
+    "eslint-plugin-mocha-no-only": "^1.1.0",
+    "eslint-plugin-prettier": "^2.7.0",
+    "prettier": "^1.17.0",
+    "rollup": "^1.10.0",
+    "rollup-plugin-babel": "^4.3.2"
+  }
+}
