@@ -18,9 +18,8 @@ fixture`Getting Started`.page`https://applitools.com/helloworld`;
 test('My App Test', async t => {
   // const button = Selector('body > div.demo-page.center > div.section.button-section > button');
   // await t.click(button);
-
   await eyes.eyesOpen({appName: 'TestCafeApp', testName: 'Cafe'});
-  await eyes.checkWindow('some name');
+  await eyes.checkWindow({tag: 'some name', saveCdt: true});
   await eyes.close();
 });
 

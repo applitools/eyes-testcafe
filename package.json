@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npx testcafe chrome:headless tmp.js",
+    "test": "npm run build:ds && npm run test:mocha && npm run eslint",
+    "test:tmp": "npx testcafe chrome:headless tmp.js",
     "test:live": "npx testcafe chrome tmp.js -L",
+    "test:mocha": "mocha --no-timeouts --trace-warnings 'tests/**/*.test.js'",
     "build:ds": "rollup -c rollup.config.js",
     "prepublishOnly": "npm run build:ds && npm version patch"
   },
@@ -15,8 +17,7 @@
   "dependencies": {
     "@applitools/dom-snapshot": "^1.1.5",
     "@applitools/eyes-common": "^3.2.0",
-    "@applitools/visual-grid-client": "^12.6.4",
-    "r": "0.0.5"
+    "@applitools/visual-grid-client": "^12.6.4"
   },
   "devDependencies": {
     "@babel/core": "^7.4.3",
@@ -26,6 +27,8 @@
     "eslint-plugin-mocha-no-only": "^1.1.0",
     "eslint-plugin-node": "^8.0.1",
     "eslint-plugin-prettier": "^2.7.0",
+    "express": "^4.16.4",
+    "mocha": "^6.1.4",
     "prettier": "^1.17.0",
     "rollup": "^1.10.0",
     "rollup-plugin-babel": "^4.3.2",
