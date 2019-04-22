@@ -5,31 +5,32 @@ const {describe, it, before, after} = require('mocha');
 const {expect} = require('chai');
 const {resolve} = require('path');
 const createTestCafe = require('testcafe');
+const testServer = require('../util/testServer');
+const resultCdtPath = resolve(__dirname, './test-cdt.json');
+const testPath = resolve(__dirname, 'processPageAndSerializeTest.js');
 const readFile = promisify(fs.readFile);
 const unlink = promisify(fs.unlink);
-const testServer = require('../util/testServer');
-const resultCdtPath = resolve(__dirname, '../../cdt.json');
-const testPath = resolve(__dirname, 'processPageAndSerializeTest.js');
 
 describe('processPageAndSerialize', () => {
   let closeTestServer;
 
   before(async () => {
-    const server = await testServer({port: 7272});
-    closeTestServer = server.close;
+    const {close} = await testServer();
+    closeTestServer = close;
   });
 
   after(async () => {
     await closeTestServer();
     try {
       await unlink(resultCdtPath);
-    } catch (_e) {}
+    } catch (e) {
+      console.log(e);
+    }
   });
 
   it('works', async () => {
     let testcafe = null;
-    const expectedCdt = {};
-    createTestCafe('localhost', 1337)
+    return createTestCafe('localhost', 1337)
       .then(tc => {
         testcafe = tc;
         const runner = testcafe.createRunner();
@@ -45,11 +46,52 @@ describe('processPageAndSerialize', () => {
       .finally(() => testcafe.close())
       .then(getCdt)
       .then(cdt => {
-        expect(cdt).to.deep.eq(expectedCdt);
+        expect(cdt).to.deep.eq(getExpectedCdtFile());
       });
   });
 
   async function getCdt() {
-    return readFile(resultCdtPath);
+    const cdt = await readFile(resultCdtPath, 'utf8');
+    return JSON.parse(cdt || {});
+  }
+
+  function getExpectedCdtFile() {
+    return {
+      cdt: [
+        {nodeType: 9, childNodeIndexes: [1, 13]},
+        {nodeType: 10, nodeName: 'html'},
+        {nodeType: 1, nodeName: 'HEAD', attributes: [], childNodeIndexes: []},
+        {nodeType: 3, nodeValue: '\n  '},
+        {nodeType: 3, nodeValue: '\n    Hello\n    '},
+        {nodeType: 3, nodeValue: '\n        A Button\n    '},
+        {
+          nodeType: 1,
+          nodeName: 'BUTTON',
+          attributes: [{name: 'someatrr2', value: 'val2'}],
+          childNodeIndexes: [5],
+        },
+        {nodeType: 3, nodeValue: '\n  '},
+        {
+          nodeType: 1,
+          nodeName: 'DIV',
+          attributes: [{name: 'someatrr', value: 'val'}],
+          childNodeIndexes: [4, 6, 7],
+        },
+        {nodeType: 3, nodeValue: '\n  '},
+        {
+          nodeType: 1,
+          nodeName: 'SCRIPT',
+          attributes: [{name: 'someattr', value: 'yo'}],
+          childNodeIndexes: [],
+        },
+        {nodeType: 3, nodeValue: '\n\n'},
+        {nodeType: 1, nodeName: 'BODY', attributes: [], childNodeIndexes: [3, 8, 9, 10, 11]},
+        {nodeType: 1, nodeName: 'HTML', attributes: [], childNodeIndexes: [2, 12]},
+      ],
+      url: 'http://localhost:7272/basicCdt.html',
+      resourceUrls: [],
+      blobs: [],
+      frames: [],
+    };
   }
 });

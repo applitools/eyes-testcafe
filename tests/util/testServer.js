@@ -3,7 +3,7 @@ const {promisify: p} = require('util');
 const path = require('path');
 const express = require('express');
 
-module.exports = ({port = 0} = {}) => {
+module.exports = ({port = 7272} = {}) => {
   const app = express();
   app.use('/', express.static(path.resolve(__dirname, '../fixtures')));
 
@@ -11,7 +11,7 @@ module.exports = ({port = 0} = {}) => {
     const server = app.listen(port, () => {
       const serverPort = server.address().port;
       const close = p(server.close.bind(server));
-      // console.log(`server running at port: ${serverPort}`);
+      // console.log(`test server running at port: ${serverPort}`);
       resolve({port: serverPort, close});
     });
   });
