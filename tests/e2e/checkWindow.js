@@ -1,5 +1,5 @@
 import {Selector} from 'testcafe';
-import Eyes from './src/eyes';
+import Eyes from '../../src/eyes';
 const eyes = new Eyes();
 
 fixture`Getting Started`.page`https://applitools.com/helloworld`;

@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "npm run build:ds && npm run test:mocha && npm run eslint",
-    "test:tmp": "npx testcafe chrome:headless tmp.js",
-    "test:live": "npx testcafe chrome tmp.js -L",
+    "test:tmp": "npx testcafe chrome:headless tests/e2e/checkWindow.js",
+    "test:tmp:live": "npx testcafe chrome tests/e2e/checkWindow.js -L",
     "test:mocha": "mocha --no-timeouts --trace-warnings 'tests/**/*.test.js'",
     "build:ds": "rollup -c rollup.config.js",
     "prepublishOnly": "npm run build:ds && npm version patch"

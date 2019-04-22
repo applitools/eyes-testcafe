@@ -3,7 +3,10 @@ import {ClientFunction} from 'testcafe';
 const EYES_NAME_SPACE = '__EYES__APPLITOOLS__';
 const MAX_OBJECT_SIZE = 1024 * 1024 * 4.0; // 4 MB
 
-// See: https://github.com/DevExpress/testcafe/issues/1110
+/*
+ * Split the result to smaller chunks if it is too big.
+ * See: https://github.com/DevExpress/testcafe/issues/1110
+ */
 async function clientFunctionJsonWrapper(fn, dependencies = {}) {
   const getResultSize = ClientFunction(
     () =>
