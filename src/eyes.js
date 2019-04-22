@@ -5,7 +5,7 @@ const {Logger} = require('@applitools/eyes-common');
 const {makeVisualGridClient} = require('@applitools/visual-grid-client');
 const {version: packageVersion} = require('../package.json');
 const processPageAndSerialize = require('../dist/processPageAndSerialize');
-const clientFunctionJsonWrapper = require('./clientFunctionJsonWrapper');
+const clientFunctionExecutor = require('./clientFunctionExecutor');
 const writeFile = promisify(fs.writeFile);
 
 class Eyes {
@@ -18,7 +18,7 @@ class Eyes {
   }
 
   async eyesOpen(config) {
-    // return this._client.openEyes(config);
+    return this._client.openEyes(config);
   }
 
   async checkWindow({saveCdt}) {
@@ -30,7 +30,9 @@ class Eyes {
 
   async _processPage() {
     if (!this._processPageClientFunction) {
-      this._processPageClientFunction = await clientFunctionJsonWrapper(processPageAndSerialize);
+      this._processPageClientFunction = await clientFunctionExecutor({
+        clientFunction: processPageAndSerialize,
+      });
     }
     return await this._processPageClientFunction();
   }

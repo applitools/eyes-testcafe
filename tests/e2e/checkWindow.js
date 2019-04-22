@@ -1,4 +1,5 @@
-import {Selector} from 'testcafe';
+/* global fixture, test */
+// import {Selector} from 'testcafe';
 import Eyes from '../../src/eyes';
 const eyes = new Eyes();
 
@@ -15,7 +16,7 @@ fixture`Getting Started`.page`https://applitools.com/helloworld`;
 //     })
 // );
 
-test('My App Test', async t => {
+test('My App Test', async (/* t */) => {
   // const button = Selector('body > div.demo-page.center > div.section.button-section > button');
   // await t.click(button);
   await eyes.eyesOpen({appName: 'TestCafeApp', testName: 'Cafe'});
