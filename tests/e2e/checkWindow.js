@@ -3,26 +3,26 @@
 import Eyes from '../../src/eyes';
 const eyes = new Eyes();
 
-fixture`Getting Started`.page`https://applitools.com/helloworld`;
-// .after(Eyes.close)
-// .before(() =>
-//     Eyes.eyesOpen({
-//         appName: 'TestCafeApp',
-//         testName: 'Cafe',
-//         // browser: [
-//         //     {width: 800, height: 600, name: 'firefox'},
-//         //     {width: 1024, height: 768, name: 'chrome'}
-//         // ]
-//     })
-// );
+fixture`Getting Started`.page`https://applitools.com/helloworld`
+  .after(async () => {
+    const results = await eyes.waitForResults(false);
+    console.log(results);
+  })
+  .before(async () =>
+    eyes.open({
+      appName: 'TestCafeApp',
+      testName: 'Hello World cafe',
+      // browser: [
+      //     {width: 800, height: 600, name: 'firefox'},
+      //     {width: 1024, height: 768, name: 'chrome'}
+      // ]
+    }),
+  );
 
-test('My App Test', async (/* t */) => {
-  // const button = Selector('body > div.demo-page.center > div.section.button-section > button');
+test('My Hello World page', async (/* t */) => {
+  await eyes.checkWindow({tag: 'loaded page', saveCdt: true});
+  // const button = Selector('body > div > div.section.button-section > button');
   // await t.click(button);
-  await eyes.eyesOpen({appName: 'TestCafeApp', testName: 'Cafe'});
-  await eyes.checkWindow({tag: 'some name', saveCdt: true});
+  // await eyes.checkWindow({tag: 'after click', saveCdt: true});
   await eyes.close();
 });
-
-// TODO - DOM SNAPSHOT ADD (domnodestoCDT):
-// .filter(k => elementNode.attributes[k].localName && elementNode.attributes[k].value)
