@@ -1,4 +1,5 @@
 'use strict';
+
 const fs = require('fs');
 const {promisify} = require('util');
 const {ConfigUtils, Logger} = require('@applitools/eyes-common');
@@ -11,9 +12,14 @@ const {TestResults} = require('@applitools/eyes-sdk-core');
 const processPageAndSerialize = require('../dist/processPageAndSerialize');
 const {version: packageVersion} = require('../package.json');
 const makeClientFunctionExecuter = require('./makeClientFunctionExecuter');
-const getAllBlobs = require('./getAllBlobs');
-const clientFunctionExecuter = makeClientFunctionExecuter({});
+const blobsToResourceContents = require('./blobsToResourceContents');
+const blobsToBuffer = require('./blobsToBuffer');
+const getResources = require('./getResources');
+const getProxyUrl = require('./getProxyUrl');
+const makeMapResourcesProxyUrls = require('./makeMapResourcesProxyUrls');
 const writeFile = promisify(fs.writeFile);
+const clientFunctionExecuter = makeClientFunctionExecuter({});
+const mapResourcesProxyUrls = makeMapResourcesProxyUrls({getResources, getProxyUrl});
 
 class Eyes {
   constructor() {
@@ -46,18 +52,28 @@ class Eyes {
     if (this._shouldIgnore('check window')) {
       return;
     }
-    const result = await this._processPage();
-    const resourceContents = getAllBlobs(result);
-    // TODO - continue from here .. looks like bad CSSS
+
+    let result = await this._processPage();
+    blobsToBuffer(result);
+    mapResourcesProxyUrls(result);
+    blobsToResourceContents(result);
+
+    // TODO - continue check css file validaty
+    console.log(
+      Object.values(result.resourceContents)
+        .filter(r => r.type.startsWith('text/css'))
+        .map(r => Buffer.from(r.value, 'base64').toString()),
+    );
+
     if (args.saveCdt || this._currentBatch.config['saveCdt']) {
       await writeFile(`./cdt.json`, JSON.stringify(result.cdt, null, 2));
     }
     this._logger.log(
-      `[eyes check window] called for test '${this._currentTestName()}' with ${JSON.stringify(
+      `[eyes check window] checking for test '${this._currentTestName()}' with ${JSON.stringify(
         args,
       )}`,
     );
-    return this._currentBatch.eyes.checkWindow({resourceContents, ...result, ...args});
+    return this._currentBatch.eyes.checkWindow({...result, ...args});
   }
 
   async waitForResults(rejectOnErrors = true) {
@@ -74,6 +90,8 @@ class Eyes {
   }
 
   async _processPage() {
+    // TODO - processPageAndSeralze should get a css mapper so
+    // the proxy fix can be done while downloading the resources
     if (!this._processPageClientFunction) {
       this._processPageClientFunction = await clientFunctionExecuter(processPageAndSerialize);
     }
