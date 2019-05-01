@@ -58,16 +58,7 @@ class Eyes {
     mapResourcesProxyUrls(result);
     blobsToResourceContents(result);
 
-    // TODO - continue check css file validaty
-    console.log(
-      Object.values(result.resourceContents)
-        .filter(r => r.type.startsWith('text/css'))
-        .map(r => Buffer.from(r.value, 'base64').toString()),
-    );
-
-    if (args.saveCdt || this._currentBatch.config['saveCdt']) {
-      await writeFile(`./cdt.json`, JSON.stringify(result.cdt, null, 2));
-    }
+    await this._handleDebugData(args, result);
     this._logger.log(
       `[eyes check window] checking for test '${this._currentTestName()}' with ${JSON.stringify(
         args,
@@ -122,6 +113,12 @@ class Eyes {
         `[eyes ${functionName}] test '${this._currentTestName()}' is not closed, closing it first.`,
       );
       await this.close();
+    }
+  }
+
+  async _handleDebugData(args, result) {
+    if (args.saveCdt || this._currentBatch.config['saveCdt']) {
+      await writeFile(`./cdt.json`, JSON.stringify(result.cdt, null, 2));
     }
   }
 
