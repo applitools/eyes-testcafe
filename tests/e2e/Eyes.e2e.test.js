@@ -19,7 +19,7 @@ describe('Eyes', () => {
     }
   });
 
-  it.only('works', async () => {
+  it('works', async () => {
     let testcafe = null;
     return createTestCafe('localhost', 1337)
       .then(tc => {
