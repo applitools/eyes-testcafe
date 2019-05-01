@@ -5,22 +5,13 @@ const {describe, it, before, after} = require('mocha');
 const {expect} = require('chai');
 const {resolve} = require('path');
 const createTestCafe = require('testcafe');
-const testServer = require('../util/testServer');
-const resultCdtPath = resolve(__dirname, './test-cdt.json');
-const testPath = resolve(__dirname, 'processPageAndSerializeTest.js');
+const resultCdtPath = resolve(__dirname, '../../cdt.json');
+const testPath = resolve(__dirname, 'helloworld.js');
 const readFile = promisify(fs.readFile);
 const unlink = promisify(fs.unlink);
 
-describe('processPageAndSerialize', () => {
-  let closeTestServer;
-
-  before(async () => {
-    const {close} = await testServer();
-    closeTestServer = close;
-  });
-
+describe('Eyes', () => {
   after(async () => {
-    await closeTestServer();
     try {
       await unlink(resultCdtPath);
     } catch (e) {
@@ -28,7 +19,7 @@ describe('processPageAndSerialize', () => {
     }
   });
 
-  it('works', async () => {
+  it.only('works', async () => {
     let testcafe = null;
     return createTestCafe('localhost', 1337)
       .then(tc => {
