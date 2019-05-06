@@ -15,7 +15,6 @@ const blobsToBuffer = require('./blobsToBuffer');
 const getResources = require('./getResources');
 const getProxyUrl = require('./getProxyUrl');
 const makeMapResourcesProxyUrls = require('./makeMapResourcesProxyUrls');
-const createDebugData = require('./createDebugData');
 const clientFunctionExecuter = makeClientFunctionExecuter({});
 const mapResourcesProxyUrls = makeMapResourcesProxyUrls({getResources, getProxyUrl});
 
@@ -56,9 +55,6 @@ class Eyes {
     mapResourcesProxyUrls(result);
     blobsToResourceContents(result);
 
-    if (args.debug || this._currentBatch.config['debug']) {
-      await createDebugData(result, {version: this._agentId()});
-    }
     this._logger.log(
       `[eyes check window] checking for test '${this._currentTestName()}' with ${JSON.stringify(
         args,
@@ -185,7 +181,7 @@ class Eyes {
     const calculatedConfig = ConfigUtils.getConfig({
       configParams: [...visualGridConfigParams, ...testcafeConfigParams],
     });
-    const defaultConfig = {agentId: this._agentId()}; // TODO - concurrency ok ?
+    const defaultConfig = {agentId: `eyes-testcafe/${packageVersion}`}; // TODO - concurrency ok ?
     const configResult = {...defaultConfig, ...calculatedConfig};
     if (configResult.failTestcafeOnDiff === '0') {
       configResult.failTestcafeOnDiff = false;
@@ -194,10 +190,6 @@ class Eyes {
       configResult.showLogs = configResult.showLogs === 'true' || configResult.showLogs === '1';
     }
     return configResult;
-  }
-
-  _agentId() {
-    return `eyes-testcafe/${packageVersion}`;
   }
 }
 

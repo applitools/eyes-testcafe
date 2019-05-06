@@ -8,13 +8,16 @@ function makeMapResourcesProxyUrls({getResources, getProxyUrl}) {
     const cssResources = getResources(frame, r => r.type.trimStart().startsWith('text/css'));
     cssResources.forEach(r => (r.value = r.value.toString()));
     cssResources.map(r => r.value).some(css => ((proxyUrl = getProxyUrl(css)), proxyUrl));
-    logger.log(`mapping proxy url ${proxyUrl} for ${cssResources.length} resources`);
-    cssResources.forEach(r => (r.value = mapProxyUrls(r.value, proxyUrl)));
+    if (!proxyUrl) {
+      throw new Error('eyes could not find testcafe proxy url for mapping');
+    }
+    cssResources.forEach(r => (r.value = mapProxyUrls(r, proxyUrl)));
     cssResources.forEach(r => (r.value = Buffer.from(r.value)));
   };
 
-  function mapProxyUrls(text, proxyUrl) {
-    return text.replace(new RegExp(proxyUrl, 'g'), '');
+  function mapProxyUrls(resource, proxyUrl) {
+    logger.log(`mapping proxy url ${proxyUrl} for ${resource.url}`);
+    return resource.value.replace(new RegExp(proxyUrl, 'g'), '');
   }
 }
 

@@ -2,7 +2,7 @@
 import Eyes from '../../src/eyes';
 const eyes = new Eyes();
 
-fixture`Getting Started`.page`https://applitools.com/helloworld`
+fixture`Getting Started`.page`http://localhost:7272/helloworld.html`
   .afterEach(async () => eyes.close())
   .after(async () => await eyes.waitForResults(true));
 
