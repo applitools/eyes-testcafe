@@ -1,7 +1,7 @@
-/* global window */
 'use strict';
-const {Logger} = require('@applitools/eyes-common');
+
 const {ClientFunction} = require('testcafe');
+const {Logger} = require('@applitools/eyes-common');
 const EYES_NAME_SPACE = '__EYES__APPLITOOLS__';
 const MAX_OBJECT_SIZE = 1024 * 1024 * 4.0; // 4 MB
 
@@ -9,17 +9,18 @@ const MAX_OBJECT_SIZE = 1024 * 1024 * 4.0; // 4 MB
  * Split the result to smaller chunks if it is too big.
  * See: https://github.com/DevExpress/testcafe/issues/1110
  */
-function makeClientFunctionExecuter({
+function makeClientFunctionWrapper({
   clientFunctionExecuter = ClientFunction,
   stringifyResult = r => JSON.stringify(r),
   parseResult = JSON.parse,
   maxObjectSize = MAX_OBJECT_SIZE,
+  window,
 }) {
-  const logger = new Logger(false, 'testcafe:clientFunctionExecuter');
-  return async function(clientFunction, dependencies = {}) {
+  const logger = new Logger(false, 'testcafe:clientFunctionWrapper');
+  return async function(browserFunction, dependencies = {}) {
     const getResultSize = clientFunctionExecuter(
       () =>
-        clientFunction().then((result = {}) => {
+        browserFunction().then((result = {}) => {
           const resultStr = stringifyResult(result);
           if (!window[EYES_NAME_SPACE]) {
             window[EYES_NAME_SPACE] = {};
@@ -27,7 +28,7 @@ function makeClientFunctionExecuter({
           window[EYES_NAME_SPACE].clientFunctionResult = resultStr;
           return resultStr.length;
         }),
-      {dependencies: {EYES_NAME_SPACE, clientFunction, stringifyResult, ...dependencies}},
+      {dependencies: {EYES_NAME_SPACE, browserFunction, stringifyResult, ...dependencies}},
     );
 
     const getResult = clientFunctionExecuter(
@@ -52,4 +53,4 @@ function makeClientFunctionExecuter({
   };
 }
 
-module.exports = makeClientFunctionExecuter;
+module.exports = makeClientFunctionWrapper;

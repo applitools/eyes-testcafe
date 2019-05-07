@@ -9,19 +9,19 @@ const {TypeUtils} = require('@applitools/eyes-common');
 const {TestResults} = require('@applitools/eyes-sdk-core');
 const processPageAndSerialize = require('../dist/processPageAndSerialize');
 const {version: packageVersion} = require('../package.json');
-const makeClientFunctionExecuter = require('./makeClientFunctionExecuter');
 const blobsToResourceContents = require('./blobsToResourceContents');
 const blobsToBuffer = require('./blobsToBuffer');
 const getResources = require('./getResources');
 const getProxyUrl = require('./getProxyUrl');
 const makeMapResourcesProxyUrls = require('./makeMapResourcesProxyUrls');
-const clientFunctionExecuter = makeClientFunctionExecuter({});
+const makeClientFunctionWrapper = require('./makeClientFunctionWrapper');
+const clientFunctionWrapper = makeClientFunctionWrapper({});
 const mapResourcesProxyUrls = makeMapResourcesProxyUrls({getResources, getProxyUrl});
 
 class Eyes {
   constructor() {
     this._defaultConfig = this._initDefaultConfig();
-    // TODO - add showLogs config, need then to pass this logger to makeClientFunctionExecuter
+    // TODO - add showLogs config, need then to pass this logger to clientFunctionWrapper
     this._logger = new Logger(false, 'testcafe:sdk');
     this._defaultConfig.apiKey = 'xHXr731030WHHgsnLujyAyH7gdVreHX1vz8lPLQHEoLFI110'; // TOOD - remove
     this._client = makeVisualGridClient(this._defaultConfig);
@@ -80,7 +80,7 @@ class Eyes {
     // TODO - processPageAndSeralze should get a css mapper so
     // the proxy fix can be done while downloading the resources
     if (!this._processPageClientFunction) {
-      this._processPageClientFunction = await clientFunctionExecuter(processPageAndSerialize);
+      this._processPageClientFunction = await clientFunctionWrapper(processPageAndSerialize);
     }
     return await this._processPageClientFunction();
   }
