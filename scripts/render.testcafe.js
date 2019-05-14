@@ -28,6 +28,7 @@ fixture`TestCafeRender`
   });
 
 test('Testcafe Eyes Render', async () => {
-  await eyes.open({appName: 'TestCafeRender', testName: 'Testcafe Eyes Render'});
-  await eyes.checkWindow({tag: 'page loaded', debug: true});
+  // await new Promise(r => setTimeout(r, 2000));
+  await eyes.open({appName: 'TestCafeRender', testName: `Testcafe Render ${url}`});
+  await eyes.checkWindow({tag: 'page loaded'});
 });

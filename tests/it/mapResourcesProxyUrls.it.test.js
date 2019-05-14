@@ -2,13 +2,29 @@
 
 const {describe, it} = require('mocha');
 const {expect} = require('chai');
-const makeMapResourcesProxyUrls = require('../../src/makeMapResourcesProxyUrls');
 const getProxyUrl = require('../../src/getProxyUrl');
-const getResources = require('../../src/getResources');
-const resourcesProxyUrls = makeMapResourcesProxyUrls({getProxyUrl, getResources});
+const collectFrameData = require('../../src/collectFrameData');
+const makeMapProxyUrls = require('../../src/makeMapProxyUrls');
+const mapProxyUrls = makeMapProxyUrls({collectFrameData, getProxyUrl});
 
-describe('mapResourcesProxyUrls', () => {
+describe('mapProxyUrls', () => {
   const frame = {
+    cdt: [
+      {
+        nodeType: 3,
+        nodeValue:
+          '/*hammerhead|stylesheet-http://localhost:2020/ftftft/http://tested-page-in-cdt.com',
+        _shouldMap: true,
+      },
+      {
+        nodeType: 2,
+        nodeValue: '/*hammerhead|stylesheet-http://localhost:2020/ftftft/http://dont-map.com',
+      },
+      {
+        nodeType: 3,
+        nodeValue: '/*hammerhead-BAD-|stylesheet-http://localhost:2020/ftftft/http://dont-map.com',
+      },
+    ],
     blobs: [
       {
         url: 'main.css',
@@ -34,6 +50,18 @@ describe('mapResourcesProxyUrls', () => {
     ],
     frames: [
       {
+        cdt: [
+          {
+            nodeType: 3,
+            nodeValue:
+              '/*hammerhead|stylesheet-http://localhost:2020/ftftft/http://tested-page-in-cdt-frame.com',
+            _shouldMap: true,
+          },
+          {
+            nodeType: 2,
+            nodeValue: '/*hammerhead|stylesheet-http://localhost:2020/ftftft/http://dont-map.com',
+          },
+        ],
         blobs: [
           {
             url: 'dontMapMeInFrame.css',
@@ -54,28 +82,16 @@ describe('mapResourcesProxyUrls', () => {
 
   it('works', () => {
     const actualFrame = cpyFrame();
-    resourcesProxyUrls(actualFrame);
+    mapProxyUrls(actualFrame);
     assertBuffer(frame);
     assertMapping(actualFrame, frame);
-  });
-
-  it('throws if no proxy url', () => {
-    let err;
-    try {
-      resourcesProxyUrls({
-        frames: [],
-        blobs: [{url: 'hello', type: 'text/css', value: 'http://123.45.21.432:1212/adads'}],
-      });
-    } catch (e) {
-      err = e;
-    }
-    expect(err && err.message).to.eq('eyes could not find testcafe proxy url for mapping');
   });
 
   it('dont throw if no proxy url and no resources for maaping', () => {
     let err = 'no error';
     try {
-      resourcesProxyUrls({
+      mapProxyUrls({
+        cdt: [],
         frames: [],
         blobs: [{url: 'hello', type: 'text/something', value: 'http://123.45.21.432:1212/adads'}],
       });
@@ -93,6 +109,11 @@ describe('mapResourcesProxyUrls', () => {
           : b.value.toString().replace(/http:\/\/localhost:2020\/ftftft\//g, ''),
       ),
     );
+    expect(actualFrame.cdt.map(n => n.nodeValue)).to.deep.eql(
+      expectedFrame.cdt.map(n =>
+        !n._shouldMap ? n.nodeValue : n.nodeValue.replace(/http:\/\/localhost:2020\/ftftft\//g, ''),
+      ),
+    );
     actualFrame.frames.forEach((f, i) => assertMapping(f, expectedFrame.frames[i]));
   }
 
@@ -108,14 +129,21 @@ describe('mapResourcesProxyUrls', () => {
         value,
         type,
       }));
+    const cpyCdt = cdt =>
+      cdt.map(({nodeType, nodeValue}) => ({
+        nodeType,
+        nodeValue,
+      }));
     return {
       blobs: cpyBlobs(frame.blobs),
       frames: [
         {
+          cdt: cpyCdt(frame.frames[0].cdt),
           blobs: cpyBlobs(frame.frames[0].blobs),
           frames: [],
         },
       ],
+      cdt: cpyCdt(frame.cdt),
     };
   }
 });

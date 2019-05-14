@@ -2,7 +2,7 @@
 
 const {resolve} = require('path');
 const createTestCafe = require('testcafe');
-const testPath = resolve(__dirname, 'render.testcafe.js');
+const testPath = resolve(__dirname, 'debug.testcafe.js');
 
 let testcafe = null;
 createTestCafe('localhost', 1339)
@@ -11,7 +11,7 @@ createTestCafe('localhost', 1339)
     const runner = testcafe.createRunner();
     return runner
       .src([testPath])
-      .browsers(['chrome:headless'])
-      .run({debugMode: process.argv[3] === 'debug'});
+      .browsers(['chrome'])
+      .run();
   })
   .finally(() => testcafe.close());

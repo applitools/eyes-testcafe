@@ -11,12 +11,12 @@ const processPageAndSerialize = require('../dist/processPageAndSerialize');
 const {version: packageVersion} = require('../package.json');
 const blobsToResourceContents = require('./blobsToResourceContents');
 const blobsToBuffer = require('./blobsToBuffer');
-const getResources = require('./getResources');
 const getProxyUrl = require('./getProxyUrl');
-const makeMapResourcesProxyUrls = require('./makeMapResourcesProxyUrls');
+const collectFrameData = require('./collectFrameData');
+const makeMapProxyUrls = require('./makeMapProxyUrls');
 const makeClientFunctionWrapper = require('./makeClientFunctionWrapper');
 const clientFunctionWrapper = makeClientFunctionWrapper({});
-const mapResourcesProxyUrls = makeMapResourcesProxyUrls({getResources, getProxyUrl});
+const mapProxyUrls = makeMapProxyUrls({collectFrameData, getProxyUrl});
 
 class Eyes {
   constructor() {
@@ -52,7 +52,7 @@ class Eyes {
 
     let result = await this._processPage();
     blobsToBuffer(result);
-    mapResourcesProxyUrls(result);
+    mapProxyUrls(result);
     blobsToResourceContents(result);
 
     this._logger.log(
@@ -69,11 +69,11 @@ class Eyes {
     await this._assertClosed('wait for batch');
     let batchesResults = await Promise.all(this._closedBatches.map(b => b.closePromise));
     batchesResults = batchesResults.map(this._removeTestResultsIfError);
-    const fulfill =
+    const settle =
       rejectOnErrors && this._shouldRejectBatches(batchesResults)
         ? Promise.reject.bind(Promise)
         : Promise.resolve.bind(Promise);
-    return fulfill(batchesResults);
+    return settle(batchesResults);
   }
 
   async _processPage() {

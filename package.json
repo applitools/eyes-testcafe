@@ -6,7 +6,7 @@
   "scripts": {
     "test": "npm run build:ds && npm run test:mocha && npm run eslint",
     "render": "node scripts/render.js",
-    "test:debug": "npx testcafe chrome tests/e2e/helloworld.js -L",
+    "debug": "node scripts/debug.js",
     "test:mocha": "mocha --no-timeouts --trace-warnings 'tests/**/*.test.js'",
     "build:ds": "rollup -c rollup.config.js",
     "eslint": "eslint '**/*.js'",
@@ -16,7 +16,14 @@
     "src",
     "index.js"
   ],
-  "keywords": ["applitools", "eyes", "testcafe", "visual testing", "testing", "eyes-testcafe"],
+  "keywords": [
+    "applitools",
+    "eyes",
+    "testcafe",
+    "visual testing",
+    "testing",
+    "eyes-testcafe"
+  ],
   "author": "Daniel Schwartz <daniel.schwartz@applitools.com>",
   "license": "MIT",
   "dependencies": {

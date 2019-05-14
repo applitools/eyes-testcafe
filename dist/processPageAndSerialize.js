@@ -134,6 +134,8 @@ module.exports = () => {
 
               if (/^blob:/.test(value)) {
                 value = value.replace(/^blob:/, '');
+              } else if (elementNode.nodeName === 'IFRAME' && name === 'src' && !elementNode.contentDocument && !value.match(/^\s*data:/)) {
+                value = '';
               }
 
               return {
