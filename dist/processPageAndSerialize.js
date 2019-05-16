@@ -75,11 +75,13 @@ module.exports = () => {
 
     const srcUrls = _toConsumableArray(doc.querySelectorAll('img[src],source[src]')).map(srcEl => srcEl.getAttribute('src'));
 
+    const hrefUrls = _toConsumableArray(doc.querySelectorAll('image')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(Boolean);
+
     const cssUrls = _toConsumableArray(doc.querySelectorAll('link[rel="stylesheet"]')).map(link => link.getAttribute('href'));
 
     const videoPosterUrls = _toConsumableArray(doc.querySelectorAll('video[poster]')).map(videoEl => videoEl.getAttribute('poster'));
 
-    return [].concat(_toConsumableArray(srcsetUrls), _toConsumableArray(srcUrls), _toConsumableArray(cssUrls), _toConsumableArray(videoPosterUrls));
+    return [].concat(_toConsumableArray(srcsetUrls), _toConsumableArray(srcUrls), _toConsumableArray(hrefUrls), _toConsumableArray(cssUrls), _toConsumableArray(videoPosterUrls));
   }
 
   var extractLinks_1 = extractLinks;
@@ -114,15 +116,19 @@ module.exports = () => {
     }
 
     function elementNodeFactory(domNodes, elementNode) {
-      let node;
+      let node, manualChildNodeIndexes;
       const {
         nodeType
       } = elementNode;
 
       if ([NODE_TYPES.ELEMENT, NODE_TYPES.DOCUMENT_FRAGMENT_NODE].includes(nodeType)) {
         if (elementNode.nodeName !== 'SCRIPT') {
-          if (elementNode.nodeName === 'STYLE' && !elementNode.textContent && elementNode.sheet && elementNode.sheet.cssRules.length) {
-            elementNode.appendChild(docNode.createTextNode(_toConsumableArray(elementNode.sheet.cssRules).map(rule => rule.cssText).join('')));
+          if (elementNode.nodeName === 'STYLE' && elementNode.sheet && elementNode.sheet.cssRules.length) {
+            domNodes.push({
+              nodeType: NODE_TYPES.TEXT,
+              nodeValue: _toConsumableArray(elementNode.sheet.cssRules).map(rule => rule.cssText).join('')
+            });
+            manualChildNodeIndexes = [domNodes.length - 1];
           }
 
           node = {
@@ -143,7 +149,7 @@ module.exports = () => {
                 value
               };
             }),
-            childNodeIndexes: elementNode.childNodes.length ? childrenFactory(domNodes, elementNode.childNodes) : []
+            childNodeIndexes: manualChildNodeIndexes || (elementNode.childNodes.length ? childrenFactory(domNodes, elementNode.childNodes) : [])
           };
 
           if (elementNode.shadowRoot) {
