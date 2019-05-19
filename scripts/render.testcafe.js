@@ -27,8 +27,9 @@ fixture`TestCafeRender`
     }
   });
 
-test('Testcafe Eyes Render', async () => {
-  // await new Promise(r => setTimeout(r, 2000));
+test('Testcafe Eyes Render', async t => {
+  await t.resizeWindow(1024, 768);
+  await new Promise(r => setTimeout(r, 1000));
   await eyes.open({appName: 'TestCafeRender', testName: `Testcafe Render ${url}`});
   await eyes.checkWindow({tag: 'page loaded'});
 });

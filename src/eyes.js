@@ -22,7 +22,7 @@ class Eyes {
   constructor() {
     this._defaultConfig = this._initDefaultConfig();
     // TODO - add showLogs config, need then to pass this logger to clientFunctionWrapper
-    this._logger = new Logger(false, 'testcafe:sdk');
+    this._logger = new Logger(false, 'testcafe:instance');
     this._defaultConfig.apiKey = 'xHXr731030WHHgsnLujyAyH7gdVreHX1vz8lPLQHEoLFI110'; // TOOD - remove
     this._client = makeVisualGridClient(this._defaultConfig);
     this._logger.log('[eyes ctr] initial config', this._defaultConfig);
