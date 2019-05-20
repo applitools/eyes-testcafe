@@ -2,14 +2,16 @@
 import Eyes from '../src/eyes';
 const eyes = new Eyes();
 
-fixture`New user faq`
-  .page('https://help.twitter.com/en/new-user-faq')
+fixture`Glossary`
+  .page('https://help.twitter.com/en/glossary')
   .afterEach(async () => eyes.close())
   .after(async () => eyes.waitForResults());
   
-test('New user faq', async t => {
+test('Glossary', async t => {
+  await t.resizeWindow(1024, 768)
+  await new Promise(r => setTimeout(r, 1000))
   // Start a visual test
-  await eyes.open({ appName: 'Twitter faq', testName: `Twitter New user faq`});
+  await eyes.open({ appName: 'Twitter Glossary', testName: `Twitter Glossary page`});
   // Test page
   await eyes.checkWindow('New user faq page');
 });

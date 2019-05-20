@@ -10,6 +10,6 @@ fixture`Cookies explained`
 test('Cookies', async t => {
   // Start a visual test
   await eyes.open({ appName: 'Twitter App', testName: `Twitter cookies explained`});
-  // test page
+  // Test page
   await eyes.checkWindow('Cookies explained page');
 });
