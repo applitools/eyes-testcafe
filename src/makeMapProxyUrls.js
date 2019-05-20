@@ -4,7 +4,7 @@ const logger = new Logger(false, 'testcafe:mapResourcesProxyUrls');
 
 function makeMapProxyUrls({collectFrameData, getProxyUrl}) {
   return function(frame) {
-    console.log(JSON.stringify(frame))
+    logger.log(JSON.stringify(frame));
     const cssBlobs = collectFrameData({
       frame,
       predicate: r => r.type.trimStart().startsWith('text/css'),
