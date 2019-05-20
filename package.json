@@ -14,7 +14,8 @@
   },
   "files": [
     "src",
-    "index.js"
+    "index.js",
+    "dist"
   ],
   "keywords": [
     "applitools",
