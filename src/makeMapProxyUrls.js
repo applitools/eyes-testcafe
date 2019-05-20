@@ -4,32 +4,43 @@ const logger = new Logger(false, 'testcafe:mapResourcesProxyUrls');
 
 function makeMapProxyUrls({collectFrameData, getProxyUrl}) {
   return function(frame) {
-    const cssResources = collectFrameData({
+    const cssBlobs = collectFrameData({
       frame,
       predicate: r => r.type.trimStart().startsWith('text/css'),
       keyName: 'blobs',
     });
-    const styleProxyNodes = collectFrameData({
+    cssBlobs.forEach(r => (r.value = r.value.toString()));
+    const proxyStyleNodes = collectFrameData({
       frame,
       predicate: n => n.nodeType === 3 && n.nodeValue.match(/\/\*hammerhead\|stylesheet/),
       keyName: 'cdt',
     });
-    cssResources.forEach(r => (r.value = r.value.toString()));
+    const styleAttrs = collectFrameData({
+      frame,
+      predicate: n =>
+        n.nodeType === 1 && n.attributes && n.attributes.some(a => a.name === 'style'),
+      keyName: 'cdt',
+    }).map(n => n.attributes.find(a => a.name === 'style'));
 
     let proxyUrl =
-      findProxyUrl(cssResources.map(r => r.value)) ||
-      findProxyUrl(styleProxyNodes.map(n => n.nodeValue));
+      findProxyUrl(cssBlobs.map(r => r.value)) ||
+      findProxyUrl(proxyStyleNodes.map(n => n.nodeValue)) ||
+      findProxyUrl(styleAttrs.map(a => a.value));
     if (!proxyUrl) {
       logger.log('warning cannot get proxy url !!');
     }
-    cssResources.forEach(r => {
-      logger.log(`mapping proxy url ${proxyUrl} for ${r.url}`);
+    cssBlobs.forEach(r => {
+      logger.log(`mapping proxy url ${proxyUrl} for blob ${r.url}`);
       const newValue = doMapProxyUrls(r.value, proxyUrl);
       r.value = Buffer.from(newValue);
     });
-    styleProxyNodes.forEach(n => {
-      logger.log(`mapping proxy url ${proxyUrl} for style node`);
+    proxyStyleNodes.forEach(n => {
+      logger.log(`mapping proxy url ${proxyUrl} for style element`);
       n.nodeValue = doMapProxyUrls(n.nodeValue, proxyUrl);
+    });
+    styleAttrs.forEach(a => {
+      logger.log(`mapping proxy url ${proxyUrl} for style attribute`);
+      a.value = doMapProxyUrls(a.value, proxyUrl);
     });
   };
 

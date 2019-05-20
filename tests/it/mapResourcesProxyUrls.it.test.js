@@ -24,6 +24,20 @@ describe('mapProxyUrls', () => {
         nodeType: 3,
         nodeValue: '/*hammerhead-BAD-|stylesheet-http://localhost:2020/ftftft/http://dont-map.com',
       },
+      {
+        nodeType: 1,
+        attributes: [
+          {
+            name: 'style',
+            value: 'some some url(http://localhost:2020/ftftft/http://attribute-style.com)',
+            _shouldMap: true,
+          },
+          {
+            name: 'style',
+            value: 'some some url(http://dont-map-me.com)',
+          },
+        ],
+      },
     ],
     blobs: [
       {
@@ -61,6 +75,21 @@ describe('mapProxyUrls', () => {
             nodeType: 2,
             nodeValue: '/*hammerhead|stylesheet-http://localhost:2020/ftftft/http://dont-map.com',
           },
+          {
+            nodeType: 1,
+            attributes: [
+              {
+                name: 'style',
+                value:
+                  'some some url(http://localhost:2020/ftftft/http://attribute-style-in-frame.com)',
+                _shouldMap: true,
+              },
+              {
+                name: 'style',
+                value: 'some some url(http://dont-map-me-in-frame.com)',
+              },
+            ],
+          },
         ],
         blobs: [
           {
@@ -87,20 +116,6 @@ describe('mapProxyUrls', () => {
     assertMapping(actualFrame, frame);
   });
 
-  it('dont throw if no proxy url and no resources for maaping', () => {
-    let err = 'no error';
-    try {
-      mapProxyUrls({
-        cdt: [],
-        frames: [],
-        blobs: [{url: 'hello', type: 'text/something', value: 'http://123.45.21.432:1212/adads'}],
-      });
-    } catch (e) {
-      err = e;
-    }
-    expect(err).to.eq('no error');
-  });
-
   function assertMapping(actualFrame, expectedFrame) {
     expect(actualFrame.blobs.map(b => b.value.toString())).to.deep.eql(
       expectedFrame.blobs.map(b =>
@@ -113,6 +128,18 @@ describe('mapProxyUrls', () => {
       expectedFrame.cdt.map(n =>
         !n._shouldMap ? n.nodeValue : n.nodeValue.replace(/http:\/\/localhost:2020\/ftftft\//g, ''),
       ),
+    );
+    expect(actualFrame.cdt.filter(n => n.attributes).map(n => n.attributes)).to.deep.eql(
+      expectedFrame.cdt
+        .filter(n => n.attributes)
+        .map(n => n.attributes)
+        .map(attributes =>
+          attributes.map(({name, value, _shouldMap}) =>
+            !_shouldMap
+              ? {name, value}
+              : {name, value: value.replace(/http:\/\/localhost:2020\/ftftft\//g, '')},
+          ),
+        ),
     );
     actualFrame.frames.forEach((f, i) => assertMapping(f, expectedFrame.frames[i]));
   }
@@ -130,9 +157,10 @@ describe('mapProxyUrls', () => {
         type,
       }));
     const cpyCdt = cdt =>
-      cdt.map(({nodeType, nodeValue}) => ({
+      cdt.map(({nodeType, nodeValue, attributes}) => ({
         nodeType,
         nodeValue,
+        attributes: (attributes && attributes.map(({name, value}) => ({name, value}))) || undefined,
       }));
     return {
       blobs: cpyBlobs(frame.blobs),
