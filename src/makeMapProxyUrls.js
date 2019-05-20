@@ -29,19 +29,12 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl}) {
     if (!proxyUrl) {
       logger.log('warning cannot get proxy url !!');
     }
-    cssBlobs.forEach(r => {
-      logger.log(`mapping proxy url ${proxyUrl} for blob ${r.url}`);
-      const newValue = doMapProxyUrls(r.value, proxyUrl);
-      r.value = Buffer.from(newValue);
-    });
-    proxyStyleNodes.forEach(n => {
-      logger.log(`mapping proxy url ${proxyUrl} for style element`);
-      n.nodeValue = doMapProxyUrls(n.nodeValue, proxyUrl);
-    });
-    styleAttrs.forEach(a => {
-      logger.log(`mapping proxy url ${proxyUrl} for style attribute`);
-      a.value = doMapProxyUrls(a.value, proxyUrl);
-    });
+    logger.log(`mapping proxy url ${proxyUrl} for ${cssBlobs.length} blobs`);
+    cssBlobs.forEach(r => (r.value = Buffer.from(doMapProxyUrls(r.value, proxyUrl))));
+    logger.log(`mapping proxy url ${proxyUrl} for ${proxyStyleNodes.length} style element`);
+    proxyStyleNodes.forEach(n => (n.nodeValue = doMapProxyUrls(n.nodeValue, proxyUrl)));
+    logger.log(`mapping proxy url ${proxyUrl} for ${styleAttrs.length} style attribute`);
+    styleAttrs.forEach(a => (a.value = doMapProxyUrls(a.value, proxyUrl)));
   };
 
   function findProxyUrl(arr) {

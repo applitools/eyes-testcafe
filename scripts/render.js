@@ -12,6 +12,6 @@ createTestCafe('localhost', 1339)
     return runner
       .src([testPath])
       .browsers(['chrome:headless'])
-      .run({debugMode: process.argv[3] === 'debug'});
+      .run({});
   })
   .finally(() => testcafe.close());
