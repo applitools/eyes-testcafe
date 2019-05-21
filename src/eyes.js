@@ -1,24 +1,24 @@
 'use strict';
 
-const {ConfigUtils, Logger} = require('@applitools/eyes-common');
-const {
-  makeVisualGridClient,
-  configParams: visualGridConfigParams,
-} = require('@applitools/visual-grid-client');
-const {TypeUtils} = require('@applitools/eyes-common');
+const {t} = require('testcafe');
+const {Logger} = require('@applitools/eyes-common');
+const {makeVisualGridClient} = require('@applitools/visual-grid-client');
+const {ArgumentGuard} = require('@applitools/eyes-common');
 const {TestResults} = require('@applitools/eyes-sdk-core');
 const processPageAndSerialize = require('../dist/processPageAndSerialize');
-const {version: packageVersion} = require('../package.json');
 const blobsToResourceContents = require('./blobsToResourceContents');
 const blobsToBuffer = require('./blobsToBuffer');
 const getProxyUrl = require('./getProxyUrl');
 const collectFrameData = require('./collectFrameData');
 const makeMapProxyUrls = require('./makeMapProxyUrls');
 const makeClientFunctionWrapper = require('./makeClientFunctionWrapper');
+const makeHandleResizeTestcafe = require('./makeHandleResizeTestcafe');
+const initDefaultConfig = require('./initDefaultConfig');
+const DEFAULT_VIEWPORT = {width: 1024, height: 768};
 
 class Eyes {
   constructor() {
-    this._defaultConfig = this._initDefaultConfig();
+    this._defaultConfig = initDefaultConfig();
     this._logger = new Logger(this._defaultConfig.showLogs, 'eyes');
     this._logger.log('[constructor] initial config', this._defaultConfig);
 
@@ -28,15 +28,7 @@ class Eyes {
     });
     this._currentBatch = null;
     this._closedBatches = [];
-
-    this._clientFunctionWrapper = makeClientFunctionWrapper({
-      logger: this._logger.extend('clientFunctionWrapper'),
-    });
-    this._mapProxyUrls = makeMapProxyUrls({
-      collectFrameData,
-      getProxyUrl,
-      logger: this._logger.extend('mapProxyUrls'),
-    });
+    this._makeFunctions();
   }
 
   async open(args) {
@@ -74,8 +66,6 @@ class Eyes {
   }
 
   async waitForResults(rejectOnErrors = true) {
-    // TODO - name of rejectOnErrors
-    // TOOD add readme
     this._logger.log('[waitForResults] called by user');
     await this._assertClosed('waitForResults');
     let batchesResults = await Promise.all(this._closedBatches.map(b => b.closePromise));
@@ -88,8 +78,6 @@ class Eyes {
   }
 
   async _processPage() {
-    // TODO - processPageAndSeralze should get a css mapper so
-    // the proxy fix can be done while downloading the resources
     if (!this._processPageClientFunction) {
       this._processPageClientFunction = await this._clientFunctionWrapper(processPageAndSerialize);
     }
@@ -97,8 +85,7 @@ class Eyes {
   }
 
   async _openBatch(args) {
-    // TOOD validate args like testName
-    this._assertCanOpen();
+    this._assertCanOpen(args);
     const batchInfo = this._initBatchInfo({
       isBatchStarted: true,
       isDisabled: this._defaultConfig['isDisabled'] || args.isDisabled,
@@ -108,7 +95,8 @@ class Eyes {
       this._logger.log('[_openBatch] skipping open since eyes is disabled');
       return;
     }
-    // TODO - we can set testcafe viewport size here
+
+    await this._handleResizeTestcafe(args.browser);
     this._logger.log(`[_openBatch] opening with' ${JSON.stringify(batchInfo.config)}`);
     batchInfo.eyes = await this._client.openEyes(batchInfo.config);
     return batchInfo;
@@ -123,11 +111,28 @@ class Eyes {
     }
   }
 
+  _makeFunctions() {
+    this._clientFunctionWrapper = makeClientFunctionWrapper({
+      logger: this._logger.extend('clientFunctionWrapper'),
+    });
+    this._mapProxyUrls = makeMapProxyUrls({
+      collectFrameData,
+      getProxyUrl,
+      logger: this._logger.extend('mapProxyUrls'),
+    });
+    this._handleResizeTestcafe = makeHandleResizeTestcafe({
+      defaultViewport: DEFAULT_VIEWPORT,
+      logger: this._logger.extend('handleResizeTestcafe'),
+      t,
+    });
+  }
+
   _currentTestName() {
     return this._currentBatch && this._currentBatch.config.testName;
   }
 
   _assertCanOpen(args) {
+    ArgumentGuard.isString(args.testName, 'testName', false);
     if (this._defaultConfig['eyesIsDisabled'] && args.isDisabled === false) {
       throw new Error(
         `Eyes is globaly disabled (via APPLITOOLS_IS_DISABLED or with applitools.config.js), ` +
@@ -179,27 +184,6 @@ class Eyes {
       },
       ...info,
     };
-  }
-
-  // TODO - take what u can to another file for tests
-  _initDefaultConfig() {
-    // TODO - config params
-    const testcafeConfigParams = [
-      /* 'tapDirPath', 'failTestcafeOnDiff' */
-    ];
-    // TODO add 'eyesTimeout' to configParams ? like cypress wait for end dont we have this in VGC ?
-    const calculatedConfig = ConfigUtils.getConfig({
-      configParams: [...visualGridConfigParams, ...testcafeConfigParams],
-    });
-    const defaultConfig = {agentId: `eyes-testcafe/${packageVersion}`}; // TODO - concurrency ok ?
-    const configResult = {...defaultConfig, ...calculatedConfig};
-    if (configResult.failTestcafeOnDiff === '0') {
-      configResult.failTestcafeOnDiff = false;
-    }
-    if (TypeUtils.isString(configResult.showLogs)) {
-      configResult.showLogs = configResult.showLogs === 'true' || configResult.showLogs === '1';
-    }
-    return configResult;
   }
 }
 
