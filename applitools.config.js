@@ -3,7 +3,6 @@ module.exports = {
   isDisabled: false,
   // showLogs: true,
   // eyesTimeout: 1234,
-  // failCypressOnDiff: true,
   // tapDirPath: './',
   // browser: [{name: 'firefox'}],
 };
