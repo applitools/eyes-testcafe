@@ -20,7 +20,6 @@ class Eyes {
   constructor() {
     this._defaultConfig = this._initDefaultConfig();
     this._logger = new Logger(this._defaultConfig.showLogs, 'eyes');
-    this._apiLogger = this._logger.extend('api');
     this._logger.log('[constructor] initial config', this._defaultConfig);
 
     this._client = makeVisualGridClient({
@@ -41,13 +40,13 @@ class Eyes {
   }
 
   async open(args) {
-    this._apiLogger.log('[open] called by user');
+    this._logger.log('[open] called by user');
     await this._assertClosed('open');
     this._currentBatch = await this._openBatch(args);
   }
 
   async close() {
-    this._apiLogger.log('[close] called by user');
+    this._logger.log('[close] called by user');
     if (this._shouldIgnore('close')) {
       return;
     }
@@ -58,7 +57,7 @@ class Eyes {
   }
 
   async checkWindow(args) {
-    this._apiLogger.log('[checkWindow] called by user');
+    this._logger.log('[checkWindow] called by user');
     if (this._shouldIgnore('checkWindow')) {
       return;
     }
@@ -77,7 +76,7 @@ class Eyes {
   async waitForResults(rejectOnErrors = true) {
     // TODO - name of rejectOnErrors
     // TOOD add readme
-    this._apiLogger.log('[waitForResults] called by user');
+    this._logger.log('[waitForResults] called by user');
     await this._assertClosed('waitForResults');
     let batchesResults = await Promise.all(this._closedBatches.map(b => b.closePromise));
     batchesResults = batchesResults.map(this._removeTestResultsIfError);
