@@ -1,7 +1,6 @@
 'use strict';
 
 const {ClientFunction} = require('testcafe');
-const {Logger} = require('@applitools/eyes-common');
 const EYES_NAME_SPACE = '__EYES__APPLITOOLS__';
 const MAX_OBJECT_SIZE = 1024 * 1024 * 4.0; // 4 MB
 
@@ -15,8 +14,8 @@ function makeClientFunctionWrapper({
   parseResult = JSON.parse,
   maxObjectSize = MAX_OBJECT_SIZE,
   window,
+  logger,
 }) {
-  const logger = new Logger(false, 'testcafe:clientFunctionWrapper');
   return async function(browserFunction, dependencies = {}) {
     const getResultSize = clientFunctionExecuter(
       () =>

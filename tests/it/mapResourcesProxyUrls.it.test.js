@@ -5,7 +5,7 @@ const {expect} = require('chai');
 const getProxyUrl = require('../../src/getProxyUrl');
 const collectFrameData = require('../../src/collectFrameData');
 const makeMapProxyUrls = require('../../src/makeMapProxyUrls');
-const mapProxyUrls = makeMapProxyUrls({collectFrameData, getProxyUrl});
+const mapProxyUrls = makeMapProxyUrls({collectFrameData, getProxyUrl, logger: console});
 
 describe('mapProxyUrls', () => {
   const frame = {

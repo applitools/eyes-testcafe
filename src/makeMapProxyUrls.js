@@ -1,10 +1,7 @@
 'use strict';
-const {Logger} = require('@applitools/eyes-common');
-const logger = new Logger(false, 'testcafe:mapResourcesProxyUrls');
 
-function makeMapProxyUrls({collectFrameData, getProxyUrl}) {
+function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
   return function(frame) {
-    logger.log(JSON.stringify(frame));
     const cssBlobs = collectFrameData({
       frame,
       predicate: r => r.type.trimStart().startsWith('text/css'),
@@ -30,6 +27,7 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl}) {
     if (!proxyUrl) {
       logger.log('warning cannot get proxy url !!');
     }
+
     logger.log(`mapping proxy url ${proxyUrl} for ${cssBlobs.length} blobs`);
     cssBlobs.forEach(r => (r.value = Buffer.from(doMapProxyUrls(r.value, proxyUrl))));
     logger.log(`mapping proxy url ${proxyUrl} for ${proxyStyleNodes.length} style element`);

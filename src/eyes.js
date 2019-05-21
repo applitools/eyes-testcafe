@@ -15,19 +15,27 @@ const getProxyUrl = require('./getProxyUrl');
 const collectFrameData = require('./collectFrameData');
 const makeMapProxyUrls = require('./makeMapProxyUrls');
 const makeClientFunctionWrapper = require('./makeClientFunctionWrapper');
-const clientFunctionWrapper = makeClientFunctionWrapper({});
-const mapProxyUrls = makeMapProxyUrls({collectFrameData, getProxyUrl});
 
 class Eyes {
   constructor() {
     this._defaultConfig = this._initDefaultConfig();
-    // TODO - add showLogs config, need then to pass this logger to clientFunctionWrapper
-    this._logger = new Logger(false, 'testcafe:instance');
-    this._defaultConfig.apiKey = 'xHXr731030WHHgsnLujyAyH7gdVreHX1vz8lPLQHEoLFI110'; // TOOD - remove
-    this._client = makeVisualGridClient(this._defaultConfig);
+    this._logger = new Logger(this._defaultConfig.showLogs, 'eyes');
+    this._client = makeVisualGridClient({
+      logger: this._logger.extend('vgc'),
+      ...this._defaultConfig,
+    });
     this._logger.log('[constructor] initial config', this._defaultConfig);
     this._currentBatch = null;
     this._closedBatches = [];
+
+    this._clientFunctionWrapper = makeClientFunctionWrapper({
+      logger: this._logger.extend('clientFunctionWrapper'),
+    });
+    this._mapProxyUrls = makeMapProxyUrls({
+      collectFrameData,
+      getProxyUrl,
+      logger: this._logger.extend('mapProxyUrls'),
+    });
   }
 
   async open(args) {
@@ -52,7 +60,7 @@ class Eyes {
 
     let result = await this._processPage();
     blobsToBuffer(result);
-    mapProxyUrls(result);
+    this._mapProxyUrls(result);
     blobsToResourceContents(result);
 
     this._logger.log(
@@ -78,7 +86,7 @@ class Eyes {
     // TODO - processPageAndSeralze should get a css mapper so
     // the proxy fix can be done while downloading the resources
     if (!this._processPageClientFunction) {
-      this._processPageClientFunction = await clientFunctionWrapper(processPageAndSerialize);
+      this._processPageClientFunction = await this._clientFunctionWrapper(processPageAndSerialize);
     }
     return await this._processPageClientFunction();
   }
@@ -172,7 +180,6 @@ class Eyes {
   _initDefaultConfig() {
     // TODO - config params
     const testcafeConfigParams = [
-      'saveCdt',
       /* 'tapDirPath', 'failTestcafeOnDiff' */
     ];
     // TODO add 'eyesTimeout' to configParams ? like cypress wait for end dont we have this in VGC ?
