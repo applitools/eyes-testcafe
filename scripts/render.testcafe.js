@@ -1,4 +1,4 @@
-/* global fixture, test */
+/* global fixture, test, location */
 import Eyes from '../src/eyes';
 const eyes = new Eyes();
 
@@ -29,6 +29,7 @@ fixture`TestCafeRender`
 
 test('Testcafe Eyes Render', async t => {
   await t.resizeWindow(1024, 768);
+  await t.eval(() => location.reload(true));
   await new Promise(r => setTimeout(r, 1000));
   await eyes.open({appName: 'TestCafeRender', testName: `Testcafe Render ${url}`});
   await eyes.checkWindow({tag: 'page loaded'});
