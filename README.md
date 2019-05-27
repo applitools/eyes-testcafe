@@ -260,7 +260,7 @@ The default level of concurrency for free accounts is `1`. This means that visua
 If your account does support a higher level of concurrency, it's possible to pass a different value by specifying it in the property `concurrency` in the applitools.config.js file (see [Advanced configuration](#advanced-configuration) section below).
 
 If you are interested in speeding up your visual tests, contact sdr@applitools.com to get a trial account and faster tests with more concurrency.
-
+___
 ## Advanced configuration
 
 There are 3 ways to specify test configuration:
