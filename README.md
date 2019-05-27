@@ -4,15 +4,13 @@ Applitools Eyes SDK for [Testcafe](https://devexpress.github.io/testcafe/).
 
 ## Installation
 
-### Install npm package
-
 Install Eyes-Testcafe as a local dev dependency in your tested project:
 
 ```bash
 npm i -D @applitools/eyes-testcafe
 ```
 
-### Applitools API key
+## Applitools API key
 
 In order to authenticate via the Applitools server, you need to supply the Eyes-Testcafe SDK with the API key you got from Applitools. Read more about how to obtain the API key [here](https://applitools.com/docs/topics/overview/obtain-api-key.html).
 
@@ -54,42 +52,14 @@ const eyes = new Eyes();
 
 fixture`Hello world`
   .page('https://applitools.com/helloworld')
-  .after(async () => eyes.waitForResults());
+  .afterEach(async () => eyes.close());
+  .after(async () => eyes.waitForResults())
   
 test('Cookies', async t => {
   await eyes.open({
       appName: 'Hello World!',
       testName: 'My first JavaScript test!',
-      browser: { width: 800, height: 600 }
-  });
-  await eyes.checkWindow('Main Page');
-  await t.click('button')
-  await eyes.checkWindow('Click!');
-  await eyes.close()
-});
-```
-
-### Best practice for using the SDK
-
-Every call to `eyes.open` and `eyes.close` defines a test in Applitool Eyes, and all the calls to `eyes.checkWindow` between them are called "steps". In order to get a test structure in Applitools that corresponds to the test structure in Testcafe, it's best to open/close tests in every `test` call. This can be done with `afterEach` function that Testcafe provides.
-
-Also note that after all tests are done you should call eyes.waitForResults, this is is done for two reasons:
-1. to signal testcafe to wait untill all the tests have been completed.
-2. to obtain test results if needed.
-
-After adjusting the example above, this becomes:
-
-```js
-fixture`Hello world`
-  .page('https://applitools.com/helloworld')
-  .afterEach(async () => await eyes.close())
-  .after(async () => eyes.waitForResults());
-  
-test('Cookies', async t => {
-  await eyes.open({
-      appName: 'Hello World!',
-      testName: 'My first JavaScript test!',
-      browser: { width: 800, height: 600 }
+      browser: [{ width: 800, height: 600, name: 'firefox' }]
   });
   await eyes.checkWindow('Main Page');
   await t.click('button')
@@ -97,11 +67,9 @@ test('Cookies', async t => {
 });
 ```
 
-Applitools will take screenshots and perform the visual comparisons in the background. Performance of the tests will not be affected during the test run, but there will be a small phase at the end of the test run that waits for visual tests to end.
+# API
 
-### API
-
-#### Open
+## Open
 
 Create an Applitools test.
 This will start a session with the Applitools server.
@@ -115,7 +83,7 @@ eyes.open({
 
 It's possible to pass a config object to `open` with all the possible configuration properties. Read the [Advanced configuration](#advanced-configuration) section for a detailed description.
 
-#### Check window
+## Check window
 
 Generate a screenshot of the current page and add it to the Applitools Test.
 
@@ -236,7 +204,7 @@ eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
     eyes.checkWindow({sendDom: false})
     ```
 
-#### Close
+## Close
 
 Close the applitools test and check that all screenshots are valid.
 
@@ -248,7 +216,7 @@ Close receives no arguments.
 cy.eyesClose();
 ```
 
-#### waitForResults
+## waitForResults
 Wait untill all tests in the fixture are completed and return their results.
 Note that if you don't wait for the tests to be completed then in case of a visual test failure, eyes cannot fail the fixture.
 * it is recommended to wait for the resulsts in the tescafe `after()` hook. 
@@ -265,7 +233,25 @@ In case of a general `Error` reject with the `Error`.
 
 In case all the tests passed then waitForResults resolves with the test results.
 <!-- resolves with an Array, each element in the array represents a test (testcafe test, i.e. open checkWindow and close) and is an Array of TestResulst. Each TestResulst is a visual test environement. -->
+___
 
+## Best practice for using the SDK
+
+Every call to `eyes.open` and `eyes.close` defines a test in Applitool Eyes, and all the calls to `eyes.checkWindow` between them are called "steps". In order to get a test structure in Applitools that corresponds to the test structure in Testcafe, it's best to open/close tests in every `test` call. **You can use `afterEach` for calling `eyes.close()`**
+
+Also note that after all tests are done you should call eyes.waitForResults, **you can use `aftre()` for calling `eyes.waitForResults`**, this is is done for two reasons:
+1. to signal testcafe to wait untill all the tests have been completed.
+2. to obtain test results if needed.
+
+```js
+fixture`Hello world`
+  .page('https://applitools.com/helloworld')
+  .afterEach(async () => eyes.close());
+  .after(async () => eyes.waitForResults())
+```
+
+Applitools will take screenshots and perform the visual comparisons in the background. Performance of the tests will not be affected during the test run, but there will be a small phase at the end of the test run that waits for visual tests to end.
+___
 ## Concurrency
 
 
@@ -303,6 +289,7 @@ Here are the available configuration properties:
 | `compareWithParentBranch` | false                       |  |
 | `ignoreBaseline`          | false                       |  |
 
+<br/><br/>
 The following configuration properties cannot be defined using the first method of passing them to `eyes.open`. They should be defined either in the `applitools.config.js` file or as environment variables.
 
 | Property name             | Default value               | Description   |
@@ -425,7 +412,7 @@ eyes.open({
   }
 }
 ```
-
+___
 ## Troubleshooting
 
 * If issues occur, DEBUG_SAVE=1 env variable can be set to save helpful information. The information will be saved under a folder named `.debug` in the current working directory. This could be then used for getting support on your issue.
