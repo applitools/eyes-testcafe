@@ -255,6 +255,8 @@ fixture`Hello world`
 
 Applitools will take screenshots and perform the visual comparisons in the background. Performance of the tests will not be affected during the test run, but there will be a small phase at the end of the test run that waits for visual tests to end.
 ___
+<br/>
+
 ## Concurrency
 
 
@@ -263,6 +265,8 @@ If your account does support a higher level of concurrency, it's possible to pas
 
 If you are interested in speeding up your visual tests, contact sdr@applitools.com to get a trial account and faster tests with more concurrency.
 ___
+<br/>
+
 ## Advanced configuration
 
 There are 3 ways to specify test configuration:
@@ -291,8 +295,8 @@ Here are the available configuration properties:
 | `properties`              | undefined                   | Custom properties for the eyes test. The format is an array of objects with name/value properties. For example: `[{name: 'My prop', value:'My value'}]`. |
 | `compareWithParentBranch` | false                       |  |
 | `ignoreBaseline`          | false                       |  |
+<br/>
 
-<br/><br/>
 The following configuration properties cannot be defined using the first method of passing them to `eyes.open`. They should be defined either in the `applitools.config.js` file or as environment variables.
 
 | Property name             | Default value               | Description   |
