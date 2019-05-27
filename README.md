@@ -235,6 +235,7 @@ In case all the tests passed then waitForResults resolves with the test results.
 <!-- resolves with an Array, each element in the array represents a test (testcafe test, i.e. open checkWindow and close) and is an Array of TestResulst. Each TestResulst is a visual test environement. -->
 ___
 
+<br/><br/>
 ## Best practice for using the SDK
 
 Every call to `eyes.open` and `eyes.close` defines a test in Applitool Eyes, and all the calls to `eyes.checkWindow` between them are called "steps". In order to get a test structure in Applitools that corresponds to the test structure in Testcafe, it's best to open/close tests in every `test` call. **You can use `afterEach` for calling `eyes.close()`**
