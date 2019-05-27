@@ -6,13 +6,16 @@ const {configParams: visualGridConfigParams} = require('@applitools/visual-grid-
 const {TypeUtils} = require('@applitools/eyes-common');
 
 function initDefaultConfig(configPath = undefined) {
-  const testcafeConfigParams = ['tapDirPath', 'failTestcafeOnDiff']; // TODO
-  // TODO add 'eyesTimeout' to configParams ? like cypress wait for end dont we have this in VGC ?
+  const testcafeConfigParams = ['tapDirPath', 'failTestcafeOnDiff'];
   const calculatedConfig = ConfigUtils.getConfig({
     configParams: [...visualGridConfigParams, ...testcafeConfigParams],
     configPath,
   });
-  const defaultConfig = {agentId: `eyes-testcafe/${packageVersion}`};
+  const defaultConfig = {
+    agentId: `eyes-testcafe/${packageVersion}`,
+    failTestcafeOnDiff: true,
+    concurrency: 1,
+  };
   const configResult = {...defaultConfig, ...calculatedConfig};
   if (configResult.failTestcafeOnDiff === '0') {
     configResult.failTestcafeOnDiff = false;

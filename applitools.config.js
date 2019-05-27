@@ -4,5 +4,4 @@ module.exports = {
   // showLogs: true,
   // eyesTimeout: 1234,
   // tapDirPath: './',
-  // browser: [{name: 'firefox'}],
 };

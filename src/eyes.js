@@ -13,6 +13,7 @@ const collectFrameData = require('./collectFrameData');
 const makeMapProxyUrls = require('./makeMapProxyUrls');
 const makeClientFunctionWrapper = require('./makeClientFunctionWrapper');
 const makeHandleResizeTestcafe = require('./makeHandleResizeTestcafe');
+const handleBatchResultsFile = require('./handleBatchResultsFile');
 const initDefaultConfig = require('./initDefaultConfig');
 const DEFAULT_VIEWPORT = {width: 1024, height: 768};
 
@@ -26,15 +27,16 @@ class Eyes {
       logger: this._logger.extend('vgc'),
       ...this._defaultConfig,
     });
-    this._currentBatch = null;
-    this._closedBatches = [];
+    this._currentTest = null;
+    this._closedTesst = [];
     this._makeFunctions();
   }
 
   async open(args) {
     this._logger.log('[open] called by user');
     await this._assertClosed('open');
-    this._currentBatch = await this._openBatch(args);
+    await this._handleResizeTestcafe(args.browser);
+    this._currentTest = await this._openTest(args);
   }
 
   async close() {
@@ -42,9 +44,9 @@ class Eyes {
     if (this._shouldIgnore('close')) {
       return;
     }
-    this._closeBatch();
-    this._closedBatches.push(this._currentBatch);
-    this._currentBatch = null;
+    this._closeTest();
+    this._closedTesst.push(this._currentTest);
+    this._currentTest = null;
     return Promise.resolve();
   }
 
@@ -62,19 +64,21 @@ class Eyes {
     this._logger.log(
       `[checkWindow] checking for test '${this._currentTestName()}' with ${JSON.stringify(args)}`,
     );
-    return this._currentBatch.eyes.checkWindow({...result, ...args});
+    return this._currentTest.eyes.checkWindow({...result, ...args});
   }
 
   async waitForResults(rejectOnErrors = true) {
     this._logger.log('[waitForResults] called by user');
     await this._assertClosed('waitForResults');
-    let batchesResults = await Promise.all(this._closedBatches.map(b => b.closePromise));
-    batchesResults = batchesResults.map(this._removeTestResultsIfError);
+    let results = await Promise.all(this._closedTesst.map(b => b.closePromise));
+    results = results.map(this._removeTestResultsIfError);
+    await handleBatchResultsFile({results, tapDirPath: this._defaultConfig.tapDirPath});
+
     const settle =
-      rejectOnErrors && this._shouldRejectBatches(batchesResults)
+      rejectOnErrors && this._shouldRejectTests(results)
         ? Promise.reject.bind(Promise)
         : Promise.resolve.bind(Promise);
-    return settle(batchesResults);
+    return settle(results);
   }
 
   async _processPage() {
@@ -84,26 +88,25 @@ class Eyes {
     return await this._processPageClientFunction();
   }
 
-  async _openBatch(args) {
+  async _openTest(args) {
     this._assertCanOpen(args);
-    const batchInfo = this._initBatchInfo({
-      isBatchStarted: true,
-      isDisabled: this._defaultConfig['isDisabled'] || args.isDisabled,
+    const testInfo = this._initTestInfo({
+      isTestStarted: true,
+      isDisabled: this._defaultConfig.isDisabled || args.isDisabled,
       config: {...this._defaultConfig, ...args},
     });
-    if (batchInfo.isDisabled) {
-      this._logger.log('[_openBatch] skipping open since eyes is disabled');
+    if (testInfo.isDisabled) {
+      this._logger.log('[_openTest] skipping open since eyes is disabled');
       return;
     }
 
-    await this._handleResizeTestcafe(args.browser);
-    this._logger.log(`[_openBatch] opening with' ${JSON.stringify(batchInfo.config)}`);
-    batchInfo.eyes = await this._client.openEyes(batchInfo.config);
-    return batchInfo;
+    this._logger.log(`[_openTest] opening with' ${JSON.stringify(testInfo.config)}`);
+    testInfo.eyes = await this._client.openEyes(testInfo.config);
+    return testInfo;
   }
 
   async _assertClosed(functionName) {
-    if (this._currentBatch) {
+    if (this._currentTest) {
       this._logger.log(
         `[${functionName}] test '${this._currentTestName()}' is not closed, closing it first.`,
       );
@@ -128,12 +131,12 @@ class Eyes {
   }
 
   _currentTestName() {
-    return this._currentBatch && this._currentBatch.config.testName;
+    return this._currentTest && this._currentTest.config.testName;
   }
 
   _assertCanOpen(args) {
     ArgumentGuard.isString(args.testName, 'testName', false);
-    if (this._defaultConfig['eyesIsDisabled'] && args.isDisabled === false) {
+    if (this._defaultConfig.eyesIsDisabled && args.isDisabled === false) {
       throw new Error(
         `Eyes is globaly disabled (via APPLITOOLS_IS_DISABLED or with applitools.config.js), ` +
           `but the test was set with isDisabled false. ` +
@@ -143,40 +146,43 @@ class Eyes {
     }
   }
 
-  _shouldRejectBatches(batchesResults) {
-    return batchesResults.some(batchResult =>
-      batchResult.some(r => !(r instanceof TestResults) || r.getStatus() !== 'Passed'),
+  _shouldRejectTests(testsResults) {
+    return (
+      this._defaultConfig.failTestcafeOnDiff &&
+      testsResults.some(testResult =>
+        testResult.some(r => !(r instanceof TestResults) || r.getStatus() !== 'Passed'),
+      )
     );
   }
 
-  _removeTestResultsIfError(batchResult) {
-    const e = batchResult.find(r => !(r instanceof TestResults));
-    return e ? [e] : batchResult;
+  _removeTestResultsIfError(testResult) {
+    const e = testResult.find(r => !(r instanceof TestResults));
+    return e ? [e] : testResult;
   }
 
-  _closeBatch() {
-    if (!this._currentBatch) {
-      return this._logger.log('[_closeBatch] closed when no current test, ignoreing.');
+  _closeTest() {
+    if (!this._currentTest) {
+      return this._logger.log('[_closeTest] closed when no current test, ignoreing.');
     }
-    const closePromise = this._currentBatch.eyes.close(false);
-    this._currentBatch.closePromise = closePromise;
+    const closePromise = this._currentTest.eyes.close(false);
+    this._currentTest.closePromise = closePromise;
   }
 
   _shouldIgnore(methodName) {
-    if (!this._currentBatch) {
+    if (!this._currentTest) {
       this._logger.log(`[${methodName}] closed when no current test, ignoring.`);
       return true;
     }
-    if (this._currentBatch.isDisabled) {
+    if (this._currentTest.isDisabled) {
       this._logger.log(`[${methodName}] eyes is disabled, ignoring.`);
       return true;
     }
   }
 
-  _initBatchInfo(info) {
+  _initTestInfo(info) {
     return {
       ...{
-        isBatchStarted: false,
+        isTestStarted: false,
         isDisabled: false,
         config: null,
         eyes: null,
