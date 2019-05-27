@@ -69,7 +69,7 @@ test('Cookies', async t => {
 
 # API
 
-### **Open**
+### **open**
 
 Create an Applitools test.
 This will start a session with the Applitools server.
@@ -83,7 +83,7 @@ eyes.open({
 
 It's possible to pass a config object to `open` with all the possible configuration properties. Read the [Advanced configuration](#advanced-configuration) section for a detailed description.
 
-### **Check window**
+### **checkWindow**
 
 Generate a screenshot of the current page and add it to the Applitools Test.
 
@@ -204,7 +204,7 @@ eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
     eyes.checkWindow({sendDom: false})
     ```
 
-### **Close**
+### **close**
 
 Close the applitools test and check that all screenshots are valid.
 
