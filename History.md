@@ -1,4 +1,11 @@
 
+v1.0.3 / 2019-05-27
+===================
+
+* 1.0.3 [[6411eeb](/commit/6411eebd1f039b1f306762a75e4b9cb7dde5f5aa)]
+* passing t in open for resize Window & clientFunction [[6fb1f79](/commit/6fb1f79d703dc45b6cac993129bfec00e244a5dc)]
+* changelog [[639371b](/commit/639371b6eca92b03566c82a9af2254bc569791a1)]
+
 v1.0.2 / 2019-05-27
 ===================
 
