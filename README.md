@@ -363,6 +363,7 @@ module.exports = {
   // all other configuration variables apply
 }
 ```
+<br/>
 
 ## Configuring the browser
 
