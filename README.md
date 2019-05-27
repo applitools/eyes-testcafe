@@ -69,7 +69,7 @@ test('Cookies', async t => {
 
 # API
 
-## Open
+### **Open**
 
 Create an Applitools test.
 This will start a session with the Applitools server.
@@ -83,7 +83,7 @@ eyes.open({
 
 It's possible to pass a config object to `open` with all the possible configuration properties. Read the [Advanced configuration](#advanced-configuration) section for a detailed description.
 
-## Check window
+### **Check window**
 
 Generate a screenshot of the current page and add it to the Applitools Test.
 
@@ -204,7 +204,7 @@ eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
     eyes.checkWindow({sendDom: false})
     ```
 
-## Close
+### **Close**
 
 Close the applitools test and check that all screenshots are valid.
 
@@ -216,7 +216,7 @@ Close receives no arguments.
 cy.eyesClose();
 ```
 
-## waitForResults
+### **waitForResults**
 Wait untill all tests in the fixture are completed and return their results.
 Note that if you don't wait for the tests to be completed then in case of a visual test failure, eyes cannot fail the fixture.
 * it is recommended to wait for the resulsts in the tescafe `after()` hook. 
