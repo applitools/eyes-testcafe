@@ -1,6 +1,6 @@
 {
   "name": "eyes-testcafe",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Eyes Testcafe SDK",
   "main": "index.js",
   "scripts": {
