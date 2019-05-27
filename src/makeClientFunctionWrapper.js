@@ -37,15 +37,17 @@ function makeClientFunctionWrapper({
       {dependencies: {EYES_NAME_SPACE: EYES_NAME_SPACE}},
     );
 
-    return async () => {
-      const size = await getResultSize();
+    return async t => {
+      const getResultSizeWithT = getResultSize.with({boundTestRun: t});
+      const getResultWithT = getResult.with({boundTestRun: t});
+      const size = await getResultSizeWithT();
       const splits = Math.ceil(size / maxObjectSize);
       logger.log(`starting to collect ClientFunction result of size ${size}`);
       let result = '';
       for (let i = 0; i < splits; i++) {
         const start = i * maxObjectSize;
         logger.log(`getting ClientFunction result chunk ${i + 1} of ${splits}`);
-        result += await getResult(start, start + maxObjectSize);
+        result += await getResultWithT(start, start + maxObjectSize);
       }
       return parseResult(result);
     };

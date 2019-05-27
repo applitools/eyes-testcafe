@@ -1,6 +1,5 @@
 'use strict';
 
-const {t} = require('testcafe');
 const {Logger} = require('@applitools/eyes-common');
 const {makeVisualGridClient} = require('@applitools/visual-grid-client');
 const {ArgumentGuard} = require('@applitools/eyes-common');
@@ -34,8 +33,9 @@ class Eyes {
 
   async open(args) {
     this._logger.log('[open] called by user');
+    this._assertCanOpen(args);
     await this._assertClosed('open');
-    await this._handleResizeTestcafe(args.browser);
+    await this._handleResizeTestcafe(args.browser, args.t);
     this._currentTest = await this._openTest(args);
   }
 
@@ -56,7 +56,7 @@ class Eyes {
       return;
     }
 
-    let result = await this._processPage();
+    let result = await this._processPage(this._currentTest.t);
     blobsToBuffer(result);
     this._mapProxyUrls(result);
     blobsToResourceContents(result);
@@ -81,26 +81,28 @@ class Eyes {
     return settle(results);
   }
 
-  async _processPage() {
+  async _processPage(t) {
     if (!this._processPageClientFunction) {
       this._processPageClientFunction = await this._clientFunctionWrapper(processPageAndSerialize);
     }
-    return await this._processPageClientFunction();
+    return await this._processPageClientFunction(t);
   }
 
   async _openTest(args) {
-    this._assertCanOpen(args);
     const testInfo = this._initTestInfo({
       isTestStarted: true,
       isDisabled: this._defaultConfig.isDisabled || args.isDisabled,
       config: {...this._defaultConfig, ...args},
+      t: args.t,
     });
     if (testInfo.isDisabled) {
       this._logger.log('[_openTest] skipping open since eyes is disabled');
       return;
     }
 
-    this._logger.log(`[_openTest] opening with' ${JSON.stringify(testInfo.config)}`);
+    const stringableConfig = {...testInfo.config};
+    delete stringableConfig.t;
+    this._logger.log(`[_openTest] opening with' ${JSON.stringify(stringableConfig)}`);
     testInfo.eyes = await this._client.openEyes(testInfo.config);
     return testInfo;
   }
@@ -126,7 +128,6 @@ class Eyes {
     this._handleResizeTestcafe = makeHandleResizeTestcafe({
       defaultViewport: DEFAULT_VIEWPORT,
       logger: this._logger.extend('handleResizeTestcafe'),
-      t,
     });
   }
 
@@ -136,6 +137,9 @@ class Eyes {
 
   _assertCanOpen(args) {
     ArgumentGuard.isString(args.testName, 'testName', false);
+    if (!args.t || !args.t.resizeWindow) {
+      throw new Error('eyes.open() was called without test contorller "t".');
+    }
     if (this._defaultConfig.eyesIsDisabled && args.isDisabled === false) {
       throw new Error(
         `Eyes is globaly disabled (via APPLITOOLS_IS_DISABLED or with applitools.config.js), ` +

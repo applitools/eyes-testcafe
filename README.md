@@ -47,7 +47,7 @@ After defining the API key, you will be able to use commands from Eyes-Testcafe 
 ### Example
 
 ```js
-import Eyes from '../src/eyes';
+import Eyes from '@applitools/eyes';
 const eyes = new Eyes();
 
 fixture`Hello world`
@@ -59,7 +59,8 @@ test('Cookies', async t => {
   await eyes.open({
       appName: 'Hello World!',
       testName: 'My first JavaScript test!',
-      browser: [{ width: 800, height: 600, name: 'firefox' }]
+      browser: [{ width: 800, height: 600, name: 'firefox' }],
+      t
   });
   await eyes.checkWindow('Main Page');
   await t.click('button')
@@ -77,7 +78,8 @@ This will start a session with the Applitools server.
 ```js
 eyes.open({
   appName: '',
-  testName: ''
+  testName: '',
+  t
 });
 ```
 
@@ -213,7 +215,7 @@ It is important to call this at the end of each test, symmetrically to `open`(or
 Close receives no arguments.
 
 ```js
-cy.eyesClose();
+eyes.close();
 ```
 
 ### **waitForResults**
@@ -299,7 +301,7 @@ The following configuration properties cannot be defined using the first method 
 | `showLogs`                | false                       | Whether or not you want to see logs. Logs are written to the same output of the Testcafe process. <br/><br/>_Note that you can also use [DEBUG=eyes*](https://github.com/visionmedia/debug) for debugging._|
 | `serverUrl`               | Default Eyes server URL     | The URL of Eyes server |
 | `proxy`                   | undefined                   | Sets the proxy settings to be used in network requests to Eyes server. This can be either a string to the proxy URI, or an object containing the URI, username and password.<br/><br/>For example:<br/>`{uri: 'https://myproxy', username: 'my_user', password: 'my_password'}`|
-| `isDisabled`              | false                       | If true, all calls to Eyes-Cypress commands will be silently ignored. |
+| `isDisabled`              | false                       | If true, all api calls to Eyes-Testcafe are ignored. |
 | `failTestcafeOnDiff`       | true                        | If true, then the Testcafe test fails if an eyes visual test fails. If false and an eyes test fails, then the Testcafe test does not fail. 
 | `tapDirPath`              | undefined                   | Directory path of a results file. If set, then a [TAP](https://en.wikipedia.org/wiki/Test_Anything_Protocol#Specification) file is created in this directory, the tap file name is created with the name eyes-[\<ISO-DATE\>](https://en.wikipedia.org/wiki/ISO_8601)\.tap and contains the Eyes test results <br><br/> _Note that results are scoped per spec file, this means that the results file is created once for each fixture file)._|
 | `concurrency`             | 1                           | The maximum number of tests that can run concurrently. The default value is the allowed amount for free accounts. For paid accounts, set this number to the quota set for your account. |

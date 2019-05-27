@@ -12,7 +12,7 @@ describe('initDefaultConfig', () => {
       (width = w), (height = h);
     },
   };
-  const handleResizeTestcafe = makeHandleResizeTestcafe({logger: console, t, defaultViewport});
+  const handleResizeTestcafe = makeHandleResizeTestcafe({logger: console, defaultViewport});
 
   afterEach(() => {
     width = undefined;
@@ -21,7 +21,7 @@ describe('initDefaultConfig', () => {
 
   it('works', async () => {
     const browser = [{height: 789, width: 888, name: 'firefox'}];
-    await handleResizeTestcafe(browser);
+    await handleResizeTestcafe(browser, t);
     expect(width).to.eq(888);
     expect(height).to.eq(789);
   });
@@ -31,20 +31,20 @@ describe('initDefaultConfig', () => {
       {height: 789, width: 888, name: 'firefox'},
       {height: 555, width: 444, name: 'firefox'},
     ];
-    await handleResizeTestcafe(browser);
+    await handleResizeTestcafe(browser, t);
     expect(width).to.eq(undefined);
     expect(height).to.eq(undefined);
   });
 
   it('works for 1 object browser', async () => {
     const browser = {height: 789, width: 888, name: 'firefox'};
-    await handleResizeTestcafe(browser);
+    await handleResizeTestcafe(browser, t);
     expect(width).to.eq(888);
     expect(height).to.eq(789);
   });
 
   it('works for no browser - sets default size', async () => {
-    await handleResizeTestcafe(undefined);
+    await handleResizeTestcafe(undefined, t);
     expect(width).to.eq(defaultViewport.width);
     expect(height).to.eq(defaultViewport.height);
   });

@@ -1,7 +1,7 @@
 'use strict';
 
-function makeHandleResizeTestcafe({logger, t, defaultViewport}) {
-  return async function(browser) {
+function makeHandleResizeTestcafe({logger, defaultViewport}) {
+  return async function(browser, t) {
     let b = browser;
     if (Array.isArray(browser) && browser.length === 1) {
       b = browser[0];

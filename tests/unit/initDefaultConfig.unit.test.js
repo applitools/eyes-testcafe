@@ -4,6 +4,7 @@ const {describe, it} = require('mocha');
 const {expect} = require('chai');
 const initDefaultConfig = require('../../src/initDefaultConfig');
 const path = require('path');
+const {version: packageVersion} = require('../../package.json');
 
 describe('initDefaultConfig', () => {
   it('works', () => {
@@ -12,8 +13,10 @@ describe('initDefaultConfig', () => {
     process.env.APPLITOOLS_TAP_DIR_PATH = 'SOME PATH';
     const config = initDefaultConfig(configPath);
     expect(config).to.eql({
-      agentId: 'eyes-testcafe/1.0.0',
+      agentId: `eyes-testcafe/${packageVersion}`,
       apiKey: 'OVERIDEN!!!',
+      concurrency: 1,
+      failTestcafeOnDiff: true,
       isDisabled: false,
       showLogs: true,
       someKey: 'someValue',
