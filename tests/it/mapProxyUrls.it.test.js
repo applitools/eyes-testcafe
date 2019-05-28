@@ -117,19 +117,19 @@ describe('mapProxyUrls', () => {
   });
 
   function assertMapping(actualFrame, expectedFrame) {
-    expect(actualFrame.blobs.map(b => b.value.toString())).to.deep.eql(
+    expect(actualFrame.blobs.map(b => b.value.toString())).to.eql(
       expectedFrame.blobs.map(b =>
         !b._shouldMap
           ? b.value.toString()
           : b.value.toString().replace(/http:\/\/localhost:2020\/ftftft\//g, ''),
       ),
     );
-    expect(actualFrame.cdt.map(n => n.nodeValue)).to.deep.eql(
+    expect(actualFrame.cdt.map(n => n.nodeValue)).to.eql(
       expectedFrame.cdt.map(n =>
         !n._shouldMap ? n.nodeValue : n.nodeValue.replace(/http:\/\/localhost:2020\/ftftft\//g, ''),
       ),
     );
-    expect(actualFrame.cdt.filter(n => n.attributes).map(n => n.attributes)).to.deep.eql(
+    expect(actualFrame.cdt.filter(n => n.attributes).map(n => n.attributes)).to.eql(
       expectedFrame.cdt
         .filter(n => n.attributes)
         .map(n => n.attributes)

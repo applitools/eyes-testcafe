@@ -18,7 +18,7 @@ describe('makeClientFunctionWrapper', () => {
     const getResult = await clientFunctionWrapper(async () => ({
       message: 'hello this is a string of some length',
     }));
-    expect(await getResult()).to.deep.eql({
+    expect(await getResult()).to.eql({
       message: 'hello this is a string of some length',
     });
   });
