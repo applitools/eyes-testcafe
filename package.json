@@ -34,7 +34,7 @@
     "@applitools/dom-snapshot": "^1.2.4",
     "@applitools/eyes-common": "^3.4.5",
     "@applitools/eyes-sdk-core": "^5.7.2",
-    "@applitools/visual-grid-client": "^12.9.2",
+    "@applitools/visual-grid-client": "^12.10.1",
     "rimraf": "^2.6.3"
   },
   "devDependencies": {
