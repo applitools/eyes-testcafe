@@ -3,7 +3,6 @@
 const {Logger} = require('@applitools/eyes-common');
 const {makeVisualGridClient} = require('@applitools/visual-grid-client');
 const {ArgumentGuard} = require('@applitools/eyes-common');
-const {TestResults} = require('@applitools/eyes-sdk-core');
 const processPageAndSerialize = require('../dist/processPageAndSerialize');
 const blobsToResourceContents = require('./blobsToResourceContents');
 const blobsToBuffer = require('./blobsToBuffer');
@@ -71,11 +70,11 @@ class Eyes {
     this._logger.log('[waitForResults] called by user');
     await this._assertClosed('waitForResults');
     let results = await Promise.all(this._closedTesst.map(b => b.closePromise));
-    results = results.map(this._removeTestResultsIfError);
+    results = results.map(this._removeTestResultsIfError.bind(this));
     await handleBatchResultsFile({results, tapDirPath: this._defaultConfig.tapDirPath});
 
     const settle =
-      rejectOnErrors && this._shouldRejectTests(results)
+      rejectOnErrors && this._defaultConfig.failTestcafeOnDiff && this._containsFailure(results)
         ? Promise.reject.bind(Promise)
         : Promise.resolve.bind(Promise);
     return settle(results);
@@ -150,17 +149,18 @@ class Eyes {
     }
   }
 
-  _shouldRejectTests(testsResults) {
-    return (
-      this._defaultConfig.failTestcafeOnDiff &&
-      testsResults.some(testResult =>
-        testResult.some(r => !(r instanceof TestResults) || r.getStatus() !== 'Passed'),
-      )
+  _containsFailure(testsResults) {
+    return testsResults.some(testResult =>
+      testResult.some(r => !this._isTestResultsInstance(r) || r.getStatus() !== 'Passed'),
     );
   }
 
+  _isTestResultsInstance(obj) {
+    return !!obj.getStepsInfo && !!obj.getStatus;
+  }
+
   _removeTestResultsIfError(testResult) {
-    const e = testResult.find(r => !(r instanceof TestResults));
+    const e = testResult.find(r => !this._isTestResultsInstance(r));
     return e ? [e] : testResult;
   }
 
