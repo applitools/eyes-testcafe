@@ -13,6 +13,7 @@ const makeClientFunctionWrapper = require('./makeClientFunctionWrapper');
 const makeHandleResizeTestcafe = require('./makeHandleResizeTestcafe');
 const handleBatchResultsFile = require('./handleBatchResultsFile');
 const initDefaultConfig = require('./initDefaultConfig');
+const getUserAgent = require('./getUserAgent');
 const DEFAULT_VIEWPORT = {width: 1024, height: 768};
 
 class Eyes {
@@ -91,7 +92,11 @@ class Eyes {
     const testInfo = this._initTestInfo({
       isTestStarted: true,
       isDisabled: this._defaultConfig.isDisabled || args.isDisabled,
-      config: {...this._defaultConfig, ...args},
+      config: {
+        userAgent: await this._getUserAgent(args.t),
+        ...this._defaultConfig,
+        ...args,
+      },
       t: args.t,
     });
     if (testInfo.isDisabled) {
@@ -113,6 +118,13 @@ class Eyes {
       );
       await this.close();
     }
+  }
+
+  async _getUserAgent(t) {
+    if (!this._userAgent) {
+      this._userAgnet = await getUserAgent({t, logger: this._logger});
+    }
+    return this._userAgnet;
   }
 
   _makeFunctions() {
@@ -185,13 +197,11 @@ class Eyes {
 
   _initTestInfo(info) {
     return {
-      ...{
-        isTestStarted: false,
-        isDisabled: false,
-        config: null,
-        eyes: null,
-        closePromise: null,
-      },
+      isTestStarted: false,
+      isDisabled: false,
+      config: null,
+      eyes: null,
+      closePromise: null,
       ...info,
     };
   }

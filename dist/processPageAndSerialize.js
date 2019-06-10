@@ -75,13 +75,15 @@ module.exports = () => {
 
     const srcUrls = _toConsumableArray(doc.querySelectorAll('img[src],source[src]')).map(srcEl => srcEl.getAttribute('src'));
 
-    const hrefUrls = _toConsumableArray(doc.querySelectorAll('image')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(Boolean);
+    const imageUrls = _toConsumableArray(doc.querySelectorAll('image,use')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(u => u && u[0] !== '#');
+
+    const objectUrls = _toConsumableArray(doc.querySelectorAll('object')).map(el => el.getAttribute('data')).filter(Boolean);
 
     const cssUrls = _toConsumableArray(doc.querySelectorAll('link[rel="stylesheet"]')).map(link => link.getAttribute('href'));
 
     const videoPosterUrls = _toConsumableArray(doc.querySelectorAll('video[poster]')).map(videoEl => videoEl.getAttribute('poster'));
 
-    return [].concat(_toConsumableArray(srcsetUrls), _toConsumableArray(srcUrls), _toConsumableArray(hrefUrls), _toConsumableArray(cssUrls), _toConsumableArray(videoPosterUrls));
+    return [].concat(_toConsumableArray(srcsetUrls), _toConsumableArray(srcUrls), _toConsumableArray(imageUrls), _toConsumableArray(cssUrls), _toConsumableArray(videoPosterUrls), _toConsumableArray(objectUrls));
   }
 
   var extractLinks_1 = extractLinks;
@@ -282,6 +284,7 @@ module.exports = () => {
     fetchUrl,
     findStyleSheetByUrl,
     extractResourcesFromStyleSheet,
+    extractResourcesFromSvg,
     isSameOrigin,
     cache = {}
   }) {
@@ -310,7 +313,8 @@ module.exports = () => {
             };
           }
 
-          const result = {
+          let resourceUrls;
+          let result = {
             blobsObj: {
               [url]: {
                 type,
@@ -322,12 +326,16 @@ module.exports = () => {
           if (/text\/css/.test(type)) {
             const styleSheet = findStyleSheetByUrl(url, doc);
 
-            if (!styleSheet) {
-              return result;
+            if (styleSheet) {
+              resourceUrls = extractResourcesFromStyleSheet(styleSheet, doc.defaultView);
             }
+          } else if (/image\/svg/.test(type)) {
+            resourceUrls = extractResourcesFromSvg(value);
+          }
 
-            const resourceUrls = extractResourcesFromStyleSheet(styleSheet, doc.defaultView).map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).filter(filterInlineUrl_1);
-            return getResourceUrlsAndBlobs(baseUrl, resourceUrls).then(({
+          if (resourceUrls) {
+            resourceUrls = resourceUrls.map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).filter(filterInlineUrl_1);
+            result = getResourceUrlsAndBlobs(baseUrl, resourceUrls).then(({
               resourceUrls,
               blobsObj
             }) => ({
@@ -339,9 +347,9 @@ module.exports = () => {
                 }
               })
             }));
-          } else {
-            return result;
           }
+
+          return result;
         }).catch(err => {
           console.log('[dom-snapshot] error while fetching', url, err);
           return {};
@@ -357,6 +365,32 @@ module.exports = () => {
   }
 
   var processResource = makeProcessResource;
+
+  function makeExtractResourcesFromSvg({
+    parser,
+    decoder
+  }) {
+    return function (svgArrayBuffer) {
+      let svgStr;
+      let urls = [];
+
+      try {
+        const decooder = decoder || new TextDecoder('utf-8');
+        svgStr = decooder.decode(svgArrayBuffer);
+        const domparser = parser || new DOMParser();
+        const doc = domparser.parseFromString(svgStr, 'image/svg+xml');
+        const fromImages = window.Array.from(doc.getElementsByTagName('image')).concat(window.Array.from(doc.getElementsByTagName('use'))).map(e => e.getAttribute('href') || e.getAttribute('xlink:href'));
+        const fromObjects = window.Array.from(doc.getElementsByTagName('object')).map(e => e.getAttribute('data'));
+        urls = [].concat(_toConsumableArray(fromImages), _toConsumableArray(fromObjects)).filter(u => u[0] !== '#');
+      } catch (e) {
+        console.log('could not parse svg content', e);
+      }
+
+      return urls;
+    };
+  }
+
+  var makeExtractResourcesFromSvg_1 = makeExtractResourcesFromSvg;
 
   /* global window */
 
@@ -468,6 +502,7 @@ module.exports = () => {
     const extractResourcesFromStyleSheet$1 = extractResourcesFromStyleSheet({
       styleSheetCache
     });
+    const extractResourcesFromSvg = makeExtractResourcesFromSvg_1({});
     const findStyleSheetByUrl$1 = findStyleSheetByUrl({
       styleSheetCache
     });
@@ -475,6 +510,7 @@ module.exports = () => {
       fetchUrl: fetchUrl_1,
       findStyleSheetByUrl: findStyleSheetByUrl$1,
       extractResourcesFromStyleSheet: extractResourcesFromStyleSheet$1,
+      extractResourcesFromSvg,
       absolutizeUrl: absolutizeUrl_1,
       isSameOrigin: isSameOrigin_1
     });

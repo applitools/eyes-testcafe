@@ -33,10 +33,10 @@
   "author": "Daniel Schwartz <daniel.schwartz@applitools.com>",
   "license": "MIT",
   "dependencies": {
-    "@applitools/dom-snapshot": "^1.2.4",
-    "@applitools/eyes-common": "^3.6.1",
-    "@applitools/eyes-sdk-core": "^5.8.1",
-    "@applitools/visual-grid-client": "^12.10.2",
+    "@applitools/dom-snapshot": "^1.2.9",
+    "@applitools/eyes-common": "^3.7.0",
+    "@applitools/eyes-sdk-core": "^5.9.0",
+    "@applitools/visual-grid-client": "^12.11.4",
     "rimraf": "^2.6.3"
   },
   "devDependencies": {
@@ -50,8 +50,8 @@
     "express": "^4.17.1",
     "mocha": "^6.1.4",
     "node-notifier-cli": "^1.1.2",
-    "prettier": "^1.17.1",
-    "rollup": "^1.12.4",
+    "prettier": "^1.18.2",
+    "rollup": "^1.14.6",
     "rollup-plugin-babel": "^4.3.2",
     "rollup-plugin-commonjs": "^9.3.4",
     "rollup-plugin-node-builtins": "^2.1.2",

@@ -3,7 +3,7 @@
 function makeHandleResizeTestcafe({logger, defaultViewport}) {
   return async function(browser, t) {
     let b = browser;
-    if (Array.isArray(browser) && browser.length === 1) {
+    if (Array.isArray(browser) && isOneSize(browser)) {
       b = browser[0];
     }
     if (b && b.width && b.height) {
@@ -14,6 +14,14 @@ function makeHandleResizeTestcafe({logger, defaultViewport}) {
       await t.resizeWindow(defaultViewport.width, defaultViewport.height);
     }
   };
+}
+
+function isOneSize(browser) {
+  const width = browser[0].width;
+  const height = browser[0].height;
+  if (width && height) {
+    return browser.every(b => b.width === width && b.height === height);
+  }
 }
 
 module.exports = makeHandleResizeTestcafe;
