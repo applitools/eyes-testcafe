@@ -4,7 +4,7 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
   return function(frame) {
     const cssBlobs = collectFrameData({
       frame,
-      predicate: r => r.type.trimStart().startsWith('text/css'),
+      predicate: r => r.type && r.type.trimStart().startsWith('text/css'),
       keyName: 'blobs',
     });
     cssBlobs.forEach(r => (r.value = r.value.toString()));
@@ -28,7 +28,7 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
       logger.log('warning cannot get proxy url !!');
     }
 
-    logger.log(`mapping proxy url ${proxyUrl} for ${cssBlobs.length} blobs`);
+    logger.log(`mapping proxy url ${proxyUrl} for ${cssBlobs.length} css blobs`);
     cssBlobs.forEach(r => (r.value = Buffer.from(doMapProxyUrls(r.value, proxyUrl))));
     logger.log(`mapping proxy url ${proxyUrl} for ${proxyStyleNodes.length} style element`);
     proxyStyleNodes.forEach(n => (n.nodeValue = doMapProxyUrls(n.nodeValue, proxyUrl)));

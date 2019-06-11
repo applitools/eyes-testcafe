@@ -28,7 +28,7 @@ class Eyes {
     });
     this._currentTest = null;
     this._closedTesst = [];
-    this._makeFunctions();
+    this._attacheFunctions();
   }
 
   async open(args) {
@@ -127,7 +127,7 @@ class Eyes {
     return this._userAgnet;
   }
 
-  _makeFunctions() {
+  _attacheFunctions() {
     this._clientFunctionWrapper = makeClientFunctionWrapper({
       logger: this._logger.extend('clientFunctionWrapper'),
     });
