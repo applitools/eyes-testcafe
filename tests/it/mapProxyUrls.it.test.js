@@ -11,9 +11,14 @@ describe('mapProxyUrls', () => {
   const frame = {
     cdt: [
       {
+        nodeType: 1,
+        nodeName: 'STYLE',
+        attributes: [],
+        childNodeIndexes: [1, 3],
+      },
+      {
         nodeType: 3,
-        nodeValue:
-          '/*hammerhead|stylesheet-http://localhost:2020/ftftft/http://tested-page-in-cdt.com',
+        nodeValue: 'http://localhost:2020/ftftft/http://tested-page-in-cdt.com',
         _shouldMap: true,
       },
       {
@@ -22,7 +27,7 @@ describe('mapProxyUrls', () => {
       },
       {
         nodeType: 3,
-        nodeValue: '/*hammerhead-BAD-|stylesheet-http://localhost:2020/ftftft/http://dont-map.com',
+        nodeValue: 'http://dont-map.com',
       },
       {
         nodeType: 1,
@@ -65,6 +70,18 @@ describe('mapProxyUrls', () => {
     frames: [
       {
         cdt: [
+          {
+            nodeType: 1,
+            nodeName: 'STYLE',
+            attributes: [],
+            childNodeIndexes: [1],
+          },
+          {
+            nodeType: 1,
+            nodeName: 'STYLE',
+            attributes: [],
+            childNodeIndexes: [2],
+          },
           {
             nodeType: 3,
             nodeValue:
@@ -157,10 +174,12 @@ describe('mapProxyUrls', () => {
         type,
       }));
     const cpyCdt = cdt =>
-      cdt.map(({nodeType, nodeValue, attributes}) => ({
-        nodeType,
-        nodeValue,
-        attributes: (attributes && attributes.map(({name, value}) => ({name, value}))) || undefined,
+      cdt.map(element => ({
+        ...element,
+        attributes:
+          (element.attributes && element.attributes.map(({name, value}) => ({name, value}))) ||
+          undefined,
+        childNodeIndexes: element.childNodeIndexes && [...element.childNodeIndexes],
       }));
     return {
       blobs: cpyBlobs(frame.blobs),
