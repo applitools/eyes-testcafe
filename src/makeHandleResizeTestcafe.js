@@ -6,14 +6,21 @@ function makeHandleResizeTestcafe({logger, defaultViewport}) {
     if (Array.isArray(browser) && isOneSize(browser)) {
       b = browser[0];
     }
-    const width = (b && b.width) || (!b && defaultViewport.width);
-    const height = (b && b.height) || (!b && defaultViewport.height);
-
-    if (width && height && (currentSize.width !== width || currentSize.height !== height)) {
-      logger.log('setting testcafe viewport size', {width, height});
-      await t.resizeWindow(width, height);
+    let requiredSize;
+    if (b && b.width && b.height) {
+      requiredSize = b;
+    } else if (!b) {
+      requiredSize = defaultViewport;
     }
-    return {width, height};
+
+    if (
+      requiredSize &&
+      (currentSize.width !== requiredSize.width || currentSize.height !== requiredSize.height)
+    ) {
+      logger.log('setting testcafe viewport size', requiredSize);
+      await t.resizeWindow(requiredSize.width, requiredSize.height);
+    }
+    return requiredSize;
   };
 }
 

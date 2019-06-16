@@ -71,7 +71,7 @@ describe('initDefaultConfig', () => {
   it('returns the required size', async () => {
     const browser = [{height: 789, width: 888, name: 'firefox'}];
     const size = await handleResizeTestcafe(browser, t);
-    expect(size).to.eql({height: 789, width: 888});
+    expect({width: size.width, height: size.height}).to.eql({height: 789, width: 888});
   });
 
   it('resizes for more then 1 browser if all sizes are the same ', async () => {
