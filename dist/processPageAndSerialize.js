@@ -398,11 +398,11 @@ module.exports = () => {
     return fetch(url, {
       cache: 'force-cache',
       credentials: 'same-origin'
-    }).then(resp => resp.arrayBuffer().then(buff => ({
+    }).then(resp => resp.status === 200 ? resp.arrayBuffer().then(buff => ({
       url,
       type: resp.headers.get('Content-Type'),
       value: buff
-    })));
+    })) : Promise.reject(`bad status code ${resp.status}`));
   }
 
   var fetchUrl_1 = fetchUrl;
