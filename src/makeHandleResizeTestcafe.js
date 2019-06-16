@@ -1,18 +1,19 @@
 'use strict';
 
 function makeHandleResizeTestcafe({logger, defaultViewport}) {
-  return async function(browser, t) {
+  return async function(browser, t, currentSize = {}) {
     let b = browser;
     if (Array.isArray(browser) && isOneSize(browser)) {
       b = browser[0];
     }
-    if (b && b.width && b.height) {
-      logger.log('setting testcafe viewport size', b.width, b.height);
-      await t.resizeWindow(b.width, b.height);
-    } else if (!b) {
-      logger.log('setting testcafe viewport size', defaultViewport);
-      await t.resizeWindow(defaultViewport.width, defaultViewport.height);
+    const width = (b && b.width) || (!b && defaultViewport.width);
+    const height = (b && b.height) || (!b && defaultViewport.height);
+
+    if (width && height && (currentSize.width !== width || currentSize.height !== height)) {
+      logger.log('setting testcafe viewport size', {width, height});
+      await t.resizeWindow(width, height);
     }
+    return {width, height};
   };
 }
 

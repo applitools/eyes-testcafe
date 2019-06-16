@@ -27,7 +27,8 @@ class Eyes {
       ...this._defaultConfig,
     });
     this._currentTest = null;
-    this._closedTesst = [];
+    this._testcafeSize = {};
+    this._closedTests = [];
     this._attacheFunctions();
   }
 
@@ -35,7 +36,7 @@ class Eyes {
     this._logger.log('[open] called by user');
     this._assertCanOpen(args);
     await this._assertClosed('open');
-    await this._handleResizeTestcafe(args.browser, args.t);
+    this._testcafeSize = await this._handleResizeTestcafe(args.browser, args.t, this._testcafeSize);
     this._currentTest = await this._openTest(args);
   }
 
@@ -45,7 +46,7 @@ class Eyes {
       return;
     }
     this._closeTest();
-    this._closedTesst.push(this._currentTest);
+    this._closedTests.push(this._currentTest);
     this._currentTest = null;
     return Promise.resolve();
   }
@@ -70,7 +71,7 @@ class Eyes {
   async waitForResults(rejectOnErrors = true) {
     this._logger.log('[waitForResults] called by user');
     await this._assertClosed('waitForResults');
-    let results = await Promise.all(this._closedTesst.map(b => b.closePromise));
+    let results = await Promise.all(this._closedTests.map(b => b.closePromise));
     results = results.map(this._removeTestResultsIfError.bind(this));
     await handleBatchResultsFile({results, tapDirPath: this._defaultConfig.tapDirPath});
 

@@ -46,6 +46,34 @@ describe('initDefaultConfig', () => {
     expect(height).to.eq(undefined);
   });
 
+  it('does not set size if the current size maches the required size', async () => {
+    const browser = [{height: 789, width: 888, name: 'firefox'}];
+    let called = false;
+    const t2 = {
+      resizeWindow: async () => {
+        called = true;
+      },
+    };
+    await handleResizeTestcafe(browser, t2, {height: 789, width: 888});
+    expect(called).to.eq(false);
+  });
+
+  it('sets the size if the current size is different then the required size', async () => {
+    const browser = [
+      {height: 789, width: 888, name: 'firefox'},
+      {height: 789, width: 888, name: 'firefox'},
+    ];
+    await handleResizeTestcafe(browser, t, {height: 789, width: 889});
+    expect(width).to.eq(888);
+    expect(height).to.eq(789);
+  });
+
+  it('returns the required size', async () => {
+    const browser = [{height: 789, width: 888, name: 'firefox'}];
+    const size = await handleResizeTestcafe(browser, t);
+    expect(size).to.eql({height: 789, width: 888});
+  });
+
   it('resizes for more then 1 browser if all sizes are the same ', async () => {
     const browser = [
       {height: 789, width: 888, name: 'firefox'},
