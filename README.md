@@ -281,7 +281,7 @@ Here are the available configuration properties:
 | Property name             | Default value               | Description   |
 | -------------             |:-------------               |:-----------   |
 | `testName`                | undefined | The test name |
-| `browser`                 | { width: 800, height: 600, name: 'chrome' } | The size and browser of the generated screenshots. This doesn't need to be the same as the browser that Testcafe is running. It could be a different size and also a different browser. Currently, `firefox`, `chrome`, `edge`, `ie10` and `ie11` are supported. For more info, see the [browser section below](#configuring-the-browser).|
+| `browser`                 | { width: 800, height: 600, name: 'chrome' } | The size and browser of the generated screenshots. This doesn't need to be the same as the browser that Testcafe is running. It could be a different size and also a different browser. Currently, `firefox`, `chrome`, `edge`, `ie10` and `ie11` are supported. For more info, see the [browser section below](#configuring-the-browser).<br/><br/>*Note: for best performance if possible eyes resizes the viewport to the given browser size.*|
 | `batchId`                 | random                      | Provides ability to group tests into batches. Read more about batches [here](https://applitools.com/docs/topics/working-with-test-batches/how-to-group-tests-into-batches.html). |
 | `batchName`               | The name of the first test in the batch                   | Provides a name to the batch (for display purpose only). |
 | `baselineEnvName`         | undefined                   | The name of the environment of the baseline. |
