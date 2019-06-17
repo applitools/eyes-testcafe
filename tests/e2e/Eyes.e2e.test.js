@@ -4,7 +4,7 @@ const {describe, it, before, after} = require('mocha');
 const {expect} = require('chai');
 const {resolve} = require('path');
 const createTestCafe = require('testcafe');
-const testPath = resolve(__dirname, 'helloworld.testcafe.js');
+const testPath = resolve(__dirname, '*.testcafe.js');
 const testServer = require('../util/testServer');
 
 describe('Eyes', () => {
