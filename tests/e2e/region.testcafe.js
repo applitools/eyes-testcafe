@@ -9,7 +9,7 @@ fixture`Region`.page`http://localhost:7272/helloworld.html`
 test.skip('testcafe Eyes.e2e helloworld region', async t => {
   await eyes.open({appName: 'TestCafeApp', testName: 'Testcafe Eyes.e2e helloworld region', t});
   await eyes.checkWindow({
-    sizeMode: 'region',
+    target: 'region',
     region: {top: 100, left: 0, width: 1000, height: 200},
   });
 });

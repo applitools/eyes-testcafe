@@ -9,7 +9,7 @@ fixture`Selector`.page`http://localhost:7272/helloworld.html`
 test.skip('testcafe Eyes.e2e helloworld selector', async t => {
   await eyes.open({appName: 'TestCafeApp', testName: 'Testcafe Eyes.e2e helloworld selector', t});
   await eyes.checkWindow({
-    sizeMode: 'selector',
+    target: 'region',
     selector: {
       selector: 'div.fancy.title.primary',
     },

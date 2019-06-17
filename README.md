@@ -94,57 +94,70 @@ eyes.checkWindow(tag)
 
 OR
 
-eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
+eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
 ```
 
-##### Arguments to `eyes.checkWindow`
+#### Arguments to `eyes.checkWindow`
 
-- `tag` (optional): A logical name for this check.
-- `sizeMode` (optional): Possible values are:
+- #### tag 
+  (optional): A logical name for this check.
+- #### target
+   (optional): Possible values are:
 
-  - **`full-page`**: This is the default value. It means a screenshot of everything that exists in the DOM at the point of calling `checkWindow` will be rendered.
-  - **`viewport`**: Only a screenshot the size of the browser will be rendered (the size of the browser can be set in the call to `eyes.open` - see [Advanced configuration](#advanced-configuration) below).
-  - **`selector`**: Take a screenshot of the content of the element targeted by css or xpath selector. It's necessary to specify the value of the selector in the `selector` argument.
-  - **`region`**: Take a screenshot of a region of the page, specified by coordinates. It's necessary to specify the value of the region in the `region` argument.
+  - **`window`**: This is the default value. Capture the entire window or only the viewport. If set then add [fully](#fully) as sibling to determine weather to capture full screen or viewport.
+  - **`region`**: Take a screenshot of a region of the page, specified by coordinates or a selector. If set then add [region](#region) or [selector](#selector) as siblings for specifying the region/s.
 
-- `selector` (optional): In case `sizeMode` is `selector`, this should be the actual css or xpath selector to an element, and the screenshot would be the content of that element. For example:
+- #### fully: 
+  (optional) In case [target](#target) is `window`, determines wether to capture full page or viewport only. if `true` (default) then captures full page, if `false` then captures viewport.
 
     ```js
-    // Using a css selector
+        // capture viewport only
+        eyes.checkWindow({
+          target: 'window',
+          fully: 'false',
+        });
+    ```
+- #### selector 
+  (optional) In case [target](#target) is `region`, this should be the actual css or xpath selector to an element, and the screenshot would be the content of that element. For example:
+
+  ```js
+      // The shorthand string version defaults to css selectors
+      eyes.checkWindow({
+        target: 'region',
+        selector: '.my-element'
+      });
+
+      // Using a css selector
+      eyes.checkWindow({
+        target: 'region',
+        selector: {
+          type: 'css',
+          selector: '.my-element' // or '//button'
+        }
+      });
+
+      // Using an xpath selector
     eyes.checkWindow({
-      sizeMode: 'selector',
-      selector: {
-        type: 'css',
-        selector: '.my-element' // or '//button'
-      }
-    });
-    
-    // Using an xpath selector
-    eyes.checkWindow({
-      sizeMode: 'selector',
+      target: 'region',
       selector: {
         type: 'xpath',
         selector: '//button[1]'
       }
     });
-    
-    // The shorthand string version defaults to css selectors
-    eyes.checkWindow({
-      sizeMode: 'selector',
-      selector: '.my-element'
-    });
-    ```
+  ```
 
-- `region` (optional): In case `sizeMode` is `region`, this should be an object describing the region's coordinates. For example:
+- #### region 
+  (optional) In case [target](#target) is `region`, this should be an object describing the region's coordinates. For example:
 
     ```js
     eyes.checkWindow({
-      sizeMode: 'region',
+      target: 'region',
       region: {top: 100, left: 0, width: 1000, height: 200}
     });
     ```
 
-- `ignore` (optional): A single or an array of regions to ignore when checking for visual differences. For example:
+- #### ignore 
+  (optional): A single or an array of regions to ignore when checking for visual differences. For example:
 
     ```js
     eyes.checkWindow({
@@ -155,7 +168,8 @@ eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
     });
     ```
 
-- `floating` (optional): A single or an array of floating regions to ignore when checking for visual differences. More information about floating regions can be found in Applitools docs [here](https://help.applitools.com/hc/en-us/articles/360006915292-Testing-of-floating-UI-elements). For example:
+- #### floating
+  (optional): A single or an array of floating regions to ignore when checking for visual differences. More information about floating regions can be found in Applitools docs [here](https://help.applitools.com/hc/en-us/articles/360006915292-Testing-of-floating-UI-elements). For example:
 
     ```js
     eyes.checkWindow({
@@ -166,9 +180,10 @@ eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
     });
     ```
 
-- `layout` (optional): A single or an array of regions to match as [layout level.](https://help.applitools.com/hc/en-us/articles/360007188591-Match-Levels) For example:
-
+- #### layout
+  (optional): A single or an array of regions to match as [layout level.](https://help.applitools.com/hc/en-us/articles/360007188591-Match-Levels) For example:
     ```js
+
     eyes.checkWindow({
       layout: [
         {top: 100, left: 0, width: 1000, height: 100},
@@ -177,9 +192,10 @@ eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
     });
     ```
 
-- `strict` (optional): A single or an array of regions to match as [strict level.](https://help.applitools.com/hc/en-us/articles/360007188591-Match-Levels) For example:
-
+- #### strict
+  (optional): A single or an array of regions to match as [strict level.](https://help.applitools.com/hc/en-us/articles/360007188591-Match-Levels) For example:
     ```js
+
     eyes.checkWindow({
       strict: [
         {top: 100, left: 0, width: 1000, height: 100},
@@ -188,10 +204,11 @@ eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
     });
     ```
 
-- `scriptHooks` (optional): A set of scripts to be run by the browser during the rendering. It is intended to be used as a means to alter the page's state and structure at the time of rendering.
-  An object with the following properties:
-    - `beforeCaptureScreenshot`: a script that runs after the page is loaded but before taking the screenshot. For example:
-        
+- #### scriptHooks 
+  (optional): A set of scripts to be run by the browser during the rendering. It is intended to be used as a means to alter the page's state and structure at the time of rendering.
+    An object with the following properties:
+      - `beforeCaptureScreenshot`: a script that runs after the page is loaded but before taking the screenshot. For example:
+
         ```js
         eyes.checkWindow({
           scriptHooks: {
@@ -200,7 +217,8 @@ eyes.checkWindow({ tag: 'your tag', sizeMode: 'your size mode' })
         })
         ```
 
-- `sendDom` (optional): A flag to specify whether a capture of DOM and CSS should be taken when rendering the screenshot. The default value is true. This should only be modified to troubleshoot unexpected behavior, and not for normal production use.
+- #### sendDom
+  (optional): A flag to specify whether a capture of DOM and CSS should be taken when rendering the screenshot. The default value is true. This should only be modified to troubleshoot unexpected behavior, and not for normal production use.
 
     ```js
     eyes.checkWindow({sendDom: false})
