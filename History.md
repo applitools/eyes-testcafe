@@ -1,4 +1,27 @@
 
+v1.0.5 / 2019-06-17
+===================
+
+* 1.0.5 [[196cbfe](/commit/196cbfee4d04df24f1d53c97db768fd46596dfa4)]
+* 1.0.4 [[b59b60c](/commit/b59b60c7d09f107fb8a50fca6a7066d173f152cb)]
+* added e2e tests [[b1b0640](/commit/b1b0640e10b0b6165acad7363afb91235d87bd88)]
+* readme [[437d9bf](/commit/437d9bfc5fc8d37f0c73b70a933c70ab32604a00)]
+* handle size changes [[c074b91](/commit/c074b912f2c690a1027e5deb1e354b5f75f490f0)]
+* ignoring unneeded viewport resizes [[99d10b7](/commit/99d10b7cfe5ad7403fe039b2787842f9d32608cc)]
+* update vgc and ds [[7080c8a](/commit/7080c8aad9ddfb79f9b975d9ccb9d10817c90dfe)]
+* mapping all style elements [[d8d1cb4](/commit/d8d1cb4b8b7e29caf746c9d4d73103f269df51f3)]
+* sanity changes [[18b399d](/commit/18b399d848dc6239c155e9023fa7b7008d8e8fcc)]
+* added userAgenrt [[66b18f5](/commit/66b18f524b0737b3606f2a2321bcf2f513c73bc3)]
+* node notifier [[e6c63ef](/commit/e6c63efb0e02b63c279e41fc036a4b591cb92f39)]
+* duck typing TestsResults [[2b47d8d](/commit/2b47d8d187fe1b8d4f7d5d71c9498266d35c912c)]
+* ipdated vgc to have ignoreDisplacements [[eaf1fee](/commit/eaf1feecab78c18cba6b76789f16440dfb661a4c)]
+* removed deep.eq to eql in mocha [[a7f167b](/commit/a7f167b6afe1edb1d382531f8f52cd12fdece5e1)]
+* added clientFunctionWrraper u test [[39fbd3c](/commit/39fbd3c927b6c1c936da0b60145bb80a57e5e855)]
+* readme [[b5d3965](/commit/b5d396502cca0217f8aa4b2864d90ac830efb1ff)]
+* readme [[3aa0905](/commit/3aa0905bb733a4259324ebd9800c7362f1e9b856)]
+* readme [[d507297](/commit/d507297a107117e034d13d74f978d6e399d671fa)]
+* changelog [[75c80d0](/commit/75c80d0ee533677c258c2999c344bb3085f89c90)]
+
 v1.0.3 / 2019-05-27
 ===================
 
