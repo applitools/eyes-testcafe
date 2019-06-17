@@ -1,4 +1,11 @@
 
+v1.0.7 / 2019-06-17
+===================
+
+* 1.0.7 [[837467e](/commit/837467ecb4b7aa11c29d9f3830bddbf573683739)]
+* support for target instead of sizeMode [[6ddb504](/commit/6ddb504e31034acb763a6cfd19a3bf8d9c890829)]
+* changelog [[4200337](/commit/4200337d6f2520c3283f62826be04857612dffd0)]
+
 v1.0.6 / 2019-06-17
 ===================
 
