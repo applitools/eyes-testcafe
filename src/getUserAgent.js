@@ -1,7 +1,7 @@
 'use strict';
 /* global navigator */
 
-import {ClientFunction} from 'testcafe';
+const {ClientFunction} = require('testcafe');
 const doGetuserAgent = ClientFunction(() => navigator.userAgent);
 
 async function getUserAgent({t, logger}) {
