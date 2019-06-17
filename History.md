@@ -1,4 +1,12 @@
 
+v1.0.6 / 2019-06-17
+===================
+
+* 1.0.6 [[f002d3b](/commit/f002d3bf627f882c8d69f1b3a1f9bd59080e8260)]
+* added file name change [[89ff5ab](/commit/89ff5ab9bccd0d44d3ecceedfdf52739555654d7)]
+* fixed import on src file [[f29dfca](/commit/f29dfca0e97b1d99ffd29af9c71f9c6dd37832d0)]
+* changelog, 1.0.5 [[40defff](/commit/40defff68153eeb981fe5177e43721a03ca1d364)]
+
 v1.0.5 / 2019-06-17
 ===================
 
