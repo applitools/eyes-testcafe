@@ -1,6 +1,6 @@
 {
   "name": "@applitools/eyes-testcafe",
-  "version": "1.0.7",
+  "version": "1.1.0-beta",
   "description": "Eyes Testcafe SDK",
   "main": "index.js",
   "scripts": {
@@ -37,10 +37,10 @@
   "author": "Daniel Schwartz <daniel.schwartz@applitools.com>",
   "license": "MIT",
   "dependencies": {
-    "@applitools/dom-snapshot": "^1.2.10",
+    "@applitools/dom-snapshot": "^1.2.11",
     "@applitools/eyes-common": "^3.7.0",
     "@applitools/eyes-sdk-core": "^5.9.1",
-    "@applitools/visual-grid-client": "^12.12.0",
+    "@applitools/visual-grid-client": "^12.12.2",
     "rimraf": "^2.6.3"
   },
   "devDependencies": {

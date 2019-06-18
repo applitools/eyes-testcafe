@@ -482,6 +482,12 @@ module.exports = () => {
 
   var extractResourceUrlsFromStyleTags = makeExtractResourceUrlsFromStyleTags;
 
+  function toUriEncoding(url) {
+    return url.replace(/\\\w{2}\s?/g, '/');
+  }
+
+  var toUriEncoding_1 = toUriEncoding;
+
   function isSameOrigin(url, baseUrl) {
     const blobOrData = /^(blob|data):/;
     if (blobOrData.test(url)) return true;
@@ -525,7 +531,7 @@ module.exports = () => {
       const frameElement = doc.defaultView && doc.defaultView.frameElement;
       const url = frameElement ? frameElement.src : doc.location.href;
       const cdt = domNodesToCdt_1(doc);
-      const links = uniq_1(extractLinks_1(doc).concat(extractResourceUrlsFromStyleAttrs_1(cdt)).concat(extractResourceUrlsFromStyleTags$1(doc))).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
+      const links = uniq_1(extractLinks_1(doc).concat(extractResourceUrlsFromStyleAttrs_1(cdt)).concat(extractResourceUrlsFromStyleTags$1(doc))).map(toUriEncoding_1).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
       const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(doc, url, links);
       const frameDocs = extractFrames_1(doc);
       const processFramesPromise = frameDocs.map(doProcessPage);
