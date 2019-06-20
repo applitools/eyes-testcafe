@@ -138,7 +138,7 @@ module.exports = () => {
             nodeName: elementNode.nodeName,
             attributes: nodeAttributes(elementNode).map(key => {
               let value = elementNode.attributes[key].value;
-              const name = elementNode.attributes[key].localName;
+              const name = elementNode.attributes[key].name;
 
               if (/^blob:/.test(value)) {
                 value = value.replace(/^blob:/, '');
@@ -176,7 +176,7 @@ module.exports = () => {
             nodeType: NODE_TYPES.ELEMENT,
             nodeName: 'SCRIPT',
             attributes: nodeAttributes(elementNode).map(key => ({
-              name: elementNode.attributes[key].localName,
+              name: elementNode.attributes[key].name,
               value: elementNode.attributes[key].value
             })).filter(attr => attr.name !== 'src'),
             childNodeIndexes: []
@@ -205,7 +205,7 @@ module.exports = () => {
       function nodeAttributes({
         attributes = {}
       }) {
-        return window.Object.keys(attributes).filter(k => attributes[k].localName);
+        return window.Object.keys(attributes).filter(k => attributes[k].name);
       }
     }
   }
@@ -274,6 +274,13 @@ module.exports = () => {
 
   var filterInlineUrl_1 = filterInlineUrl;
 
+  function toUnAnchoredUri(url) {
+    const m = url && url.match(/(^[^#]*)/);
+    return m && m[1] || url;
+  }
+
+  var toUnAnchoredUri_1 = toUnAnchoredUri;
+
   function absolutizeUrl(url, absoluteUrl) {
     return new URL(url, absoluteUrl).href;
   }
@@ -334,7 +341,7 @@ module.exports = () => {
           }
 
           if (resourceUrls) {
-            resourceUrls = resourceUrls.map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).filter(filterInlineUrl_1);
+            resourceUrls = resourceUrls.map(toUnAnchoredUri_1).map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).filter(filterInlineUrl_1);
             result = getResourceUrlsAndBlobs(baseUrl, resourceUrls).then(({
               resourceUrls,
               blobsObj
@@ -483,7 +490,11 @@ module.exports = () => {
   var extractResourceUrlsFromStyleTags = makeExtractResourceUrlsFromStyleTags;
 
   function toUriEncoding(url) {
-    return url.replace(/\\\w{2}\s?/g, '/');
+    const result = url && url.replace(/(\\[0-9a-fA-F]{1,6}\s?)/g, s => {
+      const int = parseInt(s.substr(1).trim(), 16);
+      return String.fromCodePoint(int);
+    }) || url;
+    return result;
   }
 
   var toUriEncoding_1 = toUriEncoding;
@@ -531,7 +542,7 @@ module.exports = () => {
       const frameElement = doc.defaultView && doc.defaultView.frameElement;
       const url = frameElement ? frameElement.src : doc.location.href;
       const cdt = domNodesToCdt_1(doc);
-      const links = uniq_1(extractLinks_1(doc).concat(extractResourceUrlsFromStyleAttrs_1(cdt)).concat(extractResourceUrlsFromStyleTags$1(doc))).map(toUriEncoding_1).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
+      const links = uniq_1(extractLinks_1(doc).concat(extractResourceUrlsFromStyleAttrs_1(cdt)).concat(extractResourceUrlsFromStyleTags$1(doc))).map(toUnAnchoredUri_1).map(toUriEncoding_1).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
       const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(doc, url, links);
       const frameDocs = extractFrames_1(doc);
       const processFramesPromise = frameDocs.map(doProcessPage);
