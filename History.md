@@ -1,4 +1,11 @@
 
+v1.1.3 / 2019-06-20
+===================
+
+* 1.1.3 [[7780ca6](/commit/7780ca6461a3a3c3972ef47c844de7c727c0e697)]
+* updated ds to support bad url functions [[49a97b5](/commit/49a97b57e18b52968f859322bd185ed93101967c)]
+* changelog [[fcd6c87](/commit/fcd6c8724b15116968d1cf25586042efd351ca1c)]
+
 v1.1.1 / 2019-06-20
 ===================
 
