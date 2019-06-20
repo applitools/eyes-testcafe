@@ -140,7 +140,9 @@ module.exports = () => {
               let value = elementNode.attributes[key].value;
               const name = elementNode.attributes[key].name;
 
-              if (/^blob:/.test(value)) {
+              if (name === 'style') {
+                value = elementNode.style.cssText;
+              } else if (/^blob:/.test(value)) {
                 value = value.replace(/^blob:/, '');
               } else if (elementNode.nodeName === 'IFRAME' && name === 'src' && !elementNode.contentDocument && !value.match(/^\s*data:/)) {
                 value = '';
