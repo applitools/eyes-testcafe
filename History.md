@@ -1,4 +1,17 @@
 
+v1.1.1 / 2019-06-20
+===================
+
+* 1.1.1 [[5b917fe](/commit/5b917fe294525d1faaa7e51f082de303448336bd)]
+* updated vgc and ds [[6274d51](/commit/6274d512174a7f1178a9b661435b36cc03c26a0b)]
+
+v1.1.0 / 2019-06-18
+===================
+
+* 1.1.0 [[4ffc423](/commit/4ffc423ef8ad93d8748ce50ded1fa400b4a88395)]
+* updated vgc [[26fb1a8](/commit/26fb1a8b5f4bb6a25f2b2e2667932aaf3036ab8d)]
+* changelog [[40b7cb7](/commit/40b7cb7e01420516e3146710150681a57daa7dbb)]
+
 v1.0.7 / 2019-06-17
 ===================
 
