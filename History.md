@@ -1,4 +1,11 @@
 
+v1.1.4 / 2019-06-23
+===================
+
+* 1.1.4 [[6416bc3](/commit/6416bc3dea015f7cf973f9b6387bec79188f41ed)]
+* removed raw css from cdt [[cd1eef4](/commit/cd1eef45763af246ef5be80c5b10b0a6494ae7dd)]
+* changelog [[c2b7318](/commit/c2b731847f165df9c05ebcb7b597e832c1acb26d)]
+
 v1.1.3 / 2019-06-20
 ===================
 
