@@ -37,10 +37,10 @@
   "author": "Daniel Schwartz <daniel.schwartz@applitools.com>",
   "license": "MIT",
   "dependencies": {
-    "@applitools/dom-snapshot": "^1.2.21",
+    "@applitools/dom-snapshot": "^1.2.24",
     "@applitools/eyes-common": "^3.7.1",
-    "@applitools/eyes-sdk-core": "^5.9.3",
-    "@applitools/visual-grid-client": "^12.13.3",
+    "@applitools/eyes-sdk-core": "^5.10.0",
+    "@applitools/visual-grid-client": "^12.15.1",
     "rimraf": "^2.6.3"
   },
   "devDependencies": {
