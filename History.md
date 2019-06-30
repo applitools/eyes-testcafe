@@ -1,4 +1,11 @@
 
+v1.1.6 / 2019-06-30
+===================
+
+* 1.1.6 [[d4929f0](/commit/d4929f0875fe866a13d2191f887b6adf26b1d048)]
+* added basic result printing & readme fix [[bcf3dbb](/commit/bcf3dbb145e6bcfe3081be9d468a5836e4bc8ebe)]
+* changelog [[c785c24](/commit/c785c243a70ab7d36ebe2ab270a0ea97781440e6)]
+
 v1.1.5 / 2019-06-26
 ===================
 
