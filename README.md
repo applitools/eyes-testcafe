@@ -19,14 +19,14 @@ For example, on Linux/Mac:
 
 ```bash
 export APPLITOOLS_API_KEY=<your_key>
-npx testcafe chrome:headless tests
+npx testcafe chrome:headless some-test-dir
 ```
 
 And on Windows:
 
 ```bash
 set APPLITOOLS_API_KEY=<your_key>
-npx testcafe chrome:headless tests
+npx testcafe chrome:headless some-test-dir
 ```
 
 It's also possible to specify the API key in the `applitools.config.js` file. The property name is `apiKey`. For example:
