@@ -14,6 +14,7 @@ const makeHandleResizeTestcafe = require('./makeHandleResizeTestcafe');
 const handleBatchResultsFile = require('./handleBatchResultsFile');
 const initDefaultConfig = require('./initDefaultConfig');
 const getUserAgent = require('./getUserAgent');
+const printResults = require('./printResults');
 const DEFAULT_VIEWPORT = {width: 1024, height: 768};
 
 class Eyes {
@@ -79,6 +80,8 @@ class Eyes {
       rejectOnErrors && this._defaultConfig.failTestcafeOnDiff && this._containsFailure(results)
         ? Promise.reject.bind(Promise)
         : Promise.resolve.bind(Promise);
+
+    printResults(results);
     return settle(results);
   }
 

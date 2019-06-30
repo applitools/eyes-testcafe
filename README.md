@@ -47,13 +47,13 @@ After defining the API key, you will be able to use commands from Eyes-Testcafe 
 ### Example
 
 ```js
-import Eyes from '@applitools/eyes';
+import Eyes from '@applitools/eyes-testcafe';
 const eyes = new Eyes();
 
 fixture`Hello world`
   .page('https://applitools.com/helloworld')
-  .afterEach(async () => eyes.close());
-  .after(async () => eyes.waitForResults())
+  .afterEach(async () => eyes.close())
+  .after(async () => eyes.waitForResults());
   
 test('Cookies', async t => {
   await eyes.open({
