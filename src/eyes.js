@@ -110,7 +110,7 @@ class Eyes {
 
     const stringableConfig = {...testInfo.config};
     delete stringableConfig.t;
-    this._logger.log(`[_openTest] opening with' ${JSON.stringify(stringableConfig)}`);
+    this._logger.log(`[_openTest] opening with ${JSON.stringify(stringableConfig)}`);
     testInfo.eyes = await this._client.openEyes(testInfo.config);
     return testInfo;
   }

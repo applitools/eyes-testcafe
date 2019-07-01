@@ -24,11 +24,12 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
       logger.log('warning cannot get proxy url !!');
     }
 
-    logger.log(`mapping proxy url ${proxyUrl} for ${cssBlobs.length} css blobs`);
+    logger.log('mapping proxy url', proxyUrl);
+    logger.log(`mapping ${cssBlobs.length} css blobs`);
     cssBlobs.forEach(r => (r.value = Buffer.from(doMapProxyUrls(r.value, proxyUrl))));
-    logger.log(`mapping proxy url ${proxyUrl} for ${proxyStyleElements.length} style elements`);
+    logger.log(`mapping ${proxyStyleElements.length} style elements`);
     proxyStyleElements.forEach(n => (n.nodeValue = doMapProxyUrls(n.nodeValue, proxyUrl)));
-    logger.log(`mapping proxy url ${proxyUrl} for ${styleAttrs.length} style attributes`);
+    logger.log(`mapping ${styleAttrs.length} style attributes`);
     styleAttrs.forEach(a => (a.value = doMapProxyUrls(a.value, proxyUrl)));
   };
 
