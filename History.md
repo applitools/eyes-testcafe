@@ -1,4 +1,12 @@
 
+v1.1.7 / 2019-07-11
+===================
+
+* 1.1.7 [[4e35afe](/commit/4e35afebaa77a840f0618d2c0068abdce6b7470a)]
+* better disabling [[f625a5c](/commit/f625a5cff4446adc1221c0a8ae19d9c014dad8cb)]
+* log changes [[a737043](/commit/a73704340553590856359ef9c2ef1ada4dc9ca62)]
+* changelog [[b67bd31](/commit/b67bd31bcb37265dd6a79cd3747aa7d23fb1d762)]
+
 v1.1.6 / 2019-06-30
 ===================
 
