@@ -35,15 +35,19 @@ class Eyes {
 
   async open(args) {
     this._logger.log('[open] called by user');
+    this._currentTest = await this._openAndInitTest(args);
+    if (this._shouldSkip('open')) {
+      return;
+    }
+
     this._assertCanOpen(args);
     await this._assertClosed('open');
     this._testcafeSize = await this._handleResizeTestcafe(args.browser, args.t, this._testcafeSize);
-    this._currentTest = await this._openTest(args);
   }
 
   async close() {
     this._logger.log('[close] called by user');
-    if (this._shouldIgnore('close')) {
+    if (this._shouldSkip('close')) {
       return;
     }
     this._closeTest();
@@ -54,7 +58,7 @@ class Eyes {
 
   async checkWindow(args) {
     this._logger.log('[checkWindow] called by user');
-    if (this._shouldIgnore('checkWindow')) {
+    if (this._shouldSkip('checkWindow')) {
       return;
     }
 
@@ -71,6 +75,9 @@ class Eyes {
 
   async waitForResults(rejectOnErrors = true) {
     this._logger.log('[waitForResults] called by user');
+    if (this._shouldSkip('waitForResults')) {
+      return [];
+    }
     await this._assertClosed('waitForResults');
     let results = await Promise.all(this._closedTests.map(b => b.closePromise));
     results = results.map(this._removeTestResultsIfError.bind(this));
@@ -92,25 +99,33 @@ class Eyes {
     return await this._processPageClientFunction(t);
   }
 
-  async _openTest(args) {
+  async _openAndInitTest(args) {
     const testInfo = this._initTestInfo({
       isTestStarted: true,
       isDisabled: this._defaultConfig.isDisabled || args.isDisabled,
       config: {
-        userAgent: await this._getUserAgent(args.t),
         ...this._defaultConfig,
         ...args,
       },
       t: args.t,
     });
-    if (testInfo.isDisabled) {
-      this._logger.log('[_openTest] skipping open since eyes is disabled');
-      return;
+
+    if (this._defaultConfig.eyesIsDisabled && args.isDisabled === false) {
+      throw new Error(
+        `Eyes is globaly disabled (via APPLITOOLS_IS_DISABLED or with applitools.config.js), ` +
+          `but the test was set with isDisabled false. ` +
+          `A test cannot be enabled when Eyes is disabled globaly. ` +
+          `Please enable the test or enable Eyes globaly.`,
+      );
     }
+    if (testInfo.isDisabled) {
+      return testInfo;
+    }
+    testInfo.config.userAgent = await this._getUserAgent(args.t);
 
     const stringableConfig = {...testInfo.config};
     delete stringableConfig.t;
-    this._logger.log(`[_openTest] opening with ${JSON.stringify(stringableConfig)}`);
+    this._logger.log(`[_openAndInitTest] opening with ${JSON.stringify(stringableConfig)}`);
     testInfo.eyes = await this._client.openEyes(testInfo.config);
     return testInfo;
   }
@@ -155,14 +170,6 @@ class Eyes {
     if (!args.t || !args.t.resizeWindow) {
       throw new Error('eyes.open() was called without test contorller "t".');
     }
-    if (this._defaultConfig.eyesIsDisabled && args.isDisabled === false) {
-      throw new Error(
-        `Eyes is globaly disabled (via APPLITOOLS_IS_DISABLED or with applitools.config.js), ` +
-          `but the test was set with isDisabled false. ` +
-          `A test cannot be enabled when Eyes is disabled globaly. ` +
-          `Please enable the test or enable Eyes globaly.`,
-      );
-    }
   }
 
   _containsFailure(testsResults) {
@@ -188,13 +195,13 @@ class Eyes {
     this._currentTest.closePromise = closePromise;
   }
 
-  _shouldIgnore(methodName) {
+  _shouldSkip(methodName) {
     if (!this._currentTest) {
-      this._logger.log(`[${methodName}] closed when no current test, ignoring.`);
+      this._logger.log(`no current test, skipping ${methodName}()`);
       return true;
     }
     if (this._currentTest.isDisabled) {
-      this._logger.log(`[${methodName}] eyes is disabled, ignoring.`);
+      this._logger.log(`eyes is disabled, skipping ${methodName}().`);
       return true;
     }
   }
