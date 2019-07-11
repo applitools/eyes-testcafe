@@ -39,9 +39,6 @@ class Eyes {
     if (this._shouldSkip('open')) {
       return;
     }
-
-    this._assertCanOpen(args);
-    await this._assertClosed('open');
     this._testcafeSize = await this._handleResizeTestcafe(args.browser, args.t, this._testcafeSize);
   }
 
@@ -126,6 +123,9 @@ class Eyes {
     const stringableConfig = {...testInfo.config};
     delete stringableConfig.t;
     this._logger.log(`[_openAndInitTest] opening with ${JSON.stringify(stringableConfig)}`);
+
+    await this._assertClosed('open');
+    this._assertCanOpen(args);
     testInfo.eyes = await this._client.openEyes(testInfo.config);
     return testInfo;
   }
