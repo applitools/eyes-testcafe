@@ -1,4 +1,17 @@
 
+v1.1.9 / 2019-07-11
+===================
+
+* 1.1.9 [[f876a18](/commit/f876a183602223249653f2e6be4864d8ff80ac4f)]
+* updated ds & vgc [[3bba48a](/commit/3bba48a6283909e2e1506a4e65a95bf7f9ac6898)]
+
+v1.1.8 / 2019-07-11
+===================
+
+* 1.1.8 [[1a55be2](/commit/1a55be20652a14f555a11da65408b95130c1eb05)]
+* better assertions before open [[0d49374](/commit/0d49374fb9bafe197c92dd7cbab3ac9dc75255ad)]
+* changelog [[477a8b3](/commit/477a8b321528b15217be6ec22279f1cba4201369)]
+
 v1.1.7 / 2019-07-11
 ===================
 
