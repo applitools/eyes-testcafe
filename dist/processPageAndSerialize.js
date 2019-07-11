@@ -71,48 +71,47 @@ module.exports = () => {
   }
 
   function extractLinks(doc = document) {
-    const srcsetUrls = _toConsumableArray(doc.querySelectorAll('img[srcset],source[srcset]')).map(srcsetEl => srcsetEl.getAttribute('srcset').split(',').map(str => str.trim().split(/\s+/)[0])).reduce((acc, urls) => acc.concat(urls), []);
-
-    const srcUrls = _toConsumableArray(doc.querySelectorAll('img[src],source[src]')).map(srcEl => srcEl.getAttribute('src'));
-
-    const imageUrls = _toConsumableArray(doc.querySelectorAll('image,use')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(u => u && u[0] !== '#');
-
-    const objectUrls = _toConsumableArray(doc.querySelectorAll('object')).map(el => el.getAttribute('data')).filter(Boolean);
-
-    const cssUrls = _toConsumableArray(doc.querySelectorAll('link[rel="stylesheet"]')).map(link => link.getAttribute('href'));
-
-    const videoPosterUrls = _toConsumableArray(doc.querySelectorAll('video[poster]')).map(videoEl => videoEl.getAttribute('poster'));
-
-    return [].concat(_toConsumableArray(srcsetUrls), _toConsumableArray(srcUrls), _toConsumableArray(imageUrls), _toConsumableArray(cssUrls), _toConsumableArray(videoPosterUrls), _toConsumableArray(objectUrls));
+    const srcsetUrls = window.Array.from(doc.querySelectorAll('img[srcset],source[srcset]')).map(srcsetEl => srcsetEl.getAttribute('srcset').split(',').map(str => str.trim().split(/\s+/)[0])).reduce((acc, urls) => acc.concat(urls), []);
+    const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src]')).map(srcEl => srcEl.getAttribute('src'));
+    const imageUrls = window.Array.from(doc.querySelectorAll('image,use')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(u => u && u[0] !== '#');
+    const objectUrls = window.Array.from(doc.querySelectorAll('object')).map(el => el.getAttribute('data')).filter(Boolean);
+    const cssUrls = window.Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(link => link.getAttribute('href'));
+    const videoPosterUrls = window.Array.from(doc.querySelectorAll('video[poster]')).map(videoEl => videoEl.getAttribute('poster'));
+    return window.Array.from(srcsetUrls).concat(window.Array.from(srcUrls)).concat(window.Array.from(imageUrls)).concat(window.Array.from(cssUrls)).concat(window.Array.from(videoPosterUrls)).concat(window.Array.from(objectUrls));
   }
 
   var extractLinks_1 = extractLinks;
 
-  /* eslint-disable no-use-before-define */
+  function absolutizeUrl(url, absoluteUrl) {
+    return new URL(url, absoluteUrl).href;
+  }
 
-  function domNodesToCdt(docNode) {
-    const NODE_TYPES = {
-      ELEMENT: 1,
-      TEXT: 3,
-      DOCUMENT: 9,
-      DOCUMENT_TYPE: 10,
-      DOCUMENT_FRAGMENT_NODE: 11
-    };
+  var absolutizeUrl_1 = absolutizeUrl;
+
+  function uuid() {
+    return window.crypto.getRandomValues(new Uint32Array(1))[0];
+  }
+
+  var uuid_1 = uuid;
+
+  function domNodesToCdt(docNode, url) {
     const cdt = [{
-      nodeType: NODE_TYPES.DOCUMENT
+      nodeType: Node.DOCUMENT_NODE
     }];
     const documents = [docNode];
-    cdt[0].childNodeIndexes = childrenFactory(cdt, documents, docNode.childNodes);
+    const canvasElements = [];
+    cdt[0].childNodeIndexes = childrenFactory(cdt, docNode.childNodes);
     return {
       cdt,
-      documents
+      documents,
+      canvasElements
     };
 
-    function childrenFactory(domNodes, documents, elementNodes) {
+    function childrenFactory(cdt, elementNodes) {
       if (!elementNodes || elementNodes.length === 0) return null;
       const childIndexes = [];
-      elementNodes.forEach(elementNode => {
-        const index = elementNodeFactory(domNodes, documents, elementNode);
+      window.Array.prototype.forEach.call(elementNodes, elementNode => {
+        const index = elementNodeFactory(cdt, elementNode);
 
         if (index !== null) {
           childIndexes.push(index);
@@ -121,46 +120,38 @@ module.exports = () => {
       return childIndexes;
     }
 
-    function elementNodeFactory(domNodes, documents, elementNode) {
+    function elementNodeFactory(cdt, elementNode) {
       let node, manualChildNodeIndexes;
       const {
         nodeType
       } = elementNode;
+      let canvasUrl;
 
-      if ([NODE_TYPES.ELEMENT, NODE_TYPES.DOCUMENT_FRAGMENT_NODE].includes(nodeType)) {
+      if ([Node.ELEMENT_NODE, Node.DOCUMENT_FRAGMENT_NODE].includes(nodeType)) {
         if (elementNode.nodeName !== 'SCRIPT') {
           if (elementNode.nodeName === 'STYLE' && elementNode.sheet && elementNode.sheet.cssRules.length) {
-            domNodes.push({
-              nodeType: NODE_TYPES.TEXT,
-              nodeValue: _toConsumableArray(elementNode.sheet.cssRules).map(rule => rule.cssText).join('')
-            });
-            manualChildNodeIndexes = [domNodes.length - 1];
+            cdt.push(getCssRulesNode(elementNode));
+            manualChildNodeIndexes = [cdt.length - 1];
           }
 
-          node = {
-            nodeType: nodeType,
-            nodeName: elementNode.nodeName,
-            attributes: nodeAttributes(elementNode).map(key => {
-              let value = elementNode.attributes[key].value;
-              const name = elementNode.attributes[key].name;
-
-              if (/^blob:/.test(value)) {
-                value = value.replace(/^blob:/, '');
-              } else if (elementNode.nodeName === 'IFRAME' && name === 'src' && !elementNode.contentDocument && !value.match(/^\s*data:/)) {
-                value = '';
-              }
-
-              return {
-                name,
-                value
-              };
-            }),
-            childNodeIndexes: manualChildNodeIndexes || (elementNode.childNodes.length ? childrenFactory(domNodes, documents, elementNode.childNodes) : [])
-          };
+          node = getBasicNode(elementNode);
+          node.childNodeIndexes = manualChildNodeIndexes || (elementNode.childNodes.length ? childrenFactory(cdt, elementNode.childNodes) : []);
 
           if (elementNode.shadowRoot) {
-            node.shadowRootIndex = elementNodeFactory(domNodes, documents, elementNode.shadowRoot);
+            node.shadowRootIndex = elementNodeFactory(cdt, elementNode.shadowRoot);
             documents.push(elementNode.shadowRoot);
+          }
+
+          if (elementNode.nodeName === 'CANVAS') {
+            canvasUrl = absolutizeUrl_1(`canvas-${uuid_1()}.png`, url);
+            node.attributes.push({
+              name: 'data-applitools-src',
+              value: canvasUrl
+            });
+            canvasElements.push({
+              element: elementNode,
+              url: canvasUrl
+            });
           }
 
           if (elementNode.checked && !elementNode.attributes.checked) {
@@ -177,52 +168,85 @@ module.exports = () => {
             });
           }
         } else {
-          node = {
-            nodeType: NODE_TYPES.ELEMENT,
-            nodeName: 'SCRIPT',
-            attributes: nodeAttributes(elementNode).map(key => ({
-              name: elementNode.attributes[key].name,
-              value: elementNode.attributes[key].value
-            })).filter(attr => attr.name !== 'src'),
-            childNodeIndexes: []
-          };
+          node = getScriptNode(elementNode);
         }
-      } else if (nodeType === NODE_TYPES.TEXT) {
-        node = {
-          nodeType: NODE_TYPES.TEXT,
-          nodeValue: elementNode.nodeValue
-        };
-      } else if (nodeType === NODE_TYPES.DOCUMENT_TYPE) {
-        node = {
-          nodeType: NODE_TYPES.DOCUMENT_TYPE,
-          nodeName: elementNode.nodeName
-        };
+      } else if (nodeType === Node.TEXT_NODE) {
+        node = getTextNode(elementNode);
+      } else if (nodeType === Node.DOCUMENT_TYPE_NODE) {
+        node = getDocNode(elementNode);
       }
 
       if (node) {
-        domNodes.push(node);
-        return domNodes.length - 1;
+        cdt.push(node);
+        return cdt.length - 1;
       } else {
-        // console.log(`Unknown nodeType: ${nodeType}`);
         return null;
       }
+    }
 
-      function nodeAttributes({
-        attributes = {}
-      }) {
-        return window.Object.keys(attributes).filter(k => attributes[k].name);
-      }
+    function nodeAttributes({
+      attributes = {}
+    }) {
+      return window.Object.keys(attributes).filter(k => attributes[k] && attributes[k].name);
+    }
+
+    function getCssRulesNode(elementNode) {
+      return {
+        nodeType: Node.TEXT_NODE,
+        nodeValue: window.Array.from(elementNode.sheet.cssRules).map(rule => rule.cssText).join('')
+      };
+    }
+
+    function getBasicNode(elementNode) {
+      return {
+        nodeType: elementNode.nodeType,
+        nodeName: elementNode.nodeName,
+        attributes: nodeAttributes(elementNode).map(key => {
+          let value = elementNode.attributes[key].value;
+          const name = elementNode.attributes[key].name;
+
+          if (/^blob:/.test(value)) {
+            value = value.replace(/^blob:/, '');
+          } else if (elementNode.nodeName === 'IFRAME' && name === 'src' && !elementNode.contentDocument && !value.match(/^\s*data:/)) {
+            value = '';
+          }
+
+          return {
+            name,
+            value
+          };
+        })
+      };
+    }
+
+    function getScriptNode(elementNode) {
+      return {
+        nodeType: Node.ELEMENT_NODE,
+        nodeName: 'SCRIPT',
+        attributes: nodeAttributes(elementNode).map(key => ({
+          name: elementNode.attributes[key].name,
+          value: elementNode.attributes[key].value
+        })).filter(attr => attr.name !== 'src'),
+        childNodeIndexes: []
+      };
+    }
+
+    function getTextNode(elementNode) {
+      return {
+        nodeType: Node.TEXT_NODE,
+        nodeValue: elementNode.nodeValue
+      };
+    }
+
+    function getDocNode(elementNode) {
+      return {
+        nodeType: Node.DOCUMENT_TYPE_NODE,
+        nodeName: elementNode.nodeName
+      };
     }
   }
 
   var domNodesToCdt_1 = domNodesToCdt;
-  var NODE_TYPES = {
-    ELEMENT: 1,
-    TEXT: 3,
-    DOCUMENT: 9,
-    DOCUMENT_TYPE: 10
-  };
-  domNodesToCdt_1.NODE_TYPES = NODE_TYPES;
 
   function flat(arr) {
     var _ref;
@@ -233,7 +257,7 @@ module.exports = () => {
   var flat_1 = flat;
 
   function extractFrames(documents = [document]) {
-    const iframes = flat_1(documents.map(d => _toConsumableArray(d.querySelectorAll('iframe[src]:not([src=""])'))));
+    const iframes = flat_1(documents.map(d => window.Array.from(d.querySelectorAll('iframe[src]:not([src=""])'))));
     return iframes.map(srcEl => {
       try {
         const contentDoc = srcEl.contentDocument;
@@ -296,11 +320,54 @@ module.exports = () => {
 
   var toUnAnchoredUri_1 = toUnAnchoredUri;
 
-  function absolutizeUrl(url, absoluteUrl) {
-    return new URL(url, absoluteUrl).href;
+  function createTempStylsheet(cssContent) {
+    if (!cssContent) {
+      console.log('[dom-snapshot] error createTempStylsheet called without cssContent');
+      return;
+    }
+
+    const head = document.head || document.querySelectorAll('head')[0];
+    const style = document.createElement('style');
+    style.type = 'text/css';
+    style.setAttribute('data-desc', 'Applitools tmp variable created by DOM SNAPSHOT');
+    head.appendChild(style); // This is required for IE8 and below.
+
+    if (style.styleSheet) {
+      style.styleSheet.cssText = cssContent;
+    } else {
+      style.appendChild(document.createTextNode(cssContent));
+    }
+
+    return style.sheet;
   }
 
-  var absolutizeUrl_1 = absolutizeUrl;
+  var createTempStyleSheet = createTempStylsheet;
+
+  function makeExtractResourcesFromStyle({
+    extractResourcesFromStyleSheet
+  }) {
+    return function extractResourcesFromStyle(styleSheet, cssContent, doc = document) {
+      let corsFreeStyleSheet;
+
+      try {
+        styleSheet.cssRules;
+        corsFreeStyleSheet = styleSheet;
+      } catch (e) {
+        console.log(`[dom-snapshot] could not access cssRules for ${styleSheet.href} ${e}\ncreating temp style for access.`);
+        corsFreeStyleSheet = createTempStyleSheet(cssContent);
+      }
+
+      const result = extractResourcesFromStyleSheet(corsFreeStyleSheet, doc);
+
+      if (corsFreeStyleSheet !== styleSheet) {
+        corsFreeStyleSheet.ownerNode.parentNode.removeChild(corsFreeStyleSheet.ownerNode);
+      }
+
+      return result;
+    };
+  }
+
+  var extractResourcesFromStyle = makeExtractResourcesFromStyle;
 
   function makeProcessResource({
     fetchUrl,
@@ -310,6 +377,9 @@ module.exports = () => {
     isSameOrigin,
     cache = {}
   }) {
+    const extractResourcesFromStyle$1 = extractResourcesFromStyle({
+      extractResourcesFromStyleSheet
+    });
     return function processResource(absoluteUrl, documents, baseUrl, getResourceUrlsAndBlobs) {
       return cache[absoluteUrl] || (cache[absoluteUrl] = doProcessResource(absoluteUrl));
 
@@ -349,7 +419,7 @@ module.exports = () => {
             const styleSheet = findStyleSheetByUrl(url, documents);
 
             if (styleSheet) {
-              resourceUrls = extractResourcesFromStyleSheet(styleSheet, documents[0]);
+              resourceUrls = extractResourcesFromStyle$1(styleSheet, value, documents[0]);
             }
           } else if (/image\/svg/.test(type)) {
             resourceUrls = extractResourcesFromSvg(value);
@@ -379,7 +449,7 @@ module.exports = () => {
       }
 
       function probablyCORS(err, url) {
-        const msgCORS = err.message && err.message.includes('Failed to fetch');
+        const msgCORS = err.message && (err.message.includes('Failed to fetch') || err.message.includes('Network request failed'));
         const nameCORS = err.name && err.name.includes('TypeError');
         return msgCORS && nameCORS && !isSameOrigin(url, baseUrl);
       }
@@ -403,7 +473,7 @@ module.exports = () => {
         const doc = domparser.parseFromString(svgStr, 'image/svg+xml');
         const fromImages = window.Array.from(doc.getElementsByTagName('image')).concat(window.Array.from(doc.getElementsByTagName('use'))).map(e => e.getAttribute('href') || e.getAttribute('xlink:href'));
         const fromObjects = window.Array.from(doc.getElementsByTagName('object')).map(e => e.getAttribute('data'));
-        urls = [].concat(_toConsumableArray(fromImages), _toConsumableArray(fromObjects)).filter(u => u[0] !== '#');
+        urls = fromImages.concat(fromObjects).filter(u => u[0] !== '#');
       } catch (e) {
         console.log('could not parse svg content', e);
       }
@@ -433,7 +503,7 @@ module.exports = () => {
     styleSheetCache
   }) {
     return function findStyleSheetByUrl(url, documents) {
-      const allStylesheets = flat_1(documents.map(d => _toConsumableArray(d.styleSheets)));
+      const allStylesheets = flat_1(documents.map(d => window.Array.from(d.styleSheets)));
       return styleSheetCache[url] || allStylesheets.find(styleSheet => styleSheet.href && toUnAnchoredUri_1(styleSheet.href) === url);
     };
   }
@@ -459,13 +529,13 @@ module.exports = () => {
   }) {
     return function extractResourcesFromStyleSheet(styleSheet, doc = document) {
       const win = doc.defaultView || doc.ownerDocument.defaultView;
-      return uniq_1(_toConsumableArray(styleSheet.cssRules || []).reduce((acc, rule) => {
+      return uniq_1(window.Array.from(styleSheet.cssRules || []).reduce((acc, rule) => {
         if (rule instanceof win.CSSImportRule) {
           styleSheetCache[rule.styleSheet.href] = rule.styleSheet;
           return acc.concat(rule.href);
         } else if (rule instanceof win.CSSFontFaceRule) {
-          return acc.concat(getUrlFromCssText_1(rule.style.getPropertyValue('src')));
-        } else if (rule instanceof win.CSSSupportsRule || rule instanceof win.CSSMediaRule) {
+          return acc.concat(getUrlFromCssText_1(rule.cssText));
+        } else if (win.CSSSupportsRule && rule instanceof win.CSSSupportsRule || rule instanceof win.CSSMediaRule) {
           return acc.concat(extractResourcesFromStyleSheet(rule));
         } else if (rule instanceof win.CSSStyleRule) {
           for (let i = 0, ii = rule.style.length; i < ii; i++) {
@@ -496,15 +566,45 @@ module.exports = () => {
 
   function makeExtractResourceUrlsFromStyleTags(extractResourcesFromStyleSheet) {
     return function extractResourceUrlsFromStyleTags(doc) {
-      return uniq_1(_toConsumableArray(doc.querySelectorAll('style')).reduce((resourceUrls, styleEl) => {
-        const styleSheet = _toConsumableArray(doc.styleSheets).find(styleSheet => styleSheet.ownerNode === styleEl);
-
+      return uniq_1(window.Array.from(doc.querySelectorAll('style')).reduce((resourceUrls, styleEl) => {
+        const styleSheet = window.Array.from(doc.styleSheets).find(styleSheet => styleSheet.ownerNode === styleEl);
         return styleSheet ? resourceUrls.concat(extractResourcesFromStyleSheet(styleSheet, doc)) : resourceUrls;
       }, []));
     };
   }
 
   var extractResourceUrlsFromStyleTags = makeExtractResourceUrlsFromStyleTags;
+
+  function base64ToArrayBuffer(base64) {
+    var binary_string = window.atob(base64);
+    var len = binary_string.length;
+    var bytes = new Uint8Array(len);
+
+    for (var i = 0; i < len; i++) {
+      bytes[i] = binary_string.charCodeAt(i);
+    }
+
+    return bytes.buffer;
+  }
+
+  var base64ToArrayBuffer_1 = base64ToArrayBuffer;
+
+  function buildCanvasBlobs(canvasElements) {
+    return canvasElements.map(({
+      url,
+      element
+    }) => {
+      const data = element.toDataURL('image/png');
+      const value = base64ToArrayBuffer_1(data.split(',')[1]);
+      return {
+        url,
+        type: 'image/png',
+        value
+      };
+    });
+  }
+
+  var buildCanvasBlobs_1 = buildCanvasBlobs;
 
   function toUriEncoding(url) {
     const result = url && url.replace(/(\\[0-9a-fA-F]{1,6}\s?)/g, s => {
@@ -556,18 +656,21 @@ module.exports = () => {
     return doProcessPage(doc);
 
     function doProcessPage(doc) {
+      const baseUrl = doc.querySelectorAll('base')[0] && doc.querySelectorAll('base')[0].href;
       const frameElement = doc.defaultView && doc.defaultView.frameElement;
-      const url = frameElement ? frameElement.src : doc.location.href;
+      const url = baseUrl || (frameElement ? frameElement.src : doc.location.href);
       const {
         cdt,
-        documents
-      } = domNodesToCdt_1(doc);
+        documents,
+        canvasElements
+      } = domNodesToCdt_1(doc, url);
       const linkUrls = flat_1(documents.map(extractLinks_1));
       const styleTagUrls = flat_1(documents.map(extractResourceUrlsFromStyleTags$1));
-      const links = uniq_1([].concat(_toConsumableArray(linkUrls), _toConsumableArray(styleTagUrls), _toConsumableArray(extractResourceUrlsFromStyleAttrs_1(cdt)))).map(toUnAnchoredUri_1).map(toUriEncoding_1).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
+      const links = uniq_1(window.Array.from(linkUrls).concat(window.Array.from(styleTagUrls)).concat(extractResourceUrlsFromStyleAttrs_1(cdt))).map(toUnAnchoredUri_1).map(toUriEncoding_1).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
       const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(documents, url, links);
       const frameDocs = extractFrames_1(documents);
       const processFramesPromise = frameDocs.map(doProcessPage);
+      const canvasBlobs = buildCanvasBlobs_1(canvasElements);
       return Promise.all([resourceUrlsAndBlobsPromise].concat(_toConsumableArray(processFramesPromise))).then(([{
         resourceUrls,
         blobsObj
@@ -575,7 +678,7 @@ module.exports = () => {
         cdt,
         url,
         resourceUrls,
-        blobs: blobsObjToArray(blobsObj),
+        blobs: [].concat(_toConsumableArray(blobsObjToArray(blobsObj)), _toConsumableArray(canvasBlobs)),
         frames: framesResults,
         srcAttr: frameElement ? frameElement.getAttribute('src') : undefined
       }));
