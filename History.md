@@ -1,4 +1,11 @@
 
+v1.1.10 / 2019-07-14
+====================
+
+* 1.1.10 [[4696c70](/commit/4696c7010c71f3902b1fefa60b7f4189f8ba3731)]
+* added support for Testcafe Selectors [[0e38838](/commit/0e388385f871197a20f263da8b89711790d904d8)]
+* changelog [[6ceb10b](/commit/6ceb10bcc1705e6edbced3f494ab931c180da17b)]
+
 v1.1.9 / 2019-07-11
 ===================
 
