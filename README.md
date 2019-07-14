@@ -118,7 +118,7 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
         });
     ```
 - #### selector 
-  (optional) In case [target](#target) is `region`, this should be the actual css or xpath selector to an element, and the screenshot would be the content of that element. For example:
+  (optional) In case [target](#target) is `region`, this should be the actual css, xpath or [a Testcafe Selector](https://devexpress.github.io/testcafe/documentation/test-api/selecting-page-elements/selectors/) to an element, and the screenshot would be the content of that element. For example:
 
   ```js
       // The shorthand string version defaults to css selectors
@@ -136,14 +136,21 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
         }
       });
 
+      // Using a Testcafe Selector
+      import {Selector} from 'testcafe';
+      eyes.checkWindow({
+        target: 'region',
+        selector: Selector('.my-region')
+      });
+
       // Using an xpath selector
-    eyes.checkWindow({
-      target: 'region',
-      selector: {
-        type: 'xpath',
-        selector: '//button[1]'
-      }
-    });
+      eyes.checkWindow({
+        target: 'region',
+        selector: {
+          type: 'xpath',
+          selector: '//button[1]'
+        }
+      });
   ```
 
 - #### region 
@@ -163,7 +170,8 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
     eyes.checkWindow({
       ignore: [
         {top: 100, left: 0, width: 1000, height: 100},
-        {selector: '.some-div-to-ignore'}
+        {selector: '.some-div-to-ignore'},
+        {selector: Selector('.some-div')}
       ]
     });
     ```
@@ -175,7 +183,8 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
     eyes.checkWindow({
       floating: [
         {top: 100, left: 0, width: 1000, height: 100, maxUpOffset: 20, maxDownOffset: 20, maxLeftOffset: 20, maxRightOffset: 20},
-        {selector: '.some-div-to-float', maxUpOffset: 20, maxDownOffset: 20, maxLeftOffset: 20, maxRightOffset: 20}
+        {selector: '.some-div-to-float', maxUpOffset: 20, maxDownOffset: 20, maxLeftOffset: 20, maxRightOffset: 20},
+        {selector: Selector('.some-div'), maxUpOffset: 20, maxDownOffset: 20, maxLeftOffset: 20, maxRightOffset: 20}
       ]
     });
     ```
@@ -183,11 +192,11 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
 - #### layout
   (optional): A single or an array of regions to match as [layout level.](https://help.applitools.com/hc/en-us/articles/360007188591-Match-Levels) For example:
     ```js
-
     eyes.checkWindow({
       layout: [
         {top: 100, left: 0, width: 1000, height: 100},
-        {selector: '.some-div-to-test-as-layout'}
+        {selector: '.some-div-to-test-as-layout'},
+        {selector: Selector('.some-div')}
       ]
     });
     ```
@@ -195,11 +204,11 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
 - #### strict
   (optional): A single or an array of regions to match as [strict level.](https://help.applitools.com/hc/en-us/articles/360007188591-Match-Levels) For example:
     ```js
-
     eyes.checkWindow({
       strict: [
         {top: 100, left: 0, width: 1000, height: 100},
-        {selector: '.some-div-to-test-as-strict'}
+        {selector: '.some-div-to-test-as-strict'},
+        {selector: Selector('.some-div')}
       ]
     });
     ```

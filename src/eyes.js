@@ -15,6 +15,7 @@ const handleBatchResultsFile = require('./handleBatchResultsFile');
 const initDefaultConfig = require('./initDefaultConfig');
 const getUserAgent = require('./getUserAgent');
 const printResults = require('./printResults');
+const convertSelectors = require('./convertSelectors');
 const DEFAULT_VIEWPORT = {width: 1024, height: 768};
 
 class Eyes {
@@ -37,6 +38,7 @@ class Eyes {
     this._logger.log('[open] called by user');
     this._currentTest = await this._openAndInitTest(args);
     if (this._shouldSkip('open')) {
+      this._currentTest = null;
       return;
     }
     this._testcafeSize = await this._handleResizeTestcafe(args.browser, args.t, this._testcafeSize);
@@ -64,6 +66,11 @@ class Eyes {
     this._mapProxyUrls(result);
     blobsToResourceContents(result);
 
+    await convertSelectors({
+      args,
+      t: this._currentTest.t,
+      logger: this._logger.extend('convertSelectors'),
+    });
     this._logger.log(
       `[checkWindow] checking for test '${this._currentTestName()}' with ${JSON.stringify(args)}`,
     );
@@ -72,9 +79,6 @@ class Eyes {
 
   async waitForResults(rejectOnErrors = true) {
     this._logger.log('[waitForResults] called by user');
-    if (this._shouldSkip('waitForResults')) {
-      return [];
-    }
     await this._assertClosed('waitForResults');
     let results = await Promise.all(this._closedTests.map(b => b.closePromise));
     results = results.map(this._removeTestResultsIfError.bind(this));
