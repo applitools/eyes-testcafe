@@ -269,7 +269,7 @@ ___
 
 Every call to `eyes.open` and `eyes.close` defines a test in Applitool Eyes, and all the calls to `eyes.checkWindow` between them are called "steps". In order to get a test structure in Applitools that corresponds to the test structure in Testcafe, it's best to open/close tests in every `test` call. **You can use `afterEach` for calling `eyes.close()`**
 
-Also note that after all tests are done you should call eyes.waitForResults, **you can use `aftre()` for calling `eyes.waitForResults`**, this is is done for two reasons:
+Also note that after all tests are done you should call eyes.waitForResults, **you can use `after()` for calling `eyes.waitForResults`**, this is is done for two reasons:
 1. to signal testcafe to wait untill all the tests have been completed.
 2. to obtain test results if needed.
 
