@@ -1,4 +1,12 @@
 
+v1.1.11 / 2019-07-18
+====================
+
+* 1.1.11 [[dea5053](/commit/dea5053af111d8d13521a5a11ca29cfc2914869b)]
+* gaurding empty tests and printing warning [[da3c386](/commit/da3c38671622baf768af4d06f3c4ee3329508eee)]
+* fixed typ [[7f6cf79](/commit/7f6cf79d256c8dc5c5ce3a97dc447f877025b3ab)]
+* changelog [[1a7c40b](/commit/1a7c40b53e62d1a4770dfb81aecb5f727aed2fcd)]
+
 v1.1.10 / 2019-07-14
 ====================
 
