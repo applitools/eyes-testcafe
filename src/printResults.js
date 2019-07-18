@@ -12,15 +12,18 @@ function printResults(results) {
   if (testResults.length > 0) {
     outputStr += '[EYES: TEST RESULTS]:\n';
     testResults.forEach(result => {
-      const storyTitle = `${result.getName()} [${result.getHostDisplaySize().toString()}] - `;
+      if (!result.id) {
+        return;
+      }
 
+      const title = `${result.getName()} [${result.getHostDisplaySize().toString()}] - `;
       if (result.getIsNew()) {
-        outputStr += `${storyTitle}${chalk.blue('New')}\n`;
+        outputStr += `${title}${chalk.blue('New')}\n`;
       } else if (result.isPassed()) {
-        outputStr += `${storyTitle}${chalk.green('Passed')}\n`;
+        outputStr += `${title}${chalk.green('Passed')}\n`;
       } else {
         const stepsFailed = result.getMismatches() + result.getMissing();
-        outputStr += `${storyTitle}${chalk.red(`Failed ${stepsFailed} of ${result.getSteps()}`)}\n`;
+        outputStr += `${title}${chalk.red(`Failed ${stepsFailed} of ${result.getSteps()}`)}\n`;
         exitCode = exitCode || 1;
       }
     });
@@ -33,7 +36,8 @@ function printResults(results) {
     outputStr += errors.map(err => chalk.red(err.toString())).join('\n');
   }
 
-  if (testResults[0]) {
+  const nonEmptyResult = testResults.find(tr => tr.id);
+  if (nonEmptyResult) {
     const diffCount = testResults.filter(result => !result.getIsNew() && !result.isPassed()).length;
     if (diffCount) {
       outputStr += chalk.red(`
@@ -43,7 +47,9 @@ A total of ${diffCount} difference${diffCount > 1 ? 's were' : ' was'} found.`);
 No differences were found!`);
     }
     outputStr += `\n
-See details at ${testResults[0].getAppUrls().getBatch()}\n`;
+See details at ${nonEmptyResult.getAppUrls().getBatch()}\n`;
+  } else {
+    outputStr += `\nAll tests are empty, make sure to add 'eyes.checkWindow' and wait for the promise to resolve!\n`;
   }
 
   console.log(outputStr);

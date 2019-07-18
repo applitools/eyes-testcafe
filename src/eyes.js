@@ -52,7 +52,6 @@ class Eyes {
     this._closeTest();
     this._closedTests.push(this._currentTest);
     this._currentTest = null;
-    return Promise.resolve();
   }
 
   async checkWindow(args) {
