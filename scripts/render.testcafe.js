@@ -1,6 +1,8 @@
 /* global fixture, test */
 import Eyes from '../src/eyes';
-const eyes = new Eyes();
+import path from 'path';
+const configPath = path.resolve(__dirname, '../tests/fixtures/applitools.config.js');
+const eyes = new Eyes({configPath});
 
 const url = process.argv[2];
 if (url) {

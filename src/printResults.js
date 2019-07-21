@@ -48,8 +48,12 @@ No differences were found!`);
     }
     outputStr += `\n
 See details at ${nonEmptyResult.getAppUrls().getBatch()}\n`;
-  } else {
-    outputStr += `\nYour tests do not contain visual checks! make sure that the test conatains 'eyes.checkWindow' calls and that they are awaited upon.\n`;
+  }
+
+  if (!nonEmptyResult && !errors.length) {
+    outputStr += chalk.yellow(
+      `\nYour tests do not contain visual checks! make sure that the test conatains 'eyes.checkWindow' calls and that they are awaited upon.\n`,
+    );
   }
 
   console.log(outputStr);
