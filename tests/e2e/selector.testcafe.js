@@ -1,7 +1,9 @@
 /* global fixture, test */
 import {Selector} from 'testcafe';
+import path from 'path';
 import Eyes from '../../src/eyes';
-const eyes = new Eyes();
+const configPath = path.resolve(__dirname, '../fixtures/applitools.config.js');
+const eyes = new Eyes({configPath});
 
 fixture`Selector`.page`http://localhost:7272/helloworld.html`
   .afterEach(async () => eyes.close())

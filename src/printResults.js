@@ -36,7 +36,7 @@ function printResults(results) {
     outputStr += errors.map(err => chalk.red(err.toString())).join('\n');
   }
 
-  const nonEmptyResult = testResults.find(tr => tr.id);
+  const nonEmptyResult = testResults.find(tr => tr.getStatus());
   if (nonEmptyResult) {
     const diffCount = testResults.filter(result => !result.getIsNew() && !result.isPassed()).length;
     if (diffCount) {
@@ -49,7 +49,7 @@ No differences were found!`);
     outputStr += `\n
 See details at ${nonEmptyResult.getAppUrls().getBatch()}\n`;
   } else {
-    outputStr += `\nAll tests are empty, make sure to add 'eyes.checkWindow' and wait for the promise to resolve!\n`;
+    outputStr += `\nYour tests do not contain visual checks! make sure that the test conatains 'eyes.checkWindow' calls and that they are awaited upon.\n`;
   }
 
   console.log(outputStr);
