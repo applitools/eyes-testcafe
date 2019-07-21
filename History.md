@@ -1,4 +1,11 @@
 
+v1.1.12 / 2019-07-21
+====================
+
+* 1.1.12 [[a82f6c8](/commit/a82f6c8ab973967947f0a99fc94a896b3e6d5dd8)]
+* fixed empty tests print [[3f131d5](/commit/3f131d5b8a0acf92e1a10cb418375793017bad0c)]
+* changelog [[aea786a](/commit/aea786aaf8803741b48dcf92abb2614463a33b62)]
+
 v1.1.11 / 2019-07-18
 ====================
 
