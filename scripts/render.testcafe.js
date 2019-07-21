@@ -16,6 +16,11 @@ fixture`TestCafeRender`
   .afterEach(async () => eyes.close())
   .after(async () => {
     const [results] = await eyes.waitForResults(true);
+    if (!results) {
+      console.log('[render.testcafe.js] error no results returned from waitForResults()');
+      return;
+    }
+
     if (results.some(r => r instanceof Error)) {
       console.log(
         '\nTest error:\n\t',
