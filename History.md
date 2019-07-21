@@ -1,4 +1,11 @@
 
+v1.1.13 / 2019-07-21
+====================
+
+* 1.1.13 [[0c0580e](/commit/0c0580e3247c180393f6490cfdfa9406f2e9086a)]
+* fixed empty test conosle log on errors [[378e8b2](/commit/378e8b284bdf6b22a1180bd4ca2f9c172be4524f)]
+* changelog [[0b8ce93](/commit/0b8ce93bf33fa80e8dd529dce5e5d676724ec35b)]
+
 v1.1.12 / 2019-07-21
 ====================
 
