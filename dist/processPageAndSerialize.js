@@ -94,17 +94,25 @@ module.exports = () => {
 
   var uuid_1 = uuid;
 
+  function isInlineFrame(frame) {
+    return frame && frame.contentDocument && !/^https?:$/.test(frame.contentDocument.location.protocol);
+  }
+
+  var isInlineFrame_1 = isInlineFrame;
+
   function domNodesToCdt(docNode, url) {
     const cdt = [{
       nodeType: Node.DOCUMENT_NODE
     }];
     const documents = [docNode];
     const canvasElements = [];
+    const inlineFrames = [];
     cdt[0].childNodeIndexes = childrenFactory(cdt, docNode.childNodes);
     return {
       cdt,
       documents,
-      canvasElements
+      canvasElements,
+      inlineFrames
     };
 
     function childrenFactory(cdt, elementNodes) {
@@ -125,7 +133,7 @@ module.exports = () => {
       const {
         nodeType
       } = elementNode;
-      let canvasUrl;
+      let dummyUrl, frameBase;
 
       if ([Node.ELEMENT_NODE, Node.DOCUMENT_FRAGMENT_NODE].includes(nodeType)) {
         if (elementNode.nodeName !== 'SCRIPT') {
@@ -143,28 +151,27 @@ module.exports = () => {
           }
 
           if (elementNode.nodeName === 'CANVAS') {
-            canvasUrl = absolutizeUrl_1(`canvas-${uuid_1()}.png`, url);
+            dummyUrl = absolutizeUrl_1(`applitools-canvas-${uuid_1()}.png`, url);
             node.attributes.push({
               name: 'data-applitools-src',
-              value: canvasUrl
+              value: dummyUrl
             });
             canvasElements.push({
               element: elementNode,
-              url: canvasUrl
+              url: dummyUrl
             });
           }
 
-          if (elementNode.checked && !elementNode.attributes.checked) {
+          if (elementNode.nodeName === 'IFRAME' && isInlineFrame_1(elementNode)) {
+            frameBase = getFrameBaseUrl(elementNode);
+            dummyUrl = absolutizeUrl_1(`?applitools-iframe=${uuid_1()}`, frameBase || url);
             node.attributes.push({
-              name: 'checked',
-              value: 'checked'
+              name: 'data-applitools-src',
+              value: dummyUrl
             });
-          }
-
-          if (elementNode.value !== undefined && elementNode.attributes.value === undefined && elementNode.tagName === 'INPUT') {
-            node.attributes.push({
-              name: 'value',
-              value: elementNode.value
+            inlineFrames.push({
+              element: elementNode,
+              url: dummyUrl
             });
           }
         } else {
@@ -198,7 +205,7 @@ module.exports = () => {
     }
 
     function getBasicNode(elementNode) {
-      return {
+      const node = {
         nodeType: elementNode.nodeType,
         nodeName: elementNode.nodeName,
         attributes: nodeAttributes(elementNode).map(key => {
@@ -207,8 +214,6 @@ module.exports = () => {
 
           if (/^blob:/.test(value)) {
             value = value.replace(/^blob:/, '');
-          } else if (elementNode.nodeName === 'IFRAME' && name === 'src' && !elementNode.contentDocument && !value.match(/^\s*data:/)) {
-            value = '';
           }
 
           return {
@@ -217,6 +222,22 @@ module.exports = () => {
           };
         })
       };
+
+      if (elementNode.checked && !elementNode.attributes.checked) {
+        node.attributes.push({
+          name: 'checked',
+          value: 'checked'
+        });
+      }
+
+      if (elementNode.value !== undefined && elementNode.attributes.value === undefined && elementNode.tagName === 'INPUT') {
+        node.attributes.push({
+          name: 'value',
+          value: elementNode.value
+        });
+      }
+
+      return node;
     }
 
     function getScriptNode(elementNode) {
@@ -244,30 +265,17 @@ module.exports = () => {
         nodeName: elementNode.nodeName
       };
     }
+
+    function getFrameBaseUrl(frameElement) {
+      const href = frameElement.contentDocument.querySelectorAll('base') && frameElement.contentDocument.querySelectorAll('base')[0] && frameElement.contentDocument.querySelectorAll('base')[0].href;
+
+      if (href && !href.includes('about:blank')) {
+        return href;
+      }
+    }
   }
 
   var domNodesToCdt_1 = domNodesToCdt;
-
-  function flat(arr) {
-    var _ref;
-
-    return (_ref = []).concat.apply(_ref, _toConsumableArray(arr));
-  }
-
-  var flat_1 = flat;
-
-  function extractFrames(documents = [document]) {
-    const iframes = flat_1(documents.map(d => window.Array.from(d.querySelectorAll('iframe[src]:not([src=""])'))));
-    return iframes.map(srcEl => {
-      try {
-        const contentDoc = srcEl.contentDocument;
-        return contentDoc && /^https?:$/.test(contentDoc.location.protocol) && contentDoc.defaultView && contentDoc.defaultView.frameElement && contentDoc;
-      } catch (err) {//for CORS frames
-      }
-    }).filter(x => !!x);
-  }
-
-  var extractFrames_1 = extractFrames;
 
   function uniq(arr) {
     const result = [];
@@ -374,7 +382,6 @@ module.exports = () => {
     findStyleSheetByUrl,
     extractResourcesFromStyleSheet,
     extractResourcesFromSvg,
-    isSameOrigin,
     cache = {}
   }) {
     const extractResourcesFromStyle$1 = extractResourcesFromStyle({
@@ -385,7 +392,7 @@ module.exports = () => {
 
       function doProcessResource(url) {
         return fetchUrl(url).catch(e => {
-          if (probablyCORS(e, url)) {
+          if (probablyCORS(e)) {
             return {
               probablyCORS: true,
               url
@@ -448,10 +455,10 @@ module.exports = () => {
         });
       }
 
-      function probablyCORS(err, url) {
+      function probablyCORS(err) {
         const msgCORS = err.message && (err.message.includes('Failed to fetch') || err.message.includes('Network request failed'));
         const nameCORS = err.name && err.name.includes('TypeError');
-        return msgCORS && nameCORS && !isSameOrigin(url, baseUrl);
+        return msgCORS && nameCORS;
       }
     };
   }
@@ -499,6 +506,14 @@ module.exports = () => {
 
   var fetchUrl_1 = fetchUrl;
 
+  function flat(arr) {
+    var _ref;
+
+    return (_ref = []).concat.apply(_ref, _toConsumableArray(arr));
+  }
+
+  var flat_1 = flat;
+
   function makeFindStyleSheetByUrl({
     styleSheetCache
   }) {
@@ -536,7 +551,7 @@ module.exports = () => {
         } else if (rule instanceof win.CSSFontFaceRule) {
           return acc.concat(getUrlFromCssText_1(rule.cssText));
         } else if (win.CSSSupportsRule && rule instanceof win.CSSSupportsRule || rule instanceof win.CSSMediaRule) {
-          return acc.concat(extractResourcesFromStyleSheet(rule));
+          return acc.concat(extractResourcesFromStyleSheet(rule, doc));
         } else if (rule instanceof win.CSSStyleRule) {
           for (let i = 0, ii = rule.style.length; i < ii; i++) {
             const urls = getUrlFromCssText_1(rule.style.getPropertyValue(rule.style[i]));
@@ -606,6 +621,39 @@ module.exports = () => {
 
   var buildCanvasBlobs_1 = buildCanvasBlobs;
 
+  function extractFrames(documents = [document]) {
+    const iframes = flat_1(documents.map(d => window.Array.from(d.querySelectorAll('iframe[src]:not([src=""])'))));
+    return iframes.filter(f => isAccessibleFrame(f) && !isInlineFrame_1(f)).map(f => f.contentDocument);
+  }
+
+  function isAccessibleFrame(frame) {
+    try {
+      const doc = frame.contentDocument;
+      return !!(doc && doc.defaultView && doc.defaultView.frameElement);
+    } catch (err) {// for CORS frames
+    }
+  }
+
+  var extractFrames_1 = extractFrames;
+
+  const getBaesUrl = function (doc) {
+    const baseUrl = doc.querySelectorAll('base')[0] && doc.querySelectorAll('base')[0].href;
+
+    if (baseUrl) {
+      return baseUrl;
+    }
+
+    const frameElement = doc.defaultView && doc.defaultView.frameElement;
+
+    if (frameElement) {
+      return frameElement.src || getBaesUrl(frameElement.ownerDocument);
+    }
+
+    return doc.location.href;
+  };
+
+  var getBaseUrl = getBaesUrl;
+
   function toUriEncoding(url) {
     const result = url && url.replace(/(\\[0-9a-fA-F]{1,6}\s?)/g, s => {
       const int = parseInt(s.substr(1).trim(), 16);
@@ -615,21 +663,6 @@ module.exports = () => {
   }
 
   var toUriEncoding_1 = toUriEncoding;
-
-  function isSameOrigin(url, baseUrl) {
-    const blobOrData = /^(blob|data):/;
-    if (blobOrData.test(url)) return true;
-    if (blobOrData.test(baseUrl)) return false;
-    const {
-      origin
-    } = new URL(url, baseUrl);
-    const {
-      origin: baseOrigin
-    } = new URL(baseUrl);
-    return origin === baseOrigin;
-  }
-
-  var isSameOrigin_1 = isSameOrigin;
 
   function processPage(doc = document) {
     const styleSheetCache = {};
@@ -645,8 +678,7 @@ module.exports = () => {
       findStyleSheetByUrl: findStyleSheetByUrl$1,
       extractResourcesFromStyleSheet: extractResourcesFromStyleSheet$1,
       extractResourcesFromSvg,
-      absolutizeUrl: absolutizeUrl_1,
-      isSameOrigin: isSameOrigin_1
+      absolutizeUrl: absolutizeUrl_1
     });
     const getResourceUrlsAndBlobs$1 = getResourceUrlsAndBlobs({
       processResource: processResource$1,
@@ -655,23 +687,28 @@ module.exports = () => {
     const extractResourceUrlsFromStyleTags$1 = extractResourceUrlsFromStyleTags(extractResourcesFromStyleSheet$1);
     return doProcessPage(doc);
 
-    function doProcessPage(doc) {
-      const baseUrl = doc.querySelectorAll('base')[0] && doc.querySelectorAll('base')[0].href;
-      const frameElement = doc.defaultView && doc.defaultView.frameElement;
-      const url = baseUrl || (frameElement ? frameElement.src : doc.location.href);
+    function doProcessPage(doc, baesUrl = null) {
+      const url = baesUrl || getBaseUrl(doc);
       const {
         cdt,
         documents,
-        canvasElements
+        canvasElements,
+        inlineFrames
       } = domNodesToCdt_1(doc, url);
       const linkUrls = flat_1(documents.map(extractLinks_1));
       const styleTagUrls = flat_1(documents.map(extractResourceUrlsFromStyleTags$1));
+      const absolutizeThisUrl = getAbsolutizeByUrl(url);
       const links = uniq_1(window.Array.from(linkUrls).concat(window.Array.from(styleTagUrls)).concat(extractResourceUrlsFromStyleAttrs_1(cdt))).map(toUnAnchoredUri_1).map(toUriEncoding_1).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
       const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(documents, url, links);
-      const frameDocs = extractFrames_1(documents);
-      const processFramesPromise = frameDocs.map(doProcessPage);
       const canvasBlobs = buildCanvasBlobs_1(canvasElements);
-      return Promise.all([resourceUrlsAndBlobsPromise].concat(_toConsumableArray(processFramesPromise))).then(([{
+      const frameDocs = extractFrames_1(documents);
+      const processFramesPromise = frameDocs.map(f => doProcessPage(f, null));
+      const processInlineFramesPromise = inlineFrames.map(({
+        element,
+        url
+      }) => doProcessPage(element.contentDocument, url));
+      const frameElement = doc.defaultView && doc.defaultView.frameElement;
+      return Promise.all([resourceUrlsAndBlobsPromise].concat(_toConsumableArray(processFramesPromise), _toConsumableArray(processInlineFramesPromise))).then(([{
         resourceUrls,
         blobsObj
       }, ...framesResults]) => ({
@@ -682,14 +719,16 @@ module.exports = () => {
         frames: framesResults,
         srcAttr: frameElement ? frameElement.getAttribute('src') : undefined
       }));
-
-      function absolutizeThisUrl(someUrl) {
-        try {
-          return absolutizeUrl_1(someUrl, url);
-        } catch (err) {// can't do anything with a non-absolute url
-        }
-      }
     }
+  }
+
+  function getAbsolutizeByUrl(url) {
+    return function (someUrl) {
+      try {
+        return absolutizeUrl_1(someUrl, url);
+      } catch (err) {// can't do anything with a non-absolute url
+      }
+    };
   }
 
   function blobsObjToArray(blobsObj) {

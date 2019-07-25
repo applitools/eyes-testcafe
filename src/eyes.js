@@ -19,7 +19,7 @@ const convertSelectors = require('./convertSelectors');
 const DEFAULT_VIEWPORT = {width: 1024, height: 768};
 
 class Eyes {
-  constructor({configPath}) {
+  constructor({configPath} = {}) {
     this._defaultConfig = initDefaultConfig(configPath);
     this._logger = new Logger(this._defaultConfig.showLogs, 'eyes');
     this._logger.log('[constructor] initial config', this._defaultConfig);
