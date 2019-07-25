@@ -60,7 +60,7 @@ describe('mapProxyUrls', () => {
       },
       {
         url: 'min.css',
-        type: '  text/css  ',
+        type: 'text/css  ',
         value: Buffer.from(
           'yo-hello-yo(http://localhost:2020/ftftft/https://tested-page-2.com)\naaahttp:localhost:2020/ftftft/https://tested-page-3.com/page',
         ),
@@ -116,7 +116,7 @@ describe('mapProxyUrls', () => {
           },
           {
             url: 'min-frame.css',
-            type: '  text/css  ',
+            type: 'text/css  ',
             value: Buffer.from('http://localhost:2020/ftftft/http://tested-page-2-in-frame.com'),
             _shouldMap: true,
           },

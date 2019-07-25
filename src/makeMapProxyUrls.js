@@ -5,7 +5,7 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
     const proxyStyleElements = getStyleElementsFromFrame(frame).filter(e => e.nodeValue);
     const cssBlobs = collectFrameData({
       frame,
-      predicate: r => r.type && r.type.trimStart().startsWith('text/css'),
+      predicate: r => r.type && r.type.startsWith('text/css'),
       keyName: 'blobs',
     });
     cssBlobs.forEach(r => (r.value = r.value.toString()));
@@ -27,8 +27,10 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
     logger.log('mapping proxy url', proxyUrl);
     logger.log(`mapping ${cssBlobs.length} css blobs`);
     cssBlobs.forEach(r => (r.value = Buffer.from(doMapProxyUrls(r.value, proxyUrl))));
+
     logger.log(`mapping ${proxyStyleElements.length} style elements`);
     proxyStyleElements.forEach(n => (n.nodeValue = doMapProxyUrls(n.nodeValue, proxyUrl)));
+
     logger.log(`mapping ${styleAttrs.length} style attributes`);
     styleAttrs.forEach(a => (a.value = doMapProxyUrls(a.value, proxyUrl)));
   };
