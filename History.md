@@ -1,4 +1,12 @@
 
+v1.1.14 / 2019-07-25
+====================
+
+* 1.1.14 [[78b1067](/commit/78b1067f1ef773baf221971ebff3b67f42d68a8a)]
+* updated vgc [[117a474](/commit/117a4741b07103681012ca351f3ca823f48a9e49)]
+* better render script [[7f53930](/commit/7f539303cc5c6c5a93aee4504d8b5f1f8de6ec10)]
+* changelog [[395b8a8](/commit/395b8a859c4398ea97b52cdfcf212b1034c6b204)]
+
 v1.1.13 / 2019-07-21
 ====================
 
