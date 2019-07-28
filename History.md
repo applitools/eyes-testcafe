@@ -1,4 +1,12 @@
 
+v1.1.15 / 2019-07-28
+====================
+
+* 1.1.15 [[10e2bc7](/commit/10e2bc721780fff41f68796627c8d4146c7fff7c)]
+* added repo url [[5a67021](/commit/5a67021942cd709832395ee7d16791a5389fced5)]
+* removed trim start because type should be without spaces - comes from fetch response. [[d00ee7c](/commit/d00ee7ca6850660a99244ec0d91f2ea4222170d6)]
+* changelog [[6197a71](/commit/6197a71abd4e93a15bf51705fca44f8deaab8f0f)]
+
 v1.1.14 / 2019-07-25
 ====================
 
