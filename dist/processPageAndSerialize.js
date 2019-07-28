@@ -223,18 +223,30 @@ module.exports = () => {
         })
       };
 
-      if (elementNode.checked && !elementNode.attributes.checked) {
-        node.attributes.push({
-          name: 'checked',
-          value: 'checked'
-        });
+      if (elementNode.tagName === 'INPUT' && ['checkbox', 'radio'].includes(elementNode.type)) {
+        if (elementNode.attributes.checked && !elementNode.checked) {
+          const idx = node.attributes.findIndex(a => a.name === 'checked');
+          node.attributes.splice(idx, 1);
+        }
+
+        if (!elementNode.attributes.checked && elementNode.checked) {
+          node.attributes.push({
+            name: 'checked'
+          });
+        }
       }
 
-      if (elementNode.value !== undefined && elementNode.attributes.value === undefined && elementNode.tagName === 'INPUT') {
-        node.attributes.push({
-          name: 'value',
-          value: elementNode.value
-        });
+      if (elementNode.tagName === 'INPUT' && elementNode.type === 'text' && (elementNode.attributes.value && elementNode.attributes.value.value) !== elementNode.value) {
+        const nodeAttr = node.attributes.find(a => a.name === 'value');
+
+        if (nodeAttr) {
+          nodeAttr.value = elementNode.value;
+        } else {
+          node.attributes.push({
+            name: 'value',
+            value: elementNode.value
+          });
+        }
       }
 
       return node;
