@@ -31,6 +31,10 @@
   ],
   "author": "Daniel Schwartz <daniel.schwartz@applitools.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/applitools/eyes-testcafe"
+  },
   "dependencies": {
     "@applitools/dom-snapshot": "^1.4.4",
     "@applitools/eyes-common": "^3.8.1",
