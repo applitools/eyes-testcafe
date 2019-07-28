@@ -1,4 +1,14 @@
 
+v1.1.16 / 2019-07-28
+====================
+
+* 1.1.16 [[88b1563](/commit/88b1563affb6515f341deff0aaa4e3e29090ef30)]
+* update ds to support synamic input values [[d2f5438](/commit/d2f543886fcdf13164751ade8b934e46729cfe3e)]
+* node badge [[5eb2128](/commit/5eb212817473f7be96f4bc92afbfa8cc475b5446)]
+* node badge [[2a030b9](/commit/2a030b953cbc57939aa41d10cb3eaee9906fd6f3)]
+* node badge [[0a68b7c](/commit/0a68b7c63f1cbe82fa67a440945bd78f0a40e358)]
+* changelog [[201d538](/commit/201d53813dd306ba031eb6508637a6df02dc7a2e)]
+
 v1.1.15 / 2019-07-28
 ====================
 
