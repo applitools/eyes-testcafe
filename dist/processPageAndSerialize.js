@@ -104,13 +104,13 @@ module.exports = () => {
     const cdt = [{
       nodeType: Node.DOCUMENT_NODE
     }];
-    const docRoots = [docNode];
+    const documents = [docNode];
     const canvasElements = [];
     const inlineFrames = [];
     cdt[0].childNodeIndexes = childrenFactory(cdt, docNode.childNodes);
     return {
       cdt,
-      docRoots,
+      documents,
       canvasElements,
       inlineFrames
     };
@@ -147,7 +147,7 @@ module.exports = () => {
 
           if (elementNode.shadowRoot) {
             node.shadowRootIndex = elementNodeFactory(cdt, elementNode.shadowRoot);
-            docRoots.push(elementNode.shadowRoot);
+            documents.push(elementNode.shadowRoot);
           }
 
           if (elementNode.nodeName === 'CANVAS') {
@@ -441,11 +441,7 @@ module.exports = () => {
               resourceUrls = extractResourcesFromStyle$1(styleSheet, value, documents[0]);
             }
           } else if (/image\/svg/.test(type)) {
-            try {
-              resourceUrls = extractResourcesFromSvg(value);
-            } catch (e) {
-              console.log('could not parse svg content', e);
-            }
+            resourceUrls = extractResourcesFromSvg(value);
           }
 
           if (resourceUrls) {
@@ -481,48 +477,28 @@ module.exports = () => {
 
   var processResource = makeProcessResource;
 
-  function getUrlFromCssText(cssText) {
-    const re = /url\((?!['"]?:)['"]?([^'")]*)['"]?\)/g;
-    const ret = [];
-    let result;
-
-    while ((result = re.exec(cssText)) !== null) {
-      ret.push(result[1]);
-    }
-
-    return ret;
-  }
-
-  var getUrlFromCssText_1 = getUrlFromCssText;
-
-  function flat(arr) {
-    var _ref;
-
-    return (_ref = []).concat.apply(_ref, _toConsumableArray(arr));
-  }
-
-  var flat_1 = flat;
-
   function makeExtractResourcesFromSvg({
     parser,
-    decoder,
-    extractResourceUrlsFromStyleTags
+    decoder
   }) {
     return function (svgArrayBuffer) {
-      const decooder = decoder || new TextDecoder('utf-8');
-      const svgStr = decooder.decode(svgArrayBuffer);
-      const domparser = parser || new DOMParser();
-      const doc = domparser.parseFromString(svgStr, 'image/svg+xml');
-      const fromImages = window.Array.from(doc.getElementsByTagName('image')).concat(window.Array.from(doc.getElementsByTagName('use'))).map(e => e.getAttribute('href') || e.getAttribute('xlink:href'));
-      const fromObjects = window.Array.from(doc.getElementsByTagName('object')).map(e => e.getAttribute('data'));
-      const fromStyleTags = extractResourceUrlsFromStyleTags(doc, false);
-      const fromStyleAttrs = urlsFromStyleAttrOfDoc(doc);
-      return fromImages.concat(fromObjects).concat(fromStyleTags).concat(fromStyleAttrs).filter(u => u[0] !== '#');
-    };
-  }
+      let svgStr;
+      let urls = [];
 
-  function urlsFromStyleAttrOfDoc(doc) {
-    return flat_1(window.Array.from(doc.querySelectorAll('*[style]')).map(e => e.style.cssText).map(getUrlFromCssText_1).filter(Boolean));
+      try {
+        const decooder = decoder || new TextDecoder('utf-8');
+        svgStr = decooder.decode(svgArrayBuffer);
+        const domparser = parser || new DOMParser();
+        const doc = domparser.parseFromString(svgStr, 'image/svg+xml');
+        const fromImages = window.Array.from(doc.getElementsByTagName('image')).concat(window.Array.from(doc.getElementsByTagName('use'))).map(e => e.getAttribute('href') || e.getAttribute('xlink:href'));
+        const fromObjects = window.Array.from(doc.getElementsByTagName('object')).map(e => e.getAttribute('data'));
+        urls = fromImages.concat(fromObjects).filter(u => u[0] !== '#');
+      } catch (e) {
+        console.log('could not parse svg content', e);
+      }
+
+      return urls;
+    };
   }
 
   var makeExtractResourcesFromSvg_1 = makeExtractResourcesFromSvg;
@@ -542,6 +518,14 @@ module.exports = () => {
 
   var fetchUrl_1 = fetchUrl;
 
+  function flat(arr) {
+    var _ref;
+
+    return (_ref = []).concat.apply(_ref, _toConsumableArray(arr));
+  }
+
+  var flat_1 = flat;
+
   function makeFindStyleSheetByUrl({
     styleSheetCache
   }) {
@@ -553,11 +537,25 @@ module.exports = () => {
 
   var findStyleSheetByUrl = makeFindStyleSheetByUrl;
 
+  function getUrlFromCssText(cssText) {
+    const re = /url\((?!['"]?:)['"]?([^'")]*)['"]?\)/g;
+    const ret = [];
+    let result;
+
+    while ((result = re.exec(cssText)) !== null) {
+      ret.push(result[1]);
+    }
+
+    return ret;
+  }
+
+  var getUrlFromCssText_1 = getUrlFromCssText;
+
   function makeExtractResourcesFromStyleSheet({
     styleSheetCache
   }) {
-    return function extractResourcesFromStyleSheet(styleSheet, doc) {
-      const win = doc.defaultView || doc.ownerDocument && doc.ownerDocument.defaultView || window;
+    return function extractResourcesFromStyleSheet(styleSheet, doc = document) {
+      const win = doc.defaultView || doc.ownerDocument.defaultView;
       return uniq_1(window.Array.from(styleSheet.cssRules || []).reduce((acc, rule) => {
         if (rule instanceof win.CSSImportRule) {
           styleSheetCache[rule.styleSheet.href] = rule.styleSheet;
@@ -594,9 +592,9 @@ module.exports = () => {
   var extractResourceUrlsFromStyleAttrs_1 = extractResourceUrlsFromStyleAttrs;
 
   function makeExtractResourceUrlsFromStyleTags(extractResourcesFromStyleSheet) {
-    return function extractResourceUrlsFromStyleTags(doc, onlyDocStylesheet = true) {
+    return function extractResourceUrlsFromStyleTags(doc) {
       return uniq_1(window.Array.from(doc.querySelectorAll('style')).reduce((resourceUrls, styleEl) => {
-        const styleSheet = onlyDocStylesheet ? window.Array.from(doc.styleSheets).find(styleSheet => styleSheet.ownerNode === styleEl) : styleEl.sheet;
+        const styleSheet = window.Array.from(doc.styleSheets).find(styleSheet => styleSheet.ownerNode === styleEl);
         return styleSheet ? resourceUrls.concat(extractResourcesFromStyleSheet(styleSheet, doc)) : resourceUrls;
       }, []));
     };
@@ -683,12 +681,9 @@ module.exports = () => {
     const extractResourcesFromStyleSheet$1 = extractResourcesFromStyleSheet({
       styleSheetCache
     });
+    const extractResourcesFromSvg = makeExtractResourcesFromSvg_1({});
     const findStyleSheetByUrl$1 = findStyleSheetByUrl({
       styleSheetCache
-    });
-    const extractResourceUrlsFromStyleTags$1 = extractResourceUrlsFromStyleTags(extractResourcesFromStyleSheet$1);
-    const extractResourcesFromSvg = makeExtractResourcesFromSvg_1({
-      extractResourceUrlsFromStyleTags: extractResourceUrlsFromStyleTags$1
     });
     const processResource$1 = processResource({
       fetchUrl: fetchUrl_1,
@@ -701,23 +696,24 @@ module.exports = () => {
       processResource: processResource$1,
       aggregateResourceUrlsAndBlobs: aggregateResourceUrlsAndBlobs_1
     });
+    const extractResourceUrlsFromStyleTags$1 = extractResourceUrlsFromStyleTags(extractResourcesFromStyleSheet$1);
     return doProcessPage(doc);
 
     function doProcessPage(doc, baesUrl = null) {
       const url = baesUrl || getBaseUrl(doc);
       const {
         cdt,
-        docRoots,
+        documents,
         canvasElements,
         inlineFrames
       } = domNodesToCdt_1(doc, url);
-      const linkUrls = flat_1(docRoots.map(extractLinks_1));
-      const styleTagUrls = flat_1(docRoots.map(extractResourceUrlsFromStyleTags$1));
+      const linkUrls = flat_1(documents.map(extractLinks_1));
+      const styleTagUrls = flat_1(documents.map(extractResourceUrlsFromStyleTags$1));
       const absolutizeThisUrl = getAbsolutizeByUrl(url);
       const links = uniq_1(window.Array.from(linkUrls).concat(window.Array.from(styleTagUrls)).concat(extractResourceUrlsFromStyleAttrs_1(cdt))).map(toUnAnchoredUri_1).map(toUriEncoding_1).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
-      const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(docRoots, url, links);
+      const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(documents, url, links);
       const canvasBlobs = buildCanvasBlobs_1(canvasElements);
-      const frameDocs = extractFrames_1(docRoots);
+      const frameDocs = extractFrames_1(documents);
       const processFramesPromise = frameDocs.map(f => doProcessPage(f, null));
       const processInlineFramesPromise = inlineFrames.map(({
         element,
