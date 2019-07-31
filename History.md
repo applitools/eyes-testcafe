@@ -1,4 +1,11 @@
 
+v1.1.17 / 2019-07-31
+====================
+
+* 1.1.17 [[a6f58a2](/commit/a6f58a2a25b2dcfe939bc4006938ec9a44a75ef8)]
+* extracting urls from css in svg [[837a9f7](/commit/837a9f745ba3b66e2fda18816ca02c27ea43209f)]
+* changelog [[f4072bd](/commit/f4072bd3d9b26379a728212ddea310d6025e577c)]
+
 v1.1.16 / 2019-07-28
 ====================
 
