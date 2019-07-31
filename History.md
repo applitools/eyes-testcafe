@@ -1,4 +1,11 @@
 
+v1.1.18 / 2019-07-31
+====================
+
+* 1.1.18 [[cb73029](/commit/cb73029b2b7fbee42f5c123414233aac131efe2b)]
+* revert css from svg [[201fae7](/commit/201fae7578f94ee9b6c3f5634ae72088614a6acf)]
+* changelog [[5a165eb](/commit/5a165ebde6abef600243e67f09a09c74efcf8611)]
+
 v1.1.17 / 2019-07-31
 ====================
 
