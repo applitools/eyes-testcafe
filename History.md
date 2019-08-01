@@ -1,4 +1,11 @@
 
+v1.1.19 / 2019-08-01
+====================
+
+* 1.1.19 [[80fffba](/commit/80fffba12a5377cec96d4ae680e53a06ebd03fce)]
+* returned css from svg and with links [[c93e611](/commit/c93e6116692b01dd66900d2eac34b810e9a1e4b1)]
+* changelog [[6609b33](/commit/6609b334b1dd887b2c9f4a9c4979a5ff58aa907b)]
+
 v1.1.18 / 2019-07-31
 ====================
 
