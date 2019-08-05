@@ -1,10 +1,10 @@
 'use strict';
 
-function collectFrameData({frame, predicate, keyName}) {
+function collectFrameData({frame, keyName, predicate}) {
   return uniq([
-    ...frame[keyName].filter(predicate),
+    ...(predicate ? frame[keyName].filter(predicate) : frame[keyName]),
     ...frame.frames.reduce(
-      (acc, frame) => [...acc, ...collectFrameData({frame, predicate, keyName})],
+      (acc, frame) => [...acc, ...collectFrameData({frame, keyName, predicate})],
       [],
     ),
   ]);

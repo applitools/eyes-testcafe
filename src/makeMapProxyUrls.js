@@ -1,14 +1,17 @@
 'use strict';
+const absolutizeUrl = require('./absolutizeUrl');
 
 function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
   return function(frame) {
-    const proxyStyleElements = getStyleElementsFromFrame(frame).filter(e => e.nodeValue);
+    const allBlobs = collectFrameData({frame, keyName: 'blobs'});
     const cssBlobs = collectFrameData({
       frame,
       predicate: r => r.type && r.type.startsWith('text/css'),
       keyName: 'blobs',
     });
     cssBlobs.forEach(r => (r.value = r.value.toString()));
+
+    const proxyStyleElements = getStyleElementsFromFrame(frame).filter(e => e.nodeValue);
     const styleAttrs = collectFrameData({
       frame,
       predicate: n =>
@@ -17,6 +20,7 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
     }).map(n => n.attributes.find(a => a.name === 'style'));
 
     let proxyUrl =
+      findProxyUrl(allBlobs.map(b => b.url)) ||
       findProxyUrl(cssBlobs.map(r => r.value)) ||
       findProxyUrl(proxyStyleElements.map(n => n.nodeValue)) ||
       findProxyUrl(styleAttrs.map(a => a.value));
@@ -33,6 +37,12 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
 
     logger.log(`mapping ${styleAttrs.length} style attributes`);
     styleAttrs.forEach(a => (a.value = doMapProxyUrls(a.value, proxyUrl)));
+
+    logger.log(`mapping ${allBlobs.length} blob urls`);
+    allBlobs.forEach(b => (b.url = doMapProxyUrls(b.url, proxyUrl)));
+
+    logger.log(`mapping ${allBlobs.length} blob urls for sloppy proxy`);
+    sloppyMapBlobUrls(frame, proxyUrl);
   };
 
   function findProxyUrl(arr) {
@@ -43,6 +53,27 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
 
   function doMapProxyUrls(text, proxyUrl) {
     return text.replace(new RegExp(proxyUrl, 'g'), '');
+  }
+
+  function sloppyMapBlobUrls(frame, proxyUrl) {
+    if (!proxyUrl) {
+      return;
+    }
+
+    const shortProxyUrl =
+      proxyUrl.match(/(https?:\/\/.+:\d+\/)/) && proxyUrl.match(/(https?:\/\/.+:\d+\/)/)[1];
+    const originalUrlRegex = new RegExp(`${shortProxyUrl}(.+)$`);
+    doMap(frame);
+
+    function doMap(frame) {
+      frame.blobs.forEach(b => {
+        const originalUrl = b.url.match(originalUrlRegex) && b.url.match(originalUrlRegex)[1];
+        if (originalUrl) {
+          b.url = absolutizeUrl(originalUrl, frame.url);
+        }
+      });
+      frame.frames.forEach(doMap);
+    }
   }
 
   function getStyleElementsFromFrame(frame) {

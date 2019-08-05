@@ -5,6 +5,7 @@ const {expect} = require('chai');
 const getProxyUrl = require('../../src/getProxyUrl');
 const collectFrameData = require('../../src/collectFrameData');
 const makeMapProxyUrls = require('../../src/makeMapProxyUrls');
+const absolutizeUrl = require('../../src/absolutizeUrl');
 const mapProxyUrls = makeMapProxyUrls({collectFrameData, getProxyUrl, logger: console});
 
 describe('mapProxyUrls', () => {
@@ -44,9 +45,10 @@ describe('mapProxyUrls', () => {
         ],
       },
     ],
+    url: 'https://some.com/main.html',
     blobs: [
       {
-        url: 'main.css',
+        url: 'http://localhost:2020/main.css', // partial mapping in blobs url
         type: 'text/css',
         value: Buffer.from(
           'yo-hello-yohttp://localhost:2020/ftftft/https://tested-page.com/hello?yo=true\nblabla',
@@ -59,7 +61,7 @@ describe('mapProxyUrls', () => {
         value: Buffer.from('yo-hello-yohttp://localhost:2020/ftftft/https://should-not-map.com/'),
       },
       {
-        url: 'min.css',
+        url: 'http://localhost:2020/ftftft/https://tested-page-3.com/min.css',
         type: 'text/css  ',
         value: Buffer.from(
           'yo-hello-yo(http://localhost:2020/ftftft/https://tested-page-2.com)\naaahttp:localhost:2020/ftftft/https://tested-page-3.com/page',
@@ -108,6 +110,7 @@ describe('mapProxyUrls', () => {
             ],
           },
         ],
+        url: 'https://internal.com',
         blobs: [
           {
             url: 'dontMapMeInFrame.css',
@@ -118,6 +121,12 @@ describe('mapProxyUrls', () => {
             url: 'min-frame.css',
             type: 'text/css  ',
             value: Buffer.from('http://localhost:2020/ftftft/http://tested-page-2-in-frame.com'),
+            _shouldMap: true,
+          },
+          {
+            url: 'http://localhost:2020/a/b.css',
+            type: 'text/css  ',
+            value: Buffer.from('http://localhost:2020/ftftft/http://tested-page-3-in-frame.com'),
             _shouldMap: true,
           },
         ],
@@ -141,6 +150,23 @@ describe('mapProxyUrls', () => {
           : b.value.toString().replace(/http:\/\/localhost:2020\/ftftft\//g, ''),
       ),
     );
+
+    const mappedUrl = (baseUrl, url) => {
+      const fullProxyMapping = url.replace(/http:\/\/localhost:2020\/ftftft\//g, '');
+      if (fullProxyMapping !== url) {
+        return fullProxyMapping;
+      }
+      if (url.includes('http://localhost:2020/')) {
+        return absolutizeUrl(url.replace('http://localhost:2020/', ''), baseUrl);
+      } else {
+        return url;
+      }
+    };
+
+    expect(actualFrame.blobs.map(b => b.url)).to.eql(
+      expectedFrame.blobs.map(b => (!b._shouldMap ? b.url : mappedUrl(expectedFrame.url, b.url))),
+    );
+
     expect(actualFrame.cdt.map(n => n.nodeValue)).to.eql(
       expectedFrame.cdt.map(n =>
         !n._shouldMap ? n.nodeValue : n.nodeValue.replace(/http:\/\/localhost:2020\/ftftft\//g, ''),
@@ -188,9 +214,11 @@ describe('mapProxyUrls', () => {
           cdt: cpyCdt(frame.frames[0].cdt),
           blobs: cpyBlobs(frame.frames[0].blobs),
           frames: [],
+          url: frame.frames[0].url,
         },
       ],
       cdt: cpyCdt(frame.cdt),
+      url: frame.url,
     };
   }
 });
