@@ -1,4 +1,11 @@
 
+v1.1.20 / 2019-08-05
+====================
+
+* 1.1.20 [[f0a3552](/commit/f0a3552c94d5a62243d5f833a1b3ef46ccb7cf90)]
+* mapping blob key urls and with partial mapping [[c09fcdc](/commit/c09fcdc29d06caa39bf171876f07958977d66889)]
+* changelog [[641cdd9](/commit/641cdd98a2ac557c10c71caa5b59f65616fc724c)]
+
 v1.1.19 / 2019-08-01
 ====================
 
