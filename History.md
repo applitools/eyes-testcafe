@@ -1,4 +1,11 @@
 
+v1.1.21 / 2019-08-08
+====================
+
+* 1.1.21 [[177a54c](/commit/177a54c4d3359e4bc5e0cd975e754454c1b23feb)]
+* updated vgc to better error handeling [[2470e98](/commit/2470e9818ac24aa512841987f9772acd7d6bb445)]
+* changelog [[362b6df](/commit/362b6df262c3056a96e56d69c082f7afa0b05ead)]
+
 v1.1.20 / 2019-08-05
 ====================
 
