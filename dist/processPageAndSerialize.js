@@ -95,7 +95,7 @@ module.exports = () => {
   var uuid_1 = uuid;
 
   function isInlineFrame(frame) {
-    return frame && frame.contentDocument && !/^https?:$/.test(frame.contentDocument.location.protocol);
+    return frame && frame.contentDocument && (!/^https?:$/.test(frame.contentDocument.location.protocol) || frame.src === 'about:blank');
   }
 
   var isInlineFrame_1 = isInlineFrame;
@@ -482,7 +482,7 @@ module.exports = () => {
         type,
         value
       }) {
-        const urls = resourceUrls.map(toUnAnchoredUri_1).map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).filter(filterInlineUrl_1);
+        const urls = resourceUrls.map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).map(toUnAnchoredUri_1).filter(filterInlineUrl_1);
         return getResourceUrlsAndBlobs(documents, baseUrl, urls).then(({
           resourceUrls,
           blobsObj
@@ -584,7 +584,7 @@ module.exports = () => {
   }) {
     return function extractResourcesFromStyleSheet(styleSheet, doc) {
       const win = doc.defaultView || doc.ownerDocument && doc.ownerDocument.defaultView || window;
-      return uniq_1(window.Array.from(styleSheet.cssRules || []).reduce((acc, rule) => {
+      const urls = uniq_1(window.Array.from(styleSheet.cssRules || []).reduce((acc, rule) => {
         if (rule instanceof win.CSSImportRule) {
           styleSheetCache[rule.styleSheet.href] = rule.styleSheet;
           return acc.concat(rule.href);
@@ -601,6 +601,7 @@ module.exports = () => {
 
         return acc;
       }, []));
+      return urls.filter(u => u[0] !== '#');
     };
   }
 
@@ -740,7 +741,7 @@ module.exports = () => {
       const linkUrls = flat_1(docRoots.map(extractLinks_1));
       const styleTagUrls = flat_1(docRoots.map(extractResourceUrlsFromStyleTags$1));
       const absolutizeThisUrl = getAbsolutizeByUrl(url);
-      const links = uniq_1(window.Array.from(linkUrls).concat(window.Array.from(styleTagUrls)).concat(extractResourceUrlsFromStyleAttrs_1(cdt))).map(toUnAnchoredUri_1).map(toUriEncoding_1).map(absolutizeThisUrl).filter(filterInlineUrlsIfExisting);
+      const links = uniq_1(window.Array.from(linkUrls).concat(window.Array.from(styleTagUrls)).concat(extractResourceUrlsFromStyleAttrs_1(cdt))).map(toUriEncoding_1).map(absolutizeThisUrl).map(toUnAnchoredUri_1).filter(filterInlineUrlsIfExisting);
       const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(docRoots, url, links);
       const canvasBlobs = buildCanvasBlobs_1(canvasElements);
       const frameDocs = extractFrames_1(docRoots);
