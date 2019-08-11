@@ -1,4 +1,11 @@
 
+v1.1.22 / 2019-08-11
+====================
+
+* 1.1.22 [[6fe95b8](/commit/6fe95b8b3fcd6b5029f407a069a86c8b5a63f9b2)]
+* updated ds to remove anchors from css resources [[eda29b6](/commit/eda29b668ef8a5828b209ebdcba60294d19c3cb0)]
+* changelog [[c754226](/commit/c754226a538998b77389207cb5295123812fe460)]
+
 v1.1.21 / 2019-08-08
 ====================
 
