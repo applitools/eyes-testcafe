@@ -72,7 +72,7 @@ module.exports = () => {
 
   function extractLinks(doc = document) {
     const srcsetUrls = window.Array.from(doc.querySelectorAll('img[srcset],source[srcset]')).map(srcsetEl => srcsetEl.getAttribute('srcset').split(',').map(str => str.trim().split(/\s+/)[0])).reduce((acc, urls) => acc.concat(urls), []);
-    const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src]')).map(srcEl => srcEl.getAttribute('src'));
+    const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src],input[type="image"][src]')).map(srcEl => srcEl.getAttribute('src'));
     const imageUrls = window.Array.from(doc.querySelectorAll('image,use')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(u => u && u[0] !== '#');
     const objectUrls = window.Array.from(doc.querySelectorAll('object')).map(el => el.getAttribute('data')).filter(Boolean);
     const cssUrls = window.Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(link => link.getAttribute('href'));
@@ -95,10 +95,20 @@ module.exports = () => {
   var uuid_1 = uuid;
 
   function isInlineFrame(frame) {
-    return frame && frame.contentDocument && (!/^https?:$/.test(frame.contentDocument.location.protocol) || frame.src === 'about:blank');
+    return !/^https?:.+/.test(frame.src);
   }
 
   var isInlineFrame_1 = isInlineFrame;
+
+  function isAccessibleFrame(frame) {
+    try {
+      const doc = frame.contentDocument;
+      return !!(doc && doc.defaultView && doc.defaultView.frameElement);
+    } catch (err) {// for CORS frames
+    }
+  }
+
+  var isAccessibleFrame_1 = isAccessibleFrame;
 
   function domNodesToCdt(docNode, url) {
     const cdt = [{
@@ -162,7 +172,7 @@ module.exports = () => {
             });
           }
 
-          if (elementNode.nodeName === 'IFRAME' && isInlineFrame_1(elementNode)) {
+          if (elementNode.nodeName === 'IFRAME' && isAccessibleFrame_1(elementNode) && isInlineFrame_1(elementNode)) {
             frameBase = getFrameBaseUrl(elementNode);
             dummyUrl = absolutizeUrl_1(`?applitools-iframe=${uuid_1()}`, frameBase || url);
             node.attributes.push({
@@ -664,15 +674,7 @@ module.exports = () => {
 
   function extractFrames(documents = [document]) {
     const iframes = flat_1(documents.map(d => window.Array.from(d.querySelectorAll('iframe[src]:not([src=""])'))));
-    return iframes.filter(f => isAccessibleFrame(f) && !isInlineFrame_1(f)).map(f => f.contentDocument);
-  }
-
-  function isAccessibleFrame(frame) {
-    try {
-      const doc = frame.contentDocument;
-      return !!(doc && doc.defaultView && doc.defaultView.frameElement);
-    } catch (err) {// for CORS frames
-    }
+    return iframes.filter(f => isAccessibleFrame_1(f) && !isInlineFrame_1(f)).map(f => f.contentDocument);
   }
 
   var extractFrames_1 = extractFrames;
