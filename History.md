@@ -1,4 +1,11 @@
 
+v1.1.23 / 2019-08-19
+====================
+
+* 1.1.23 [[80766cd](/commit/80766cdc3120f4f79ddd65d8d6ccabf14084b6a4)]
+* updated ds to support about:blank inline frames [[16cf5f7](/commit/16cf5f7c174e27d76183a3b22d461a6a7b0e7bbe)]
+* changelog [[b44e4f7](/commit/b44e4f7d9cc6beaae0a609a996032db5598b8ca4)]
+
 v1.1.22 / 2019-08-11
 ====================
 
