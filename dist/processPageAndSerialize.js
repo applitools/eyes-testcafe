@@ -82,12 +82,6 @@ module.exports = () => {
 
   var extractLinks_1 = extractLinks;
 
-  function absolutizeUrl(url, absoluteUrl) {
-    return new URL(url, absoluteUrl).href;
-  }
-
-  var absolutizeUrl_1 = absolutizeUrl;
-
   function uuid() {
     return window.crypto.getRandomValues(new Uint32Array(1))[0];
   }
@@ -95,7 +89,7 @@ module.exports = () => {
   var uuid_1 = uuid;
 
   function isInlineFrame(frame) {
-    return !/^https?:.+/.test(frame.src);
+    return !/^https?:.+/.test(frame.src) || frame.contentDocument && frame.contentDocument.location && frame.contentDocument.location.href === 'about:blank';
   }
 
   var isInlineFrame_1 = isInlineFrame;
@@ -110,7 +104,13 @@ module.exports = () => {
 
   var isAccessibleFrame_1 = isAccessibleFrame;
 
-  function domNodesToCdt(docNode, url) {
+  function absolutizeUrl(url, absoluteUrl) {
+    return new URL(url, absoluteUrl).href;
+  }
+
+  var absolutizeUrl_1 = absolutizeUrl;
+
+  function domNodesToCdt(docNode, baseUrl) {
     const cdt = [{
       nodeType: Node.DOCUMENT_NODE
     }];
@@ -139,11 +139,10 @@ module.exports = () => {
     }
 
     function elementNodeFactory(cdt, elementNode) {
-      let node, manualChildNodeIndexes;
+      let node, manualChildNodeIndexes, dummyUrl;
       const {
         nodeType
       } = elementNode;
-      let dummyUrl, frameBase;
 
       if ([Node.ELEMENT_NODE, Node.DOCUMENT_FRAGMENT_NODE].includes(nodeType)) {
         if (elementNode.nodeName !== 'SCRIPT') {
@@ -161,7 +160,7 @@ module.exports = () => {
           }
 
           if (elementNode.nodeName === 'CANVAS') {
-            dummyUrl = absolutizeUrl_1(`applitools-canvas-${uuid_1()}.png`, url);
+            dummyUrl = absolutizeUrl_1(`applitools-canvas-${uuid_1()}.png`, baseUrl);
             node.attributes.push({
               name: 'data-applitools-src',
               value: dummyUrl
@@ -173,8 +172,7 @@ module.exports = () => {
           }
 
           if (elementNode.nodeName === 'IFRAME' && isAccessibleFrame_1(elementNode) && isInlineFrame_1(elementNode)) {
-            frameBase = getFrameBaseUrl(elementNode);
-            dummyUrl = absolutizeUrl_1(`?applitools-iframe=${uuid_1()}`, frameBase || url);
+            dummyUrl = absolutizeUrl_1(`?applitools-iframe=${uuid_1()}`, baseUrl);
             node.attributes.push({
               name: 'data-applitools-src',
               value: dummyUrl
@@ -287,14 +285,6 @@ module.exports = () => {
         nodeName: elementNode.nodeName
       };
     }
-
-    function getFrameBaseUrl(frameElement) {
-      const href = frameElement.contentDocument.querySelectorAll('base') && frameElement.contentDocument.querySelectorAll('base')[0] && frameElement.contentDocument.querySelectorAll('base')[0].href;
-
-      if (href && !href.includes('about:blank')) {
-        return href;
-      }
-    }
   }
 
   var domNodesToCdt_1 = domNodesToCdt;
@@ -329,8 +319,8 @@ module.exports = () => {
     processResource,
     aggregateResourceUrlsAndBlobs
   }) {
-    return function getResourceUrlsAndBlobs(documents, baseUrl, urls) {
-      return Promise.all(urls.map(url => processResource(url, documents, baseUrl, getResourceUrlsAndBlobs))).then(resourceUrlsAndBlobsArr => aggregateResourceUrlsAndBlobs(resourceUrlsAndBlobsArr));
+    return function getResourceUrlsAndBlobs(documents, urls) {
+      return Promise.all(urls.map(url => processResource(url, documents, getResourceUrlsAndBlobs))).then(resourceUrlsAndBlobsArr => aggregateResourceUrlsAndBlobs(resourceUrlsAndBlobsArr));
     };
   }
 
@@ -417,7 +407,7 @@ module.exports = () => {
     const extractResourcesFromStyle$1 = extractResourcesFromStyle({
       extractResourcesFromStyleSheet
     });
-    return function processResource(absoluteUrl, documents, baseUrl, getResourceUrlsAndBlobs) {
+    return function processResource(absoluteUrl, documents, getResourceUrlsAndBlobs) {
       return cache[absoluteUrl] || (cache[absoluteUrl] = doProcessResource(absoluteUrl));
 
       function doProcessResource(url) {
@@ -493,7 +483,7 @@ module.exports = () => {
         value
       }) {
         const urls = resourceUrls.map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).map(toUnAnchoredUri_1).filter(filterInlineUrl_1);
-        return getResourceUrlsAndBlobs(documents, baseUrl, urls).then(({
+        return getResourceUrlsAndBlobs(documents, urls).then(({
           resourceUrls,
           blobsObj
         }) => ({
@@ -682,18 +672,14 @@ module.exports = () => {
   const getBaesUrl = function (doc) {
     const baseUrl = doc.querySelectorAll('base')[0] && doc.querySelectorAll('base')[0].href;
 
-    if (baseUrl) {
+    if (baseUrl && isUrl(baseUrl)) {
       return baseUrl;
     }
-
-    const frameElement = doc.defaultView && doc.defaultView.frameElement;
-
-    if (frameElement) {
-      return frameElement.src || getBaesUrl(frameElement.ownerDocument);
-    }
-
-    return doc.location.href;
   };
+
+  function isUrl(url) {
+    return url && !/^(about:blank|javascript:void|blob:)/.test(url);
+  }
 
   var getBaseUrl = getBaesUrl;
 
@@ -732,37 +718,37 @@ module.exports = () => {
     });
     return doProcessPage(doc);
 
-    function doProcessPage(doc, baesUrl = null) {
-      const url = baesUrl || getBaseUrl(doc);
+    function doProcessPage(doc, pageUrl = doc.location.href) {
+      const baseUrl = getBaseUrl(doc) || pageUrl;
       const {
         cdt,
         docRoots,
         canvasElements,
         inlineFrames
-      } = domNodesToCdt_1(doc, url);
+      } = domNodesToCdt_1(doc, baseUrl);
       const linkUrls = flat_1(docRoots.map(extractLinks_1));
       const styleTagUrls = flat_1(docRoots.map(extractResourceUrlsFromStyleTags$1));
-      const absolutizeThisUrl = getAbsolutizeByUrl(url);
+      const absolutizeThisUrl = getAbsolutizeByUrl(baseUrl);
       const links = uniq_1(window.Array.from(linkUrls).concat(window.Array.from(styleTagUrls)).concat(extractResourceUrlsFromStyleAttrs_1(cdt))).map(toUriEncoding_1).map(absolutizeThisUrl).map(toUnAnchoredUri_1).filter(filterInlineUrlsIfExisting);
-      const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(docRoots, url, links);
+      const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1(docRoots, links);
       const canvasBlobs = buildCanvasBlobs_1(canvasElements);
       const frameDocs = extractFrames_1(docRoots);
-      const processFramesPromise = frameDocs.map(f => doProcessPage(f, null));
+      const processFramesPromise = frameDocs.map(f => doProcessPage(f, f.defaultView.frameElement.src));
       const processInlineFramesPromise = inlineFrames.map(({
         element,
         url
       }) => doProcessPage(element.contentDocument, url));
-      const frameElement = doc.defaultView && doc.defaultView.frameElement;
+      const srcAttr = doc.defaultView && doc.defaultView.frameElement && doc.defaultView.frameElement.getAttribute('src');
       return Promise.all([resourceUrlsAndBlobsPromise].concat(_toConsumableArray(processFramesPromise), _toConsumableArray(processInlineFramesPromise))).then(([{
         resourceUrls,
         blobsObj
       }, ...framesResults]) => ({
         cdt,
-        url,
+        url: pageUrl,
+        srcAttr,
         resourceUrls,
         blobs: [].concat(_toConsumableArray(blobsObjToArray(blobsObj)), _toConsumableArray(canvasBlobs)),
-        frames: framesResults,
-        srcAttr: frameElement ? frameElement.getAttribute('src') : undefined
+        frames: framesResults
       }));
     }
   }
