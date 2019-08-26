@@ -1,4 +1,11 @@
 
+v1.1.24 / 2019-08-26
+====================
+
+* 1.1.24 [[36fc4e5](/commit/36fc4e5ad25d6ec01655ba0110417ae84c09b6e9)]
+* updated ds: fixed iframe with base tag url [[3c23f1b](/commit/3c23f1b481c932313e7edbe81078629c2c5db81f)]
+* changelog [[0710add](/commit/0710add90272da0557b385c7b3ed0d69ed49f5f5)]
+
 v1.1.23 / 2019-08-19
 ====================
 
