@@ -1,4 +1,11 @@
 
+v1.1.25 / 2019-08-26
+====================
+
+* 1.1.25 [[ff8e42e](/commit/ff8e42eb6668819f1bc20e4d0e746883566b4f8c)]
+* ds update: fixed srcset [[171f258](/commit/171f258f2e0e08803d2cfd28066dbd5113cad231)]
+* changelog [[20405e7](/commit/20405e7fc5ac84a0a3fd9f4f5d6361e31aea2698)]
+
 v1.1.24 / 2019-08-26
 ====================
 
