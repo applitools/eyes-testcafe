@@ -333,7 +333,7 @@ The following configuration properties cannot be defined using the first method 
 | `apiKey`                  | undefined                   | The API key used for working with the Applitools Eyes server. See more info in the [Applitools API key](#applitools-api-key) section above |
 | `showLogs`                | false                       | Whether or not you want to see logs. Logs are written to the same output of the Testcafe process. <br/><br/>_Note that you can also use [DEBUG=eyes*](https://github.com/visionmedia/debug) for debugging._|
 | `serverUrl`               | Default Eyes server URL     | The URL of Eyes server |
-| `proxy`                   | undefined                   | Sets the proxy settings to be used in network requests to Eyes server. This can be either a string to the proxy URI, or an object containing the URI, username and password.<br/><br/>For example:<br/>`{uri: 'https://myproxy', username: 'my_user', password: 'my_password'}`|
+| `proxy`                   | undefined                   | Sets the proxy settings to be used in network requests to Eyes server. This can be either a string to the proxy URI, or an object containing the URI, username and password.<br/><br/>For example:<br/>`{url: 'https://myproxy', username: 'my_user', password: 'my_password'}`<br/>Or:<br/>`https://username:password@myproxy` |
 | `isDisabled`              | false                       | If true, all api calls to Eyes-Testcafe are ignored. |
 | `failTestcafeOnDiff`       | true                        | If true, then the Testcafe test fails if an eyes visual test fails. If false and an eyes test fails, then the Testcafe test does not fail. 
 | `tapDirPath`              | undefined                   | Directory path of a results file. If set, then a [TAP](https://en.wikipedia.org/wiki/Test_Anything_Protocol#Specification) file is created in this directory, the tap file name is created with the name eyes-[\<ISO-DATE\>](https://en.wikipedia.org/wiki/ISO_8601)\.tap and contains the Eyes test results <br><br/> _Note that results are scoped per spec file, this means that the results file is created once for each fixture file)._|
@@ -378,6 +378,7 @@ APPLITOOLS_SAVE_NEW_TESTS
 APPLITOOLS_COMPARE_WITH_PARENT_BRANCH
 APPLITOOLS_IGNORE_BASELINE
 APPLITOOLS_SERVER_URL
+APPLITOOLS_PROXY
 ```
 
 ### Method 3: The `applitools.config.js` file
