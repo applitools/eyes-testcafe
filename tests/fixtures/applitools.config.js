@@ -2,7 +2,7 @@ module.exports = {
   apiKey: process.env.APPLITOOLS_API_KEY,
   isDisabled: false,
   // proxy: {
-  //   url: 'http://localhost:8888',
+  //   uri: 'http://localhost:8888',
   //   username: 'daniel',
   //   password: '1234',
   // },
