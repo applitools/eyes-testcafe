@@ -1,4 +1,13 @@
 
+v1.1.26 / 2019-09-01
+====================
+
+* 1.1.26 [[3ef6ebe](/commit/3ef6ebef1483bed00577a12abf1273c3a8da9858)]
+* updated vgc to fix proxy [[cd648dd](/commit/cd648dd32288e0322b15320d1312e96bd83509fb)]
+* proxy is now uri [[a28ebce](/commit/a28ebceab722952aefde4d59df5a3e37d1214fc6)]
+* better proxy readme [[1c4879c](/commit/1c4879c794ef05d8d85d7f72dea31518f9506303)]
+* changelog [[4faac94](/commit/4faac946d418b124bfe2c918b5a290de1e437e3b)]
+
 v1.1.25 / 2019-08-26
 ====================
 
