@@ -329,68 +329,24 @@ module.exports = () => {
 
   var toUnAnchoredUri_1 = toUnAnchoredUri;
 
-  function createTempStylsheet(cssArrayBuffer) {
-    const cssText = new TextDecoder('utf-8').decode(cssArrayBuffer);
-    const head = document.head || document.querySelectorAll('head')[0];
-    const style = document.createElement('style');
-    style.type = 'text/css';
-    style.setAttribute('data-desc', 'Applitools tmp variable created by DOM SNAPSHOT');
-    head.appendChild(style); // This is required for IE8 and below.
-
-    if (style.styleSheet) {
-      style.styleSheet.cssText = cssText;
-    } else {
-      style.appendChild(document.createTextNode(cssText));
-    }
-
-    return style.sheet;
-  }
-
-  var createTempStyleSheet = createTempStylsheet;
-
-  function makeExtractResourcesFromStyle({
-    extractResourcesFromStyleSheet
-  }) {
-    return function extractResourcesFromStyle(cssArrayBuffer, styleSheet, doc = document) {
-      let corsFreeStyleSheet;
-
-      if (styleSheet) {
-        try {
-          styleSheet.cssRules;
-          corsFreeStyleSheet = styleSheet;
-        } catch (e) {
-          console.log(`[dom-snapshot] could not access cssRules for ${styleSheet.href} ${e}\ncreating temp style for access.`);
-          corsFreeStyleSheet = createTempStyleSheet(cssArrayBuffer);
-        }
-      } else {
-        corsFreeStyleSheet = createTempStyleSheet(cssArrayBuffer);
-      }
-
-      const result = extractResourcesFromStyleSheet(corsFreeStyleSheet, doc);
-
-      if (corsFreeStyleSheet !== styleSheet) {
-        corsFreeStyleSheet.ownerNode.parentNode.removeChild(corsFreeStyleSheet.ownerNode);
-      }
-
-      return result;
-    };
-  }
-
-  var extractResourcesFromStyle = makeExtractResourcesFromStyle;
-
   var noop = () => {};
+
+  function flat(arr) {
+    return arr.reduce((flatArr, item) => flatArr.concat(item), []);
+  }
+
+  var flat_1 = flat;
 
   function makeProcessResource({
     fetchUrl,
     findStyleSheetByUrl,
+    getCorsFreeStyleSheet,
     extractResourcesFromStyleSheet,
     extractResourcesFromSvg,
+    sessionCache,
     cache = {},
-    logTimestamp = noop
+    log = noop
   }) {
-    const extractResourcesFromStyle$1 = extractResourcesFromStyle({
-      extractResourcesFromStyleSheet
-    });
     return function processResource({
       url,
       documents,
@@ -398,17 +354,25 @@ module.exports = () => {
       forceCreateStyle = false
     }) {
       if (!cache[url]) {
-        const now = Date.now();
-        cache[url] = doProcessResource(url).then(result => {
-          logTimestamp('doProcessResource', `[${Date.now() - now}ms]`, url);
-          return result;
-        });
+        if (sessionCache && sessionCache.getItem(url)) {
+          const resourceUrls = getDependencies(url);
+          log('doProcessResource from sessionStorage', url, 'deps:', resourceUrls.slice(1));
+          cache[url] = Promise.resolve({
+            resourceUrls
+          });
+        } else {
+          const now = Date.now();
+          cache[url] = doProcessResource(url).then(result => {
+            log('doProcessResource', `[${Date.now() - now}ms]`, url);
+            return result;
+          });
+        }
       }
 
       return cache[url];
 
       function doProcessResource(url) {
-        logTimestamp('fetching', url);
+        log('fetching', url);
         const now = Date.now();
         return fetchUrl(url).catch(e => {
           if (probablyCORS(e)) {
@@ -426,84 +390,86 @@ module.exports = () => {
           probablyCORS
         }) => {
           if (probablyCORS) {
+            sessionCache && sessionCache.setItem(url, []);
             return {
               resourceUrls: [url]
             };
           }
 
-          logTimestamp('fetched', `[${Date.now() - now}ms]`, url);
-          let result = {
-            blobsObj: {
-              [url]: {
-                type,
-                value
-              }
+          log('fetched', `[${Date.now() - now}ms]`, url);
+          const thisBlob = {
+            [url]: {
+              type,
+              value
             }
           };
-          let resourceUrls;
+          let dependentUrls;
 
           if (/text\/css/.test(type)) {
             let styleSheet = findStyleSheetByUrl(url, documents);
 
             if (styleSheet || forceCreateStyle) {
-              resourceUrls = extractResourcesFromStyle$1(value, styleSheet, documents[0]);
+              const {
+                corsFreeStyleSheet,
+                cleanStyleSheet
+              } = getCorsFreeStyleSheet(value, styleSheet);
+              dependentUrls = extractResourcesFromStyleSheet(corsFreeStyleSheet, documents[0]);
+              cleanStyleSheet();
             }
           } else if (/image\/svg/.test(type)) {
             try {
-              resourceUrls = extractResourcesFromSvg(value);
-              forceCreateStyle = !!resourceUrls;
+              dependentUrls = extractResourcesFromSvg(value);
+              forceCreateStyle = !!dependentUrls;
             } catch (e) {
               console.log('could not parse svg content', e);
             }
           }
 
-          if (resourceUrls) {
-            result = mapUrlsAndGetResult({
-              resourceUrls,
-              url,
-              type,
-              value,
+          if (dependentUrls) {
+            const absoluteDependentUrls = dependentUrls.map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).map(toUnAnchoredUri_1).filter(filterInlineUrl_1);
+            sessionCache && sessionCache.setItem(url, absoluteDependentUrls);
+            return getResourceUrlsAndBlobs({
+              documents,
+              urls: absoluteDependentUrls,
               forceCreateStyle
-            });
+            }).then(({
+              resourceUrls,
+              blobsObj
+            }) => ({
+              resourceUrls,
+              blobsObj: window.Object.assign(blobsObj, thisBlob)
+            }));
+          } else {
+            sessionCache && sessionCache.setItem(url, []);
+            return {
+              blobsObj: thisBlob
+            };
           }
-
-          return result;
         }).catch(err => {
-          console.log('[dom-snapshot] error while fetching', url, err);
+          log('error while fetching', url, err);
+          sessionCache && clearFromSessionStorage();
           return {};
         });
-      }
-
-      function mapUrlsAndGetResult({
-        resourceUrls,
-        url,
-        type,
-        value,
-        forceCreateStyle
-      }) {
-        const urls = resourceUrls.map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).map(toUnAnchoredUri_1).filter(filterInlineUrl_1);
-        return getResourceUrlsAndBlobs({
-          documents,
-          urls,
-          forceCreateStyle
-        }).then(({
-          resourceUrls,
-          blobsObj
-        }) => ({
-          resourceUrls,
-          blobsObj: window.Object.assign(blobsObj, {
-            [url]: {
-              type,
-              value
-            }
-          })
-        }));
       }
 
       function probablyCORS(err) {
         const msg = err.message && (err.message.includes('Failed to fetch') || err.message.includes('Network request failed'));
         const name = err.name && err.name.includes('TypeError');
         return msg && name;
+      }
+
+      function getDependencies(url) {
+        const dependentUrls = sessionCache.getItem(url);
+        return [url].concat(dependentUrls ? uniq_1(flat_1(dependentUrls.map(getDependencies))) : []);
+      }
+
+      function clearFromSessionStorage() {
+        log('clearing from sessionStorage:', url);
+        sessionCache.keys().forEach(key => {
+          const dependentUrls = sessionCache.getItem(key);
+          sessionCache.setItem(key, dependentUrls.filter(dep => dep !== url));
+        });
+        log('cleared from sessionStorage:', url);
       }
     };
   }
@@ -523,12 +489,6 @@ module.exports = () => {
   }
 
   var getUrlFromCssText_1 = getUrlFromCssText;
-
-  function flat(arr) {
-    return arr.reduce((flatArr, item) => flatArr.concat(item), []);
-  }
-
-  var flat_1 = flat;
 
   function makeExtractResourcesFromSvg({
     parser,
@@ -632,6 +592,54 @@ module.exports = () => {
 
   var extractResourceUrlsFromStyleTags = makeExtractResourceUrlsFromStyleTags;
 
+  function createTempStylsheet(cssArrayBuffer) {
+    const cssText = new TextDecoder('utf-8').decode(cssArrayBuffer);
+    const head = document.head || document.querySelectorAll('head')[0];
+    const style = document.createElement('style');
+    style.type = 'text/css';
+    style.setAttribute('data-desc', 'Applitools tmp variable created by DOM SNAPSHOT');
+    head.appendChild(style); // This is required for IE8 and below.
+
+    if (style.styleSheet) {
+      style.styleSheet.cssText = cssText;
+    } else {
+      style.appendChild(document.createTextNode(cssText));
+    }
+
+    return style.sheet;
+  }
+
+  var createTempStyleSheet = createTempStylsheet;
+
+  function getCorsFreeStyleSheet(cssArrayBuffer, styleSheet) {
+    let corsFreeStyleSheet;
+
+    if (styleSheet) {
+      try {
+        styleSheet.cssRules;
+        corsFreeStyleSheet = styleSheet;
+      } catch (e) {
+        console.log(`[dom-snapshot] could not access cssRules for ${styleSheet.href} ${e}\ncreating temp style for access.`);
+        corsFreeStyleSheet = createTempStyleSheet(cssArrayBuffer);
+      }
+    } else {
+      corsFreeStyleSheet = createTempStyleSheet(cssArrayBuffer);
+    }
+
+    return {
+      corsFreeStyleSheet,
+      cleanStyleSheet
+    };
+
+    function cleanStyleSheet() {
+      if (corsFreeStyleSheet !== styleSheet) {
+        corsFreeStyleSheet.ownerNode.parentNode.removeChild(corsFreeStyleSheet.ownerNode);
+      }
+    }
+  }
+
+  var getCorsFreeStyleSheet_1 = getCorsFreeStyleSheet;
+
   function base64ToArrayBuffer(base64) {
     var binary_string = window.atob(base64);
     var len = binary_string.length;
@@ -694,18 +702,77 @@ module.exports = () => {
 
   var toUriEncoding_1 = toUriEncoding;
 
-  function makeLogTimestamp(referenceTime) {
-    return function logTimestamp() {
+  function makeLog(referenceTime) {
+    return function log() {
       const args = ['[dom-snapshot]', `[+${Date.now() - referenceTime}ms]`].concat(window.Array.from(arguments));
       console.log.apply(console, args);
     };
   }
 
-  var logTimestamp = makeLogTimestamp;
+  var log = makeLog;
 
-  function processPage(doc = document, debug) {
-    const logTimestamp$1 = debug ? logTimestamp(Date.now()) : noop;
-    logTimestamp$1('processPage start');
+  const RESOURCE_STORAGE_KEY = '__process_resource';
+
+  function makeSessionCache({
+    log,
+    sessionStorage
+  }) {
+    let sessionStorageCache;
+
+    try {
+      sessionStorage = sessionStorage || window.sessionStorage;
+      const sessionStorageCacheStr = sessionStorage.getItem(RESOURCE_STORAGE_KEY);
+      sessionStorageCache = sessionStorageCacheStr ? JSON.parse(sessionStorageCacheStr) : {};
+    } catch (ex) {
+      log('error creating session cache', ex);
+    }
+
+    return {
+      getItem,
+      setItem,
+      keys,
+      persist
+    };
+
+    function getItem(key) {
+      if (sessionStorageCache) {
+        return sessionStorageCache[key];
+      }
+    }
+
+    function setItem(key, value) {
+      if (sessionStorageCache) {
+        log('saving to in-memory sessionStorage, key:', key, 'value:', value);
+        sessionStorageCache[key] = value;
+      }
+    }
+
+    function keys() {
+      if (sessionStorageCache) {
+        return window.Object.keys(sessionStorageCache);
+      } else {
+        return [];
+      }
+    }
+
+    function persist() {
+      if (sessionStorageCache) {
+        sessionStorage.setItem(RESOURCE_STORAGE_KEY, JSON.stringify(sessionStorageCache));
+      }
+    }
+  }
+
+  var sessionCache = makeSessionCache;
+
+  function processPage(doc = document, {
+    showLogs,
+    useSessionCache
+  } = {}) {
+    const log$1 = showLogs ? log(Date.now()) : noop;
+    log$1('processPage start');
+    const sessionCache$1 = useSessionCache && sessionCache({
+      log: log$1
+    });
     const styleSheetCache = {};
     const extractResourcesFromStyleSheet$1 = extractResourcesFromStyleSheet({
       styleSheetCache
@@ -720,17 +787,19 @@ module.exports = () => {
     const processResource$1 = processResource({
       fetchUrl: fetchUrl_1,
       findStyleSheetByUrl: findStyleSheetByUrl$1,
+      getCorsFreeStyleSheet: getCorsFreeStyleSheet_1,
       extractResourcesFromStyleSheet: extractResourcesFromStyleSheet$1,
       extractResourcesFromSvg,
       absolutizeUrl: absolutizeUrl_1,
-      logTimestamp: logTimestamp$1
+      log: log$1,
+      sessionCache: sessionCache$1
     });
     const getResourceUrlsAndBlobs$1 = getResourceUrlsAndBlobs({
       processResource: processResource$1,
       aggregateResourceUrlsAndBlobs: aggregateResourceUrlsAndBlobs_1
     });
     return doProcessPage(doc).then(result => {
-      logTimestamp$1('processPage end');
+      log$1('processPage end');
       return result;
     });
 
@@ -749,6 +818,9 @@ module.exports = () => {
       const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1({
         documents: docRoots,
         urls
+      }).then(result => {
+        sessionCache$1 && sessionCache$1.persist();
+        return result;
       });
       const canvasBlobs = buildCanvasBlobs_1(canvasElements);
       const frameDocs = extractFrames_1(docRoots);
@@ -768,7 +840,7 @@ module.exports = () => {
           cdt,
           url: pageUrl,
           srcAttr,
-          resourceUrls,
+          resourceUrls: resourceUrls.map(url => url.replace(/^blob:/, '')),
           blobs: blobsObjToArray(blobsObj).concat(canvasBlobs),
           frames: framesResults
         };
