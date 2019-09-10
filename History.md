@@ -1,4 +1,11 @@
 
+v1.1.27 / 2019-09-10
+====================
+
+* 1.1.27 [[32aea57](/commit/32aea571d42663f40809d1e85593977eb8d3233a)]
+* updated ds to new api name [[998f15b](/commit/998f15b4ee1e67517768bc14b6a13f6e2cc4762e)]
+* changelog [[ea8f93a](/commit/ea8f93a59e0e6601744c959e4a1d7307eb2caee2)]
+
 v1.1.26 / 2019-09-01
 ====================
 
