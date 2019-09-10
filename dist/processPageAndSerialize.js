@@ -500,11 +500,13 @@ module.exports = () => {
       const svgStr = decooder.decode(svgArrayBuffer);
       const domparser = parser || new DOMParser();
       const doc = domparser.parseFromString(svgStr, 'image/svg+xml');
+      const srcsetUrls = window.Array.from(doc.querySelectorAll('img[srcset]')).map(srcsetEl => srcsetEl.getAttribute('srcset').split(', ').map(str => str.trim().split(/\s+/)[0])).reduce((acc, urls) => acc.concat(urls), []);
+      const srcUrls = window.Array.from(doc.querySelectorAll('img[src]')).map(srcEl => srcEl.getAttribute('src'));
       const fromHref = window.Array.from(doc.querySelectorAll('image,use,link[rel="stylesheet"]')).map(e => e.getAttribute('href') || e.getAttribute('xlink:href'));
       const fromObjects = window.Array.from(doc.getElementsByTagName('object')).map(e => e.getAttribute('data'));
       const fromStyleTags = extractResourceUrlsFromStyleTags(doc, false);
       const fromStyleAttrs = urlsFromStyleAttrOfDoc(doc);
-      return fromHref.concat(fromObjects).concat(fromStyleTags).concat(fromStyleAttrs).filter(u => u[0] !== '#');
+      return srcsetUrls.concat(srcUrls).concat(fromHref).concat(fromObjects).concat(fromStyleTags).concat(fromStyleAttrs).filter(u => u[0] !== '#');
     };
   }
 
