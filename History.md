@@ -1,4 +1,11 @@
 
+v1.1.28 / 2019-09-11
+====================
+
+* 1.1.28 [[b7a5512](/commit/b7a5512958950954042d4df8afc52cdaa8c1b666)]
+* basic support for TS test files [[48b33bd](/commit/48b33bd026050832a4addea73caebc63009bc052)]
+* changelog [[a572357](/commit/a57235705477524bb822a7c76400b4d174e58d1e)]
+
 v1.1.27 / 2019-09-10
 ====================
 
