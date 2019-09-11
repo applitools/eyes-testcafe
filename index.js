@@ -1,2 +1,4 @@
 'use strict';
-module.exports = require('./src/eyes');
+const Eyes = require('./src/eyes');
+module.exports = Eyes;
+module.exports.default = Eyes;

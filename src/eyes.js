@@ -222,3 +222,4 @@ class Eyes {
 }
 
 module.exports = Eyes;
+module.exports.default = Eyes;
