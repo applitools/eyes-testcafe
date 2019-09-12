@@ -61,6 +61,7 @@ class Eyes {
     }
 
     let result = await this._processPage(this._currentTest.t);
+    const referrer = result.referrer;
     blobsToBuffer(result);
     this._mapProxyUrls(result);
     blobsToResourceContents(result);
@@ -73,7 +74,7 @@ class Eyes {
     this._logger.log(
       `[checkWindow] checking for test '${this._currentTestName()}' with ${JSON.stringify(args)}`,
     );
-    return this._currentTest.eyes.checkWindow({...result, ...args});
+    return this._currentTest.eyes.checkWindow({...result, ...args, referrer});
   }
 
   async waitForResults(rejectOnErrors = true) {
@@ -121,14 +122,15 @@ class Eyes {
     if (testInfo.isDisabled) {
       return testInfo;
     }
+
+    await this._assertClosed('open');
+    this._assertCanOpen(args);
     testInfo.config.userAgent = await this._getUserAgent(args.t);
 
     const stringableConfig = {...testInfo.config};
     delete stringableConfig.t;
     this._logger.log(`[_openAndInitTest] opening with ${JSON.stringify(stringableConfig)}`);
 
-    await this._assertClosed('open');
-    this._assertCanOpen(args);
     testInfo.eyes = await this._client.openEyes(testInfo.config);
     return testInfo;
   }
