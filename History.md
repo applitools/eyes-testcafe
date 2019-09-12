@@ -1,4 +1,12 @@
 
+v1.1.29 / 2019-09-12
+====================
+
+* 1.1.29 [[b82914f](https://github.com/applitools/eyes-testcafe/commit/b82914ff483102601b50b9b19539a6ccb17ef11a)]
+* added referrer to checkWindow requests [[7349811](https://github.com/applitools/eyes-testcafe/commit/7349811ca2e776e18f008d03d54a7222aa32cb34)]
+* changelog [[5b9007c](https://github.com/applitools/eyes-testcafe/commit/5b9007c4f8a37cd71eab650644c93582ce242027)]
+* changelog [[421052d](https://github.com/applitools/eyes-testcafe/commit/421052d761528dbffd9a97d59690a784d3b722b8)]
+
 v1.1.28 / 2019-09-11
 ====================
 
