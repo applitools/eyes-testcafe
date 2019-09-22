@@ -178,6 +178,28 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
     });
     ```
 
+ <!-- - #### accessibility
+    (optional): A single or an array of regions for checking accessibility on. For example:
+
+    ```js
+        eyes.checkWindow({
+          accessibility: [
+            {accessibilityType: 'RegularText', selector: '.some-div'},
+            {accessibilityType: 'RegularText', Selector('.some-div-2')},
+            {accessibilityType: 'LargeText', selector: '//*[@id="main"]/h1', type: 'xpath'},
+            {accessibilityType: 'BoldText', top: 100, left: 0, width: 1000, height: 100},
+          ]
+        });
+    ```
+
+     Possible accessibilityType values are: `None`,`IgnoreContrast`,`RegularText`,`LargeText`,`BoldText` and `GraphicalObject`.
+
+- #### accessibilityLevel
+    (optional): The accessibility level to use for the screenshot. Possible values are `None`, `AA` and `AAA`.
+    ```js
+    cy.eyesCheckWindow({accessibilityLevel: 'AA'})
+    ``` -->
+
 - #### floating
   (optional): A single or an array of floating regions to ignore when checking for visual differences. More information about floating regions can be found in Applitools docs [here](https://help.applitools.com/hc/en-us/articles/360006915292-Testing-of-floating-UI-elements). For example:
 
@@ -248,9 +270,9 @@ eyes.close();
 ```
 
 ### **waitForResults**
-Wait untill all tests in the fixture are completed and return their results.
+Wait until all tests in the fixture are completed and return their results.
 Note that if you don't wait for the tests to be completed then in case of a visual test failure, eyes cannot fail the fixture.
-* it is recommended to wait for the resulsts in the tescafe `after()` hook. 
+* it is recommended to wait for the results in the testcafe `after()` hook. 
 
 ```js
 await eyes.waitForResults()
@@ -263,16 +285,16 @@ If the rejection is not handled then Testcafe fails the fixture.
 In case of a general `Error` reject with the `Error`. 
 
 In case all the tests passed then waitForResults resolves with the test results.
-<!-- resolves with an Array, each element in the array represents a test (testcafe test, i.e. open checkWindow and close) and is an Array of TestResulst. Each TestResulst is a visual test environement. -->
+<!-- resolves with an Array, each element in the array represents a test (testcafe test, i.e. open checkWindow and close) and is an Array of TestResults. Each TestResults is a visual test environnement. -->
 ___
 <br/>
 
 ## Best practice for using the SDK
 
-Every call to `eyes.open` and `eyes.close` defines a test in Applitool Eyes, and all the calls to `eyes.checkWindow` between them are called "steps". In order to get a test structure in Applitools that corresponds to the test structure in Testcafe, it's best to open/close tests in every `test` call. **You can use `afterEach` for calling `eyes.close()`**
+Every call to `eyes.open` and `eyes.close` defines a test in Applitools Eyes, and all the calls to `eyes.checkWindow` between them are called "steps". In order to get a test structure in Applitools that corresponds to the test structure in Testcafe, it's best to open/close tests in every `test` call. **You can use `afterEach` for calling `eyes.close()`**
 
 Also note that after all tests are done you should call eyes.waitForResults, **you can use `after()` for calling `eyes.waitForResults`**, this is is done for two reasons:
-1. to signal testcafe to wait untill all the tests have been completed.
+1. to signal testcafe to wait until all the tests have been completed.
 2. to obtain test results if needed.
 
 ```js
@@ -325,6 +347,8 @@ Here are the available configuration properties:
 | `compareWithParentBranch` | false                       |  |
 | `ignoreBaseline`          | false                       |  |
 <br/>
+<!-- | `accessibilityLevel` | None | The accessibility level to use for the screenshots. Possible values are `None`, `AA` and `AAA`. |
+| `notifyOnCompletion`  | false | If `true` batch completion notifications are sent. | -->
 
 The following configuration properties cannot be defined using the first method of passing them to `eyes.open`. They should be defined either in the `applitools.config.js` file or as environment variables.
 
@@ -380,6 +404,8 @@ APPLITOOLS_IGNORE_BASELINE
 APPLITOOLS_SERVER_URL
 APPLITOOLS_PROXY
 ```
+<!-- APPLITOOLS_ACCESSIBILITY_LEVEL
+APPLITOOLS_NOTIFY_ON_COMPLETION -->
 
 ### Method 3: The `applitools.config.js` file
 

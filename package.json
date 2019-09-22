@@ -1,6 +1,6 @@
 {
   "name": "@applitools/eyes-testcafe",
-  "version": "1.1.29",
+  "version": "1.2.0",
   "description": "Eyes Testcafe SDK",
   "main": "index.js",
   "scripts": {
@@ -37,9 +37,9 @@
   },
   "dependencies": {
     "@applitools/dom-snapshot": "^3.0.2",
-    "@applitools/eyes-common": "^3.9.3",
-    "@applitools/eyes-sdk-core": "^5.16.1",
-    "@applitools/visual-grid-client": "^12.29.1",
+    "@applitools/eyes-common": "^3.10.1",
+    "@applitools/eyes-sdk-core": "^5.17.1",
+    "@applitools/visual-grid-client": "^12.32.1",
     "chalk": "^2.4.2",
     "rimraf": "^2.7.1"
   },
@@ -54,13 +54,13 @@
     "express": "^4.17.1",
     "mocha": "^6.2.0",
     "prettier": "^1.18.2",
-    "rollup": "^1.21.2",
+    "rollup": "^1.21.4",
     "rollup-plugin-babel": "^4.3.3",
     "rollup-plugin-commonjs": "^9.3.4",
     "rollup-plugin-node-builtins": "^2.1.2",
     "rollup-plugin-node-globals": "^1.4.0",
     "rollup-plugin-node-resolve": "^4.2.4",
     "rollup-plugin-replace": "^2.2.0",
-    "testcafe": "^1.4.3"
+    "testcafe": "^1.5.0"
   }
 }
