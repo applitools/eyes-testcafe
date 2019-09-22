@@ -1,4 +1,11 @@
 
+v1.2.1 / 2019-09-22
+===================
+
+* 1.2.1 [[636e253](https://github.com/applitools/eyes-testcafe/commit/636e2531650865a42ee3d94fb15191f186ff6db1)]
+* added accessibility and notifyOnCompletion [[49d7ef3](https://github.com/applitools/eyes-testcafe/commit/49d7ef3dd73b14ed67c970b6d97f7e67a6028546)]
+* changelog [[a835c55](https://github.com/applitools/eyes-testcafe/commit/a835c556694e8c5b6d9b3da5977314681b9565b7)]
+
 v1.1.29 / 2019-09-12
 ====================
 
