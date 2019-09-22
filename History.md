@@ -1,4 +1,11 @@
 
+v1.2.2 / 2019-09-22
+===================
+
+* 1.2.2 [[c516285](https://github.com/applitools/eyes-testcafe/commit/c51628597c19e804ab8ccc798e1d16bb8462f6b6)]
+* removed None from accessibilityType [[2b4e1e3](https://github.com/applitools/eyes-testcafe/commit/2b4e1e34d834b90441f3ab1f104e61ed7c328c15)]
+* changelog [[c1dd2f9](https://github.com/applitools/eyes-testcafe/commit/c1dd2f935ec4d4c49ff0a45c82226075a528c1df)]
+
 v1.2.1 / 2019-09-22
 ===================
 
