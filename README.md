@@ -192,7 +192,7 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
         });
     ```
 
-     Possible accessibilityType values are: `None`,`IgnoreContrast`,`RegularText`,`LargeText`,`BoldText` and `GraphicalObject`.
+     Possible accessibilityType values are: `IgnoreContrast`,`RegularText`,`LargeText`,`BoldText` and `GraphicalObject`.
 
 - #### accessibilityLevel
     (optional): The accessibility level to use for the screenshot. Possible values are `None`, `AA` and `AAA`.
