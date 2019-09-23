@@ -1,4 +1,11 @@
 
+v1.2.3 / 2019-09-23
+===================
+
+* 1.2.3 [[8439b95](https://github.com/applitools/eyes-testcafe/commit/8439b95dc007494e95624b521dcb5e78342d9db6)]
+* added concurrency message [[e57d599](https://github.com/applitools/eyes-testcafe/commit/e57d599282094491039c258a5e48afe770a29709)]
+* changelog [[5ba8699](https://github.com/applitools/eyes-testcafe/commit/5ba8699b6de23297b4c670bbe5bb0bf12d6b1ded)]
+
 v1.2.2 / 2019-09-22
 ===================
 
