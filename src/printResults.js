@@ -1,8 +1,9 @@
 'use strict';
 const chalk = require('chalk');
 const flat = require('./flat');
+const concurrencyMsg = require('./concurrencyMsg');
 
-function printResults(results) {
+function printResults(results, concurrency) {
   let outputStr = '\n';
   const combinedResults = flat(results);
   const testResults = combinedResults.filter(result => !(result instanceof Error));
@@ -54,6 +55,10 @@ See details at ${nonEmptyResult.getAppUrls().getBatch()}\n`;
     outputStr += chalk.yellow(
       `\nYour tests do not contain visual checks! make sure that the test conatains 'eyes.checkWindow' calls and that they are awaited upon.\n`,
     );
+  }
+
+  if (concurrency === 1) {
+    outputStr += `\n${concurrencyMsg}\n`;
   }
 
   console.log(outputStr);

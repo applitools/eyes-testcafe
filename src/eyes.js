@@ -89,7 +89,7 @@ class Eyes {
         ? Promise.reject.bind(Promise)
         : Promise.resolve.bind(Promise);
 
-    printResults(results);
+    printResults(results, this._defaultConfig.concurrency);
     return settle(results);
   }
 
