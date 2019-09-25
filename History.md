@@ -1,4 +1,11 @@
 
+v1.2.4 / 2019-09-25
+===================
+
+* 1.2.4 [[c4f867b](https://github.com/applitools/eyes-testcafe/commit/c4f867b2d1255b05d934a82dce599922782255a0)]
+* added closeBatch [[a09d35c](https://github.com/applitools/eyes-testcafe/commit/a09d35c860ea545f590927fc515139344506a7e8)]
+* changelog [[0b89892](https://github.com/applitools/eyes-testcafe/commit/0b898923046a69f9b71552aa5399c2e0bbffc4aa)]
+
 v1.2.3 / 2019-09-23
 ===================
 
