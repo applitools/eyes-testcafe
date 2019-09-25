@@ -482,5 +482,5 @@ eyes.open({
 ___
 ## Troubleshooting
 
-* If issues occur, DEBUG_SAVE=1 env variable can be set to save helpful information. The information will be saved under a folder named `.debug` in the current working directory. This could be then used for getting support on your issue.
+* If issues occur, DEBUG_SAVE=1 env variable can be set to save helpful information. The information will be saved under a folder named `.applitools` in the current working directory. This could be then used for getting support on your issue.
  * You can also use [DEBUG=eyes*](https://github.com/visionmedia/debug) for debugging.
