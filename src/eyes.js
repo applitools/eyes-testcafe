@@ -1,8 +1,8 @@
 'use strict';
 
-const {Logger} = require('@applitools/eyes-common');
+const {ArgumentGuard, Logger} = require('@applitools/eyes-common');
+const {presult} = require('@applitools/functional-commons');
 const {makeVisualGridClient} = require('@applitools/visual-grid-client');
-const {ArgumentGuard} = require('@applitools/eyes-common');
 const processPageAndSerialize = require('../dist/processPageAndSerialize');
 const blobsToResourceContents = require('./blobsToResourceContents');
 const blobsToBuffer = require('./blobsToBuffer');
@@ -81,6 +81,8 @@ class Eyes {
     this._logger.log('[waitForResults] called by user');
     await this._assertClosed('waitForResults');
     let results = await Promise.all(this._closedTests.map(b => b.closePromise));
+    await this._handleCloseBatch();
+
     results = results.map(this._removeTestResultsIfError.bind(this));
     await handleBatchResultsFile({results, tapDirPath: this._defaultConfig.tapDirPath});
 
@@ -91,6 +93,13 @@ class Eyes {
 
     printResults(results, this._defaultConfig.concurrency);
     return settle(results);
+  }
+
+  async _handleCloseBatch() {
+    const [err] = await presult(this._client.closeBatch());
+    if (err) {
+      this._logger.log('failed to close batch', err);
+    }
   }
 
   async _processPage(t) {

@@ -363,6 +363,8 @@ The following configuration properties cannot be defined using the first method 
 | `tapDirPath`              | undefined                   | Directory path of a results file. If set, then a [TAP](https://en.wikipedia.org/wiki/Test_Anything_Protocol#Specification) file is created in this directory, the tap file name is created with the name eyes-[\<ISO-DATE\>](https://en.wikipedia.org/wiki/ISO_8601)\.tap and contains the Eyes test results <br><br/> _Note that results are scoped per spec file, this means that the results file is created once for each fixture file)._|
 | `concurrency`             | 1                           | The maximum number of tests that can run concurrently. The default value is the allowed amount for free accounts. For paid accounts, set this number to the quota set for your account. |
 
+<!-- |`dontCloseBatches`| false | If true, batches are not closed for  [notifyOnCompletion](#advanced-configuration).| -->
+
 ### Method 1: Arguments for `eyes.open`
 
 Pass a config object as the only argument. For example:
