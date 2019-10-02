@@ -36,11 +36,11 @@
     "url": "https://github.com/applitools/eyes-testcafe"
   },
   "dependencies": {
-    "@applitools/dom-snapshot": "^3.0.2",
+    "@applitools/dom-snapshot": "^3.0.3",
     "@applitools/eyes-common": "^3.10.3",
-    "@applitools/eyes-sdk-core": "^5.18.0",
-    "@applitools/visual-grid-client": "^12.33.2",
+    "@applitools/eyes-sdk-core": "^5.19.0",
     "@applitools/functional-commons": "^1.5.2",
+    "@applitools/visual-grid-client": "^12.34.2",
     "chalk": "^2.4.2",
     "rimraf": "^2.7.1"
   },
@@ -53,9 +53,9 @@
     "eslint-plugin-node": "^8.0.1",
     "eslint-plugin-prettier": "^2.7.0",
     "express": "^4.17.1",
-    "mocha": "^6.2.0",
+    "mocha": "^6.2.1",
     "prettier": "^1.18.2",
-    "rollup": "^1.21.4",
+    "rollup": "^1.22.0",
     "rollup-plugin-babel": "^4.3.3",
     "rollup-plugin-commonjs": "^9.3.4",
     "rollup-plugin-node-builtins": "^2.1.2",
