@@ -1,4 +1,12 @@
 
+v1.2.5 / 2019-10-02
+===================
+
+* 1.2.5 [[f20c6da](https://github.com/applitools/eyes-testcafe/commit/f20c6da89f30b2130ab4b68ab9a2e69086790854)]
+* added accessibility to TestResults [[0f9007b](https://github.com/applitools/eyes-testcafe/commit/0f9007bf815630a3740902d3520cc3797173ff69)]
+* readme change for debug save [[ff247b7](https://github.com/applitools/eyes-testcafe/commit/ff247b7f909c2aa577cfe3d3e6ffb6a270d529a3)]
+* changelog [[26b5900](https://github.com/applitools/eyes-testcafe/commit/26b5900e455417cf4edd9eb8f6d85030244da0a6)]
+
 v1.2.4 / 2019-09-25
 ===================
 
