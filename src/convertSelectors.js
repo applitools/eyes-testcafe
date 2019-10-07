@@ -16,7 +16,7 @@ async function convertSelectors({args, t, logger}) {
       promises.push(p);
     }
   }
-  for (let propNAme of ['ignore', 'floating', 'layout', 'strict', 'accessibility']) {
+  for (let propNAme of ['ignore', 'floating', 'layout', 'strict', 'content', 'accessibility']) {
     handleArrayProperty(propNAme);
   }
   await Promise.all(promises);

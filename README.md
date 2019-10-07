@@ -237,6 +237,18 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
     });
     ```
 
+- #### content
+  (optional): A single or an array of regions to match as [content level.](https://help.applitools.com/hc/en-us/articles/360007188591-Match-Levels) For example:
+    ```js
+    eyes.checkWindow({
+      content: [
+        {top: 100, left: 0, width: 1000, height: 100},
+        {selector: '.some-div-to-test-as-content'},
+        {selector: Selector('.some-div')}
+      ]
+    });
+    ```
+
 - #### scriptHooks 
   (optional): A set of scripts to be run by the browser during the rendering. It is intended to be used as a means to alter the page's state and structure at the time of rendering.
     An object with the following properties:
