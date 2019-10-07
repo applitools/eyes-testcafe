@@ -1,4 +1,17 @@
 
+v1.3.1 / 2019-10-07
+===================
+
+* 1.3.1 [[1327d1b](https://github.com/applitools/eyes-testcafe/commit/1327d1b855ba84e7d7b9c244b3db9223f2b19994)]
+* bumped up minor [[2c75912](https://github.com/applitools/eyes-testcafe/commit/2c75912f5280145bfd04518b61d1818855c95430)]
+
+v1.2.6 / 2019-10-07
+===================
+
+* 1.2.6 [[3ac8ebc](https://github.com/applitools/eyes-testcafe/commit/3ac8ebc8ee78448cc2704ed6b94724e1cdc33e70)]
+* added content regions matche level to checkWindow [[85f5a21](https://github.com/applitools/eyes-testcafe/commit/85f5a21a9beabc8c3d90e22fdfb999bd9ebe3557)]
+* changelog [[cce235e](https://github.com/applitools/eyes-testcafe/commit/cce235eac46784203a4fcf439e6c606fe3b1aa31)]
+
 v1.2.5 / 2019-10-02
 ===================
 
