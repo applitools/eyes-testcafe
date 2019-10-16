@@ -1,4 +1,11 @@
 
+v1.4.1 / 2019-10-16
+===================
+
+* 1.4.1 [[7148df7](https://github.com/applitools/eyes-testcafe/commit/7148df7dd4159bc53854fa8477280fe972ce7c26)]
+* added typescript suuport [[846795d](https://github.com/applitools/eyes-testcafe/commit/846795d8403c6fc91eaf9ff2d305dbde61e289a2)]
+* changelog [[b299e26](https://github.com/applitools/eyes-testcafe/commit/b299e26912c5894e4abedfd7f4e291f38b4cddc7)]
+
 v1.3.1 / 2019-10-07
 ===================
 
