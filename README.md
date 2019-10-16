@@ -116,7 +116,7 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
         // capture viewport only
         eyes.checkWindow({
           target: 'window',
-          fully: 'false',
+          fully: false,
         });
     ```
 - #### selector 
@@ -185,7 +185,7 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
         eyes.checkWindow({
           accessibility: [
             {accessibilityType: 'RegularText', selector: '.some-div'},
-            {accessibilityType: 'RegularText', Selector('.some-div-2')},
+            {accessibilityType: 'RegularText', selector: Selector('.some-div-2')},
             {accessibilityType: 'LargeText', selector: '//*[@id="main"]/h1', type: 'xpath'},
             {accessibilityType: 'BoldText', top: 100, left: 0, width: 1000, height: 100},
           ]

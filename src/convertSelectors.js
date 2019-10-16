@@ -16,8 +16,8 @@ async function convertSelectors({args, t, logger}) {
       promises.push(p);
     }
   }
-  for (let propNAme of ['ignore', 'floating', 'layout', 'strict', 'content', 'accessibility']) {
-    handleArrayProperty(propNAme);
+  for (let propName of ['ignore', 'floating', 'layout', 'strict', 'content', 'accessibility']) {
+    handleArrayProperty(propName);
   }
   await Promise.all(promises);
 
@@ -28,15 +28,13 @@ async function convertSelectors({args, t, logger}) {
     if (!TypeUtils.isArray(args[propName])) {
       args[propName] = [args[propName]];
     }
-    args[propName].forEach((region, i) => {
-      if (isTestcafeSelector(region.selector)) {
-        logger.log(`converting {${propName}}`);
-        p = testcafeSelectorToEyesSelector(region.selector).then(
-          res => (args[propName][i].selector = res),
-        );
-        promises.push(p);
-      }
-    });
+
+    const testcafeSelectors = args[propName].filter(r => isTestcafeSelector(r.selector));
+    for (const region of testcafeSelectors) {
+      logger.log(`converting {${propName}}`);
+      p = testcafeSelectorToEyesSelector(region.selector).then(res => (region.selector = res));
+      promises.push(p);
+    }
   }
 }
 
