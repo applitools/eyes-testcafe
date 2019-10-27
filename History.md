@@ -1,4 +1,11 @@
 
+v1.4.2 / 2019-10-27
+===================
+
+* 1.4.2 [[6e82743](https://github.com/applitools/eyes-testcafe/commit/6e82743fce62d5962e4be4839d31387c4f700dbe)]
+* updated vgc to not parse blobs [[7afd4a8](https://github.com/applitools/eyes-testcafe/commit/7afd4a88c91a63653903ac96fa805fc51ed11b48)]
+* changelog [[9a1a1a5](https://github.com/applitools/eyes-testcafe/commit/9a1a1a56d9e23733893e8d477775e38d305b6480)]
+
 v1.4.1 / 2019-10-16
 ===================
 
