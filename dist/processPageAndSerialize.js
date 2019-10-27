@@ -413,7 +413,7 @@ module.exports = () => {
                 corsFreeStyleSheet,
                 cleanStyleSheet
               } = getCorsFreeStyleSheet(value, styleSheet);
-              dependentUrls = extractResourcesFromStyleSheet(corsFreeStyleSheet, documents[0]);
+              dependentUrls = extractResourcesFromStyleSheet(corsFreeStyleSheet);
               cleanStyleSheet();
             }
           } else if (/image\/svg/.test(type)) {
@@ -548,26 +548,34 @@ module.exports = () => {
   var findStyleSheetByUrl = makeFindStyleSheetByUrl;
 
   function makeExtractResourcesFromStyleSheet({
-    styleSheetCache
+    styleSheetCache,
+    CSSRule = window.CSSRule
   }) {
-    return function extractResourcesFromStyleSheet(styleSheet, doc) {
-      const win = doc.defaultView || doc.ownerDocument && doc.ownerDocument.defaultView || window;
+    return function extractResourcesFromStyleSheet(styleSheet) {
       const urls = uniq_1(window.Array.from(styleSheet.cssRules || []).reduce((acc, rule) => {
-        if (rule instanceof win.CSSImportRule) {
-          styleSheetCache[rule.styleSheet.href] = rule.styleSheet;
-          return acc.concat(rule.href);
-        } else if (rule instanceof win.CSSFontFaceRule) {
-          return acc.concat(getUrlFromCssText_1(rule.cssText));
-        } else if (win.CSSSupportsRule && rule instanceof win.CSSSupportsRule || rule instanceof win.CSSMediaRule) {
-          return acc.concat(extractResourcesFromStyleSheet(rule, doc));
-        } else if (rule instanceof win.CSSStyleRule) {
-          for (let i = 0, ii = rule.style.length; i < ii; i++) {
-            const urls = getUrlFromCssText_1(rule.style.getPropertyValue(rule.style[i]));
-            urls.length && (acc = acc.concat(urls));
-          }
-        }
+        const getRuleUrls = {
+          [CSSRule.IMPORT_RULE]: () => {
+            if (rule.styleSheet) {
+              styleSheetCache[rule.styleSheet.href] = rule.styleSheet;
+              return rule.href;
+            }
+          },
+          [CSSRule.FONT_FACE_RULE]: () => getUrlFromCssText_1(rule.cssText),
+          [CSSRule.SUPPORTS_RULE]: () => extractResourcesFromStyleSheet(rule),
+          [CSSRule.MEDIA_RULE]: () => extractResourcesFromStyleSheet(rule),
+          [CSSRule.STYLE_RULE]: () => {
+            let rv = [];
 
-        return acc;
+            for (let i = 0, ii = rule.style.length; i < ii; i++) {
+              const urls = getUrlFromCssText_1(rule.style.getPropertyValue(rule.style[i]));
+              rv = rv.concat(urls);
+            }
+
+            return rv;
+          }
+        }[rule.type];
+        const urls = getRuleUrls && getRuleUrls() || [];
+        return acc.concat(urls);
       }, []));
       return urls.filter(u => u[0] !== '#');
     };
@@ -592,7 +600,7 @@ module.exports = () => {
     return function extractResourceUrlsFromStyleTags(doc, onlyDocStylesheet = true) {
       return uniq_1(window.Array.from(doc.querySelectorAll('style')).reduce((resourceUrls, styleEl) => {
         const styleSheet = onlyDocStylesheet ? window.Array.from(doc.styleSheets).find(styleSheet => styleSheet.ownerNode === styleEl) : styleEl.sheet;
-        return styleSheet ? resourceUrls.concat(extractResourcesFromStyleSheet(styleSheet, doc)) : resourceUrls;
+        return styleSheet ? resourceUrls.concat(extractResourcesFromStyleSheet(styleSheet)) : resourceUrls;
       }, []));
     };
   }

@@ -38,33 +38,33 @@
     "url": "https://github.com/applitools/eyes-testcafe"
   },
   "dependencies": {
-    "@applitools/dom-snapshot": "^3.0.3",
+    "@applitools/dom-snapshot": "^3.0.4",
     "@applitools/eyes-common": "^3.11.2",
     "@applitools/eyes-sdk-core": "^5.20.2",
     "@applitools/functional-commons": "^1.5.2",
-    "@applitools/visual-grid-client": "^12.36.6",
+    "@applitools/visual-grid-client": "^13.0.1",
     "chalk": "^2.4.2",
     "rimraf": "^2.7.1"
   },
   "devDependencies": {
     "@babel/core": "^7.6.4",
     "@babel/plugin-transform-spread": "^7.6.2",
-    "core-js-pure": "^3.3.2",
+    "core-js-pure": "^3.3.4",
     "eslint": "^5.16.0",
     "eslint-plugin-mocha-no-only": "^1.1.0",
     "eslint-plugin-node": "^8.0.1",
     "eslint-plugin-prettier": "^2.7.0",
     "express": "^4.17.1",
-    "mocha": "^6.2.1",
+    "mocha": "^6.2.2",
     "prettier": "^1.18.2",
-    "rollup": "^1.24.0",
+    "rollup": "^1.25.2",
     "rollup-plugin-babel": "^4.3.3",
     "rollup-plugin-commonjs": "^9.3.4",
     "rollup-plugin-node-builtins": "^2.1.2",
     "rollup-plugin-node-globals": "^1.4.0",
     "rollup-plugin-node-resolve": "^4.2.4",
     "rollup-plugin-replace": "^2.2.0",
-    "testcafe": "^1.5.0",
+    "testcafe": "^1.6.0",
     "typescript": "^3.6.4"
   }
 }
