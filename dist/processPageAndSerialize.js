@@ -90,6 +90,8 @@ module.exports = () => {
 
   var absolutizeUrl_1 = absolutizeUrl;
 
+  const NEED_MAP_INPUT_TYPES = new window.Set(['date', 'datetime-local', 'email', 'month', 'number', 'password', 'search', 'tel', 'text', 'time', 'url', 'week']);
+
   function domNodesToCdt(docNode, baseUrl) {
     const cdt = [{
       nodeType: Node.DOCUMENT_NODE
@@ -224,7 +226,7 @@ module.exports = () => {
         }
       }
 
-      if (elementNode.tagName === 'INPUT' && elementNode.type === 'text' && (elementNode.attributes.value && elementNode.attributes.value.value) !== elementNode.value) {
+      if (elementNode.tagName === 'INPUT' && NEED_MAP_INPUT_TYPES.has(elementNode.type) && (elementNode.attributes.value && elementNode.attributes.value.value) !== elementNode.value) {
         const nodeAttr = node.attributes.find(a => a.name === 'value');
 
         if (nodeAttr) {
@@ -233,6 +235,17 @@ module.exports = () => {
           node.attributes.push({
             name: 'value',
             value: elementNode.value
+          });
+        }
+      }
+
+      if (elementNode.tagName === 'OPTION' && elementNode.parentElement.value === elementNode.value) {
+        const nodeAttr = node.attributes.find(a => a.name === 'selected');
+
+        if (!nodeAttr) {
+          node.attributes.push({
+            name: 'selected',
+            value: ''
           });
         }
       }
