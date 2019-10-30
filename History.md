@@ -1,4 +1,11 @@
 
+v1.4.3 / 2019-10-30
+===================
+
+* 1.4.3 [[f868b9f](https://github.com/applitools/eyes-testcafe/commit/f868b9feae2d8324e48ca145a3969b9485336821)]
+* updated ds to support all input value maaings and seupport select value mapping [[6725028](https://github.com/applitools/eyes-testcafe/commit/6725028302eec4e3f5f095e02bc985183508cb6f)]
+* changelog [[8c82996](https://github.com/applitools/eyes-testcafe/commit/8c82996b715b6d970bbc52a5e03af02bd4db424a)]
+
 v1.4.2 / 2019-10-27
 ===================
 
