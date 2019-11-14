@@ -133,6 +133,11 @@ module.exports = () => {
             manualChildNodeIndexes = [cdt.length - 1];
           }
 
+          if (elementNode.tagName === 'TEXTAREA' && elementNode.value !== elementNode.textContent) {
+            cdt.push(getTextContentNode(elementNode));
+            manualChildNodeIndexes = [cdt.length - 1];
+          }
+
           node = getBasicNode(elementNode);
           node.childNodeIndexes = manualChildNodeIndexes || (elementNode.childNodes.length ? childrenFactory(cdt, elementNode.childNodes) : []);
 
@@ -191,6 +196,13 @@ module.exports = () => {
       return {
         nodeType: Node.TEXT_NODE,
         nodeValue: window.Array.from(elementNode.sheet.cssRules).map(rule => rule.cssText).join('')
+      };
+    }
+
+    function getTextContentNode(elementNode) {
+      return {
+        nodeType: Node.TEXT_NODE,
+        nodeValue: elementNode.value
       };
     }
 
@@ -794,7 +806,8 @@ module.exports = () => {
 
   function processPage(doc = document, {
     showLogs,
-    useSessionCache
+    useSessionCache,
+    dontFetchResources
   } = {}) {
     const log$1 = showLogs ? log(Date.now()) : noop;
     log$1('processPage start');
@@ -843,7 +856,10 @@ module.exports = () => {
       const styleTagUrls = flat_1(docRoots.map(extractResourceUrlsFromStyleTags$1));
       const absolutizeThisUrl = getAbsolutizeByUrl(baseUrl);
       const urls = uniq_1(window.Array.from(linkUrls).concat(window.Array.from(styleTagUrls)).concat(extractResourceUrlsFromStyleAttrs_1(cdt))).map(toUriEncoding_1).map(absolutizeThisUrl).map(toUnAnchoredUri_1).filter(filterInlineUrlsIfExisting);
-      const resourceUrlsAndBlobsPromise = getResourceUrlsAndBlobs$1({
+      const resourceUrlsAndBlobsPromise = dontFetchResources ? Promise.resolve({
+        resourceUrls: urls,
+        blobsObj: {}
+      }) : getResourceUrlsAndBlobs$1({
         documents: docRoots,
         urls
       }).then(result => {

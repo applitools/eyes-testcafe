@@ -84,7 +84,10 @@ function makeMapProxyUrls({collectFrameData, getProxyUrl, logger}) {
       .apply([], styleElements)
       .map(i => i !== undefined && frame.cdt[i])
       .filter(Boolean);
-    return [].concat.apply(styleElements, frame.frames.map(f => getStyleElementsFromFrame(f)));
+    return [].concat.apply(
+      styleElements,
+      frame.frames.map(f => getStyleElementsFromFrame(f)),
+    );
   }
 }
 
