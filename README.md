@@ -178,7 +178,7 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
     });
     ```
 
- <!-- - #### accessibility
+ - #### accessibility
     (optional): A single or an array of regions for checking accessibility on. For example:
 
     ```js
@@ -198,7 +198,7 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
     (optional): The accessibility level to use for the screenshot. Possible values are `None`, `AA` and `AAA`.
     ```js
     cy.eyesCheckWindow({accessibilityLevel: 'AA'})
-    ``` -->
+    ```
 
 - #### floating
   (optional): A single or an array of floating regions to ignore when checking for visual differences. More information about floating regions can be found in Applitools docs [here](https://help.applitools.com/hc/en-us/articles/360006915292-Testing-of-floating-UI-elements). For example:
