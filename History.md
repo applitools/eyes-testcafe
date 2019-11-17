@@ -1,4 +1,15 @@
 
+v1.4.4 / 2019-11-17
+===================
+
+* 1.4.4 [[ee9e3f4](https://github.com/applitools/eyes-testcafe/commit/ee9e3f42513a3928817c9d268943fd799c4630ff)]
+* updated vgc to support bamboo prefix [[13c8879](https://github.com/applitools/eyes-testcafe/commit/13c887922924209032d554e022247ecdc428a157)]
+* styling for index table [[c4da2ba](https://github.com/applitools/eyes-testcafe/commit/c4da2bac620523ca175a9a92e7712283c87e2e7d)]
+* added index table to readme [[da910bd](https://github.com/applitools/eyes-testcafe/commit/da910bdc4dd9c408a8ec1eef038179c2d0386d6a)]
+* enabled accessibility readme again [[dc51aaf](https://github.com/applitools/eyes-testcafe/commit/dc51aaf82aae55e0167d690c6ff0f579d0c63039)]
+* updated vgc [[d844d26](https://github.com/applitools/eyes-testcafe/commit/d844d2665d00894a7bfc4bdde1580628d52e8466)]
+* changelog [[ab81337](https://github.com/applitools/eyes-testcafe/commit/ab8133723564464cf563351047c3178152b9f9fb)]
+
 v1.4.3 / 2019-10-30
 ===================
 
