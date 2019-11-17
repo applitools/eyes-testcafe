@@ -70,6 +70,39 @@ test('Cookies', async t => {
 });
 ```
 
+### Index
+- [API](#API)
+  - [Open](#open)
+  - [CheckWindow](#checkWindow)
+    - [tag](#tag)
+    - [target](#target)
+    - [fully](#fully)
+    - [selector](#selector)
+    - [region](#region)
+    - [ignore](#ignore)
+    - [floating](#floating)
+    - [layout](#layout)
+    - [strict](#strict)
+    - [content](#content)
+    - [accessibility](#accessibility)
+    - [accessibilityLevel](#accessibilityLevel)
+    - [scriptHooks](#scriptHooks)
+    - [sendDom](#sendDom)
+  - [Close](#Close)
+  - [waitForResults](#waitForResults)
+  - [Best practices](#Best-practice-for-using-the-SDK)
+- [Concurrency](#Concurrency)
+- [Advanced configuration](#Advanced-configuration)
+  - [Scoped configuration](#configuration-properties)
+  - [Global configuration](#global-configuration-properties)
+  - [Examples](#Method-1-Arguments-for-eyesOpen)
+    - [Arguments for `eyesOpen`](#Method-1-Arguments-for-eyesOpen)
+    - [Environment variables](#Method-2-Environment-variables)
+    - [The `applitools.config.js` file](#Method-3-The-applitoolsconfigjs-file)
+- [Configuring the browser](#Configuring-the-browser)
+  - [Device emulation](#Device-emulation)
+- [Troubleshooting](#Troubleshooting)
+
 # API
 
 ### **open**
@@ -178,28 +211,6 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
     });
     ```
 
- - #### accessibility
-    (optional): A single or an array of regions for checking accessibility on. For example:
-
-    ```js
-        eyes.checkWindow({
-          accessibility: [
-            {accessibilityType: 'RegularText', selector: '.some-div'},
-            {accessibilityType: 'RegularText', selector: Selector('.some-div-2')},
-            {accessibilityType: 'LargeText', selector: '//*[@id="main"]/h1', type: 'xpath'},
-            {accessibilityType: 'BoldText', top: 100, left: 0, width: 1000, height: 100},
-          ]
-        });
-    ```
-
-     Possible accessibilityType values are: `IgnoreContrast`,`RegularText`,`LargeText`,`BoldText` and `GraphicalObject`.
-
-- #### accessibilityLevel
-    (optional): The accessibility level to use for the screenshot. Possible values are `None`, `AA` and `AAA`.
-    ```js
-    cy.eyesCheckWindow({accessibilityLevel: 'AA'})
-    ```
-
 - #### floating
   (optional): A single or an array of floating regions to ignore when checking for visual differences. More information about floating regions can be found in Applitools docs [here](https://help.applitools.com/hc/en-us/articles/360006915292-Testing-of-floating-UI-elements). For example:
 
@@ -248,7 +259,28 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
       ]
     });
     ```
+- #### accessibility
+    (optional): A single or an array of regions for checking accessibility on. For example:
 
+    ```js
+    eyes.checkWindow({
+      accessibility: [
+        {accessibilityType: 'RegularText', selector: '.some-div'},
+        {accessibilityType: 'RegularText', selector: Selector('.some-div-2')},
+        {accessibilityType: 'LargeText', selector: '//*[@id="main"]/h1', type: 'xpath'},
+        {accessibilityType: 'BoldText', top: 100, left: 0, width: 1000, height: 100},
+      ]
+    });
+    ```
+
+     Possible accessibilityType values are: `IgnoreContrast`,`RegularText`,`LargeText`,`BoldText` and `GraphicalObject`.
+
+- #### accessibilityLevel
+    (optional): The accessibility level to use for the screenshot. Possible values are `None`, `AA` and `AAA`.
+    ```js
+    cy.eyesCheckWindow({accessibilityLevel: 'AA'})
+    ```
+    
 - #### scriptHooks 
   (optional): A set of scripts to be run by the browser during the rendering. It is intended to be used as a means to alter the page's state and structure at the time of rendering.
     An object with the following properties:
@@ -339,7 +371,7 @@ There are 3 ways to specify test configuration:
 
 The list above is also the order of precedence, which means that if you pass a property to `eyes.open` it will override the environment variable, and the environment variable will override the value defined in the `applitools.config.js` file.
 
-Here are the available configuration properties:
+#### Configuration properties:
 
 | Property name             | Default value               | Description   |
 | -------------             |:-------------               |:-----------   |
@@ -361,6 +393,8 @@ Here are the available configuration properties:
 | `accessibilityLevel` | None | The accessibility level to use for the screenshots. Possible values are `None`, `AA` and `AAA`. |
 | `notifyOnCompletion`  | false | If `true` batch completion notifications are sent. |
 <br/>
+
+### Global configuration properties:
 
 The following configuration properties cannot be defined using the first method of passing them to `eyes.open`. They should be defined either in the `applitools.config.js` file or as environment variables.
 
