@@ -69,6 +69,7 @@ test('Cookies', async t => {
   await eyes.checkWindow('Click!');
 });
 ```
+<br/>
 
 ### Index
 - [API](#API)
@@ -102,6 +103,8 @@ test('Cookies', async t => {
 - [Configuring the browser](#Configuring-the-browser)
   - [Device emulation](#Device-emulation)
 - [Troubleshooting](#Troubleshooting)
+
+<br/><br/><br/>
 
 # API
 
