@@ -85,8 +85,8 @@ test('Cookies', async t => {
     - [layout](#layout)
     - [strict](#strict)
     - [content](#content)
-    - [accessibility](#accessibility)
-    - [accessibilityLevel](#accessibilityLevel)
+    <!-- - [accessibility](#accessibility)
+    - [accessibilityLevel](#accessibilityLevel) -->
     - [scriptHooks](#scriptHooks)
     - [sendDom](#sendDom)
   - [Close](#Close)
@@ -262,7 +262,7 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
       ]
     });
     ```
-- #### accessibility
+<!-- - #### accessibility
     (optional): A single or an array of regions for checking accessibility on. For example:
 
     ```js
@@ -282,7 +282,7 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
     (optional): The accessibility level to use for the screenshot. Possible values are `None`, `AA` and `AAA`.
     ```js
     cy.eyesCheckWindow({accessibilityLevel: 'AA'})
-    ```
+    ``` -->
     
 - #### scriptHooks 
   (optional): A set of scripts to be run by the browser during the rendering. It is intended to be used as a means to alter the page's state and structure at the time of rendering.
@@ -393,9 +393,9 @@ The list above is also the order of precedence, which means that if you pass a p
 | `properties`              | undefined                   | Custom properties for the eyes test. The format is an array of objects with name/value properties. For example: `[{name: 'My prop', value:'My value'}]`. |
 | `compareWithParentBranch` | false                       |  |
 | `ignoreBaseline`          | false                       |  |
-| `accessibilityLevel` | None | The accessibility level to use for the screenshots. Possible values are `None`, `AA` and `AAA`. |
 | `notifyOnCompletion`  | false | If `true` batch completion notifications are sent. |
 <br/>
+<!-- | `accessibilityLevel` | None | The accessibility level to use for the screenshots. Possible values are `None`, `AA` and `AAA`. | -->
 
 ### Global configuration properties:
 
@@ -453,9 +453,9 @@ APPLITOOLS_COMPARE_WITH_PARENT_BRANCH
 APPLITOOLS_IGNORE_BASELINE
 APPLITOOLS_SERVER_URL
 APPLITOOLS_PROXY
-APPLITOOLS_ACCESSIBILITY_LEVEL
 APPLITOOLS_NOTIFY_ON_COMPLETION
 ```
+<!-- APPLITOOLS_ACCESSIBILITY_LEVEL -->
 
 ### Method 3: The `applitools.config.js` file
 
