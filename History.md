@@ -1,4 +1,13 @@
 
+v1.4.5 / 2019-11-28
+===================
+
+* 1.4.5 [[5438b3b](https://github.com/applitools/eyes-testcafe/commit/5438b3b77744dda1a3a297a312e968bb9b9e9285)]
+* Added isHttpOnly flag for proxy [[dde90d8](https://github.com/applitools/eyes-testcafe/commit/dde90d807411283823e4aeebdb6aec606d44a590)]
+* removed accessibilioty from readme [[6a6b603](https://github.com/applitools/eyes-testcafe/commit/6a6b603fa2b883119a31e511d1077cac20e7b9f9)]
+* Switched rollup-plugin-node-builtins to a forked version with no volnerabilities. See: https://github.com/calvinmetcalf/rollup-plugin-node-builtins/issues/47 . [[a31c925](https://github.com/applitools/eyes-testcafe/commit/a31c925463a769e5d38aa8db5d3f3a5c0fe13be5)]
+* changelog [[02fe260](https://github.com/applitools/eyes-testcafe/commit/02fe260ed8427344b2eb668c3d27303da644bae9)]
+
 v1.4.4 / 2019-11-17
 ===================
 
