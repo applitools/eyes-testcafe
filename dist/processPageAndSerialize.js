@@ -561,12 +561,27 @@ module.exports = () => {
 
   var fetchUrl_1 = fetchUrl;
 
+  function sanitizeAuthUrl(urlStr) {
+    const url = new URL(urlStr);
+
+    if (url.username && url.password) {
+      return urlStr.replace(`${url.username}:${url.password}@`, '');
+    }
+
+    return urlStr;
+  }
+
+  var sanitizeAuthUrl_1 = sanitizeAuthUrl;
+
   function makeFindStyleSheetByUrl({
     styleSheetCache
   }) {
     return function findStyleSheetByUrl(url, documents) {
       const allStylesheets = flat_1(documents.map(d => window.Array.from(d.styleSheets)));
-      return styleSheetCache[url] || allStylesheets.find(styleSheet => styleSheet.href && toUnAnchoredUri_1(styleSheet.href) === url);
+      return styleSheetCache[url] || allStylesheets.find(styleSheet => {
+        const styleUrl = styleSheet.href && toUnAnchoredUri_1(styleSheet.href);
+        return styleUrl && sanitizeAuthUrl_1(styleUrl) === url;
+      });
     };
   }
 

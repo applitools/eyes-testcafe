@@ -4,7 +4,7 @@ module.exports = {
   // accessibilityLevel: 'AAA',
   // notifyOnCompletion: true,
   // proxy: {
-  //   uri: 'http://localhost:8888',
+  //   url: 'http://localhost:8888',
   //   username: 'daniel',
   //   password: '1234',
   // },
