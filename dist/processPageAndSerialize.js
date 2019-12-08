@@ -564,11 +564,15 @@ module.exports = () => {
   function sanitizeAuthUrl(urlStr) {
     const url = new URL(urlStr);
 
-    if (url.username && url.password) {
-      return urlStr.replace(`${url.username}:${url.password}@`, '');
+    if (url.username) {
+      url.username = '';
     }
 
-    return urlStr;
+    if (url.password) {
+      url.password = '';
+    }
+
+    return url.href;
   }
 
   var sanitizeAuthUrl_1 = sanitizeAuthUrl;
@@ -856,6 +860,7 @@ module.exports = () => {
     });
     return doProcessPage(doc).then(result => {
       log$1('processPage end');
+      result.scriptVersion = 'DOM_SNAPSHOT_SCRIPT_VERSION_TO_BE_REPLACED';
       return result;
     });
 
