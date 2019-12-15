@@ -15,6 +15,8 @@ import {Selector} from 'testcafe'
       
     });
 
+    await eyes.checkWindow('some string')
+
     await eyes.checkWindow({
       layout: [
         {top: 100, left: 0, width: 1000, height: 100},

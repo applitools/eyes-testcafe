@@ -10,5 +10,5 @@ fixture`Hello world`.page`http://localhost:7272/helloworld.html`
 
 test('testcafe Eyes.e2e helloworld', async t => {
   await eyes.open({appName: 'TestCafeApp', testName: 'Testcafe Eyes.e2e helloworld', t});
-  await eyes.checkWindow({tag: 'page loaded'});
+  await eyes.checkWindow('page loaded');
 });

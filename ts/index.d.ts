@@ -28,7 +28,7 @@ export default class Eyes {
    *  selector: '.my-element' 
    * });
   */
-  checkWindow(config: Eyes.Testcafe.CheckOptions): Promise<any>
+  checkWindow(config: Eyes.Testcafe.CheckOptions | string): Promise<any>
 
   /**
    * Close the applitools test and check that all screenshots are valid.
