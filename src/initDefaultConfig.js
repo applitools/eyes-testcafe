@@ -1,9 +1,8 @@
 'use strict';
 
 const {version: packageVersion} = require('../package.json');
-const {ConfigUtils} = require('@applitools/eyes-common');
+const {ConfigUtils, TypeUtils} = require('@applitools/eyes-sdk-core');
 const {configParams: visualGridConfigParams} = require('@applitools/visual-grid-client');
-const {TypeUtils} = require('@applitools/eyes-common');
 
 function initDefaultConfig(configPath = undefined) {
   const testcafeConfigParams = ['tapDirPath', 'failTestcafeOnDiff'];

@@ -1,7 +1,7 @@
 'use strict';
 const isTestcafeSelector = require('./isTestcafeSelector');
 const makeToEyesSelector = require('./makeToEyesSelector');
-const {TypeUtils} = require('@applitools/eyes-common');
+const {TypeUtils} = require('@applitools/eyes-sdk-core');
 
 async function convertSelectors({args, t, logger}) {
   if (!args) return;

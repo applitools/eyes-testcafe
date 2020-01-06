@@ -1,6 +1,6 @@
 'use strict';
 
-const {ArgumentGuard, Logger} = require('@applitools/eyes-common');
+const {ArgumentGuard, Logger} = require('@applitools/eyes-sdk-core');
 const {presult} = require('@applitools/functional-commons');
 const {makeVisualGridClient} = require('@applitools/visual-grid-client');
 const processPageAndSerialize = require('../dist/processPageAndSerialize');
