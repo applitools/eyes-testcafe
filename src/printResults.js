@@ -51,13 +51,14 @@ No differences were found!`);
 See details at ${nonEmptyResult.getAppUrls().getBatch()}\n`;
   }
 
-  if (!nonEmptyResult && !errors.length) {
+  const shouldShowNoCheckWindowWarning = !nonEmptyResult && !errors.length;
+  if (shouldShowNoCheckWindowWarning) {
     outputStr += chalk.yellow(
-      `\nYour tests do not contain visual checks! make sure that the test conatains 'eyes.checkWindow' calls and that they are awaited upon.\n`,
+      `\nYour tests do not contain visual checks! make sure that the test contains 'eyes.checkWindow' calls and that they are awaited upon.\n`,
     );
   }
 
-  if (concurrency === 1) {
+  if (concurrency === 1 && !shouldShowNoCheckWindowWarning) {
     outputStr += `\n${concurrencyMsg}\n`;
   }
 
