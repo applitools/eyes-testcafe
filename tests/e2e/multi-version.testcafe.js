@@ -8,19 +8,23 @@ fixture`Multi browser version`.page`http://localhost:7272/helloworld.html`
   .afterEach(async () => eyes.close())
   .after(async () => await eyes.waitForResults(true));
 
-test('testcafe Eyes.e2e multi browser version', async t => {
-  await eyes.open({
-    appName: 'TestCafeApp',
-    testName: 'Testcafe Eyes.e2e multi-browser-version',
-    browser: [
-      {width: 640, height: 480, name: 'chrome-one-version-back'},
-      {width: 640, height: 480, name: 'chrome-two-versions-back'},
-      {width: 640, height: 480, name: 'firefox-one-version-back'},
-      {width: 640, height: 480, name: 'firefox-two-versions-back'},
-    ],
-    t,
-  });
-  await eyes.checkWindow({
-    tag: 'page loaded',
+const browsers = [
+  {width: 640, height: 480, name: 'chrome-one-version-back'},
+  {width: 640, height: 480, name: 'chrome-two-versions-back'},
+  {width: 640, height: 480, name: 'firefox-one-version-back'},
+  {width: 640, height: 480, name: 'firefox-two-versions-back'},
+];
+
+browsers.forEach(browser => {
+  test(`testcafe Eyes.e2e multi browser version - ${browser.name}`, async t => {
+    await eyes.open({
+      appName: 'TestCafeApp',
+      testName: `Testcafe Eyes.e2e multi-browser-version - ${browser.name}`,
+      browser,
+      t,
+    });
+    await eyes.checkWindow({
+      tag: 'page loaded',
+    });
   });
 });

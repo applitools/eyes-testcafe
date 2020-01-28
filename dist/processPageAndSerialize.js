@@ -55,7 +55,7 @@ module.exports = () => {
     const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src],input[type="image"][src]')).map(srcEl => srcEl.getAttribute('src'));
     const imageUrls = window.Array.from(doc.querySelectorAll('image,use')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(u => u && u[0] !== '#');
     const objectUrls = window.Array.from(doc.querySelectorAll('object')).map(el => el.getAttribute('data')).filter(Boolean);
-    const cssUrls = window.Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(link => link.getAttribute('href'));
+    const cssUrls = window.Array.from(doc.querySelectorAll('link[rel~="stylesheet"], link[as="stylesheet"]')).map(link => link.getAttribute('href'));
     const videoPosterUrls = window.Array.from(doc.querySelectorAll('video[poster]')).map(videoEl => videoEl.getAttribute('poster'));
     return window.Array.from(srcsetUrls).concat(window.Array.from(srcUrls)).concat(window.Array.from(imageUrls)).concat(window.Array.from(cssUrls)).concat(window.Array.from(videoPosterUrls)).concat(window.Array.from(objectUrls));
   }
