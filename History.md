@@ -1,4 +1,30 @@
 
+v1.5.7 / 2020-02-16
+===================
+
+* 1.5.7 [[e8192b9](https://github.com/applitools/eyes-testcafe/commit/e8192b9ea3814cd794bfd53d0f51eaa0a0a74d76)]
+
+v1.5.6 / 2020-02-16
+===================
+
+* 1.5.6 [[e329f58](https://github.com/applitools/eyes-testcafe/commit/e329f58497e6ad28fb57e4dcf11c2c7ea43d47bc)]
+* updated vgc to suport branching feature [[ba3f467](https://github.com/applitools/eyes-testcafe/commit/ba3f46797f98a0502a3b3fc809360977ae526de8)]
+* 1.5.5 [[2e71e8b](https://github.com/applitools/eyes-testcafe/commit/2e71e8bfd0cafbfcb8f45897b67674b5bd5d5b66)]
+* update deps to get device emulation validation [[66f90ca](https://github.com/applitools/eyes-testcafe/commit/66f90cac974b4624a91649f274875fb1e47d16dc)]
+* 1.5.4 [[6c79c06](https://github.com/applitools/eyes-testcafe/commit/6c79c0662997a74f6cdd6f04d11c3d8ccbc8010a)]
+* docs for multi-version browser and safari [[b052907](https://github.com/applitools/eyes-testcafe/commit/b0529072889690ffab8a58bdf24ada147a9c9ba2)]
+* 1.5.3 [[adc3b71](https://github.com/applitools/eyes-testcafe/commit/adc3b7162df698e9ce5796310073f67ce7c7637f)]
+* update packages to get ua even in case of render failure [[430b200](https://github.com/applitools/eyes-testcafe/commit/430b200ef8c84f37bc8cfedab94033b082e820fb)]
+* fix typo and avoid concurrency message with no checkpoints message [[e9fd496](https://github.com/applitools/eyes-testcafe/commit/e9fd49611d5d7b95b3956165a482606b6a8f83bc)]
+* license [[81d3db4](https://github.com/applitools/eyes-testcafe/commit/81d3db4933c517a81448586ab8a13bbce9b7df74)]
+* 1.5.2 [[fdb5495](https://github.com/applitools/eyes-testcafe/commit/fdb5495e8068807b66769823cba8d3460e30b56d)]
+* add string to checkWindow argument types in type defs [[8d3fdd5](https://github.com/applitools/eyes-testcafe/commit/8d3fdd53591ebe38267270dd7455da07a3230718)]
+* better proxy readme section [[e90018c](https://github.com/applitools/eyes-testcafe/commit/e90018cdf30172815de072987d7187dab4112cf4)]
+* 1.5.1 [[934f4bf](https://github.com/applitools/eyes-testcafe/commit/934f4bf434b753ac8ea6730961c549689acbb434)]
+* 1.5.0 [[3e525ef](https://github.com/applitools/eyes-testcafe/commit/3e525ef701eaa3088f706581aebe5f5ea03aa050)]
+* bump vgc to 13.4.0 to support multi browser versions [[ccb6ef3](https://github.com/applitools/eyes-testcafe/commit/ccb6ef369f16bc4db5d7f366fc89ad77dbc0c729)]
+* changelog [[1f9b9b3](https://github.com/applitools/eyes-testcafe/commit/1f9b9b3ee96ac0c8ed2154b6fc91c7c49c2951bc)]
+
 v1.4.5 / 2019-11-28
 ===================
 
