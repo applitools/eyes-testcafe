@@ -1,4 +1,12 @@
 
+v1.5.8 / 2020-02-26
+===================
+
+* 1.5.8 [[e222a0c](https://github.com/applitools/eyes-testcafe/commit/e222a0c90e299fd8134a9520263d1db81ac0307f)]
+* added branch base commit support [[488e739](https://github.com/applitools/eyes-testcafe/commit/488e739557586ba8c450c1d833901c470bc1d136)]
+* updated render script [[3989a49](https://github.com/applitools/eyes-testcafe/commit/3989a49197275d5dca720dd065d9412e5d7d4a0f)]
+* changelog [[fb08365](https://github.com/applitools/eyes-testcafe/commit/fb083650d7d5da30117e89fc71e9d9c4df352ebc)]
+
 v1.5.7 / 2020-02-16
 ===================
 
