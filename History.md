@@ -1,4 +1,11 @@
 
+v1.5.9 / 2020-03-08
+===================
+
+* 1.5.9 [[865515f](https://github.com/applitools/eyes-testcafe/commit/865515fb9ec39ad15c35bca339045212d18b3755)]
+* fix getting branching info from server [[fec8fd6](https://github.com/applitools/eyes-testcafe/commit/fec8fd66bd607783a23c99cef8f2edeacaeeb44a)]
+* changelog [[eccf3c5](https://github.com/applitools/eyes-testcafe/commit/eccf3c53dee1416979567fdab8ef9a25f8c778a1)]
+
 v1.5.8 / 2020-02-26
 ===================
 
