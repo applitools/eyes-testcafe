@@ -40,14 +40,14 @@
   "dependencies": {
     "@applitools/dom-snapshot": "3.3.3",
     "@applitools/eyes-common": "3.18.5",
-    "@applitools/eyes-sdk-core": "7.0.0",
+    "@applitools/eyes-sdk-core": "8.1.1",
     "@applitools/functional-commons": "1.5.5",
-    "@applitools/visual-grid-client": "13.5.19",
+    "@applitools/visual-grid-client": "13.6.0",
     "chalk": "^2.4.2",
     "rimraf": "^2.7.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.8.4",
+    "@babel/core": "^7.8.7",
     "@babel/plugin-transform-spread": "^7.8.3",
     "@joseph184/rollup-plugin-node-builtins": "^2.1.4",
     "core-js-pure": "^3.6.4",
@@ -58,13 +58,13 @@
     "express": "^4.17.1",
     "mocha": "^6.2.2",
     "prettier": "^1.19.1",
-    "rollup": "^1.31.1",
-    "rollup-plugin-babel": "^4.3.3",
+    "rollup": "^1.32.1",
+    "rollup-plugin-babel": "^4.4.0",
     "rollup-plugin-commonjs": "^9.3.4",
     "rollup-plugin-node-globals": "^1.4.0",
     "rollup-plugin-node-resolve": "^4.2.4",
     "rollup-plugin-replace": "^2.2.0",
     "testcafe": "^1.8.2",
-    "typescript": "^3.8.2"
+    "typescript": "^3.8.3"
   }
 }
