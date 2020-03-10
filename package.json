@@ -1,6 +1,6 @@
 {
   "name": "@applitools/eyes-testcafe",
-  "version": "1.5.9",
+  "version": "1.5.10",
   "description": "Eyes Testcafe SDK",
   "main": "index.js",
   "types": "./ts/index.d.ts",
