@@ -1,4 +1,27 @@
 
+v1.5.13 / 2020-03-26
+====================
+
+* 1.5.13 [[2b6714e](https://github.com/applitools/eyes-testcafe/commit/2b6714e9891584e91a1ece807759c4720a07779b)]
+
+v1.5.12 / 2020-03-26
+====================
+
+* 1.5.12 [[9bbeb85](https://github.com/applitools/eyes-testcafe/commit/9bbeb85a252c36e83efdafbea2a3224cf2d1b345)]
+* fix process page css tree compilation error [[d2bc085](https://github.com/applitools/eyes-testcafe/commit/d2bc0855d220424297e6e05f1dde7ac4fbc03988)]
+
+v1.5.11 / 2020-03-10
+====================
+
+* 1.5.11 [[788ec44](https://github.com/applitools/eyes-testcafe/commit/788ec44587af0e74af6fa952d14b83cb9c27bf0e)]
+
+v1.5.10 / 2020-03-10
+====================
+
+* 1.5.10 [[5231c61](https://github.com/applitools/eyes-testcafe/commit/5231c612af85df4c9dddcc6ffd5247069ab3ab63)]
+* bump ec, esc, vgc [[11cd927](https://github.com/applitools/eyes-testcafe/commit/11cd92767aa47fc5ac9b49ff673eb74901a413b7)]
+* changelog [[ac53b7b](https://github.com/applitools/eyes-testcafe/commit/ac53b7b0a34d79857480819a75c238d4216251da)]
+
 v1.5.9 / 2020-03-08
 ===================
 
@@ -24,18 +47,42 @@ v1.5.6 / 2020-02-16
 
 * 1.5.6 [[e329f58](https://github.com/applitools/eyes-testcafe/commit/e329f58497e6ad28fb57e4dcf11c2c7ea43d47bc)]
 * updated vgc to suport branching feature [[ba3f467](https://github.com/applitools/eyes-testcafe/commit/ba3f46797f98a0502a3b3fc809360977ae526de8)]
+
+v1.5.5 / 2020-01-28
+===================
+
 * 1.5.5 [[2e71e8b](https://github.com/applitools/eyes-testcafe/commit/2e71e8bfd0cafbfcb8f45897b67674b5bd5d5b66)]
 * update deps to get device emulation validation [[66f90ca](https://github.com/applitools/eyes-testcafe/commit/66f90cac974b4624a91649f274875fb1e47d16dc)]
+
+v1.5.4 / 2020-01-21
+===================
+
 * 1.5.4 [[6c79c06](https://github.com/applitools/eyes-testcafe/commit/6c79c0662997a74f6cdd6f04d11c3d8ccbc8010a)]
 * docs for multi-version browser and safari [[b052907](https://github.com/applitools/eyes-testcafe/commit/b0529072889690ffab8a58bdf24ada147a9c9ba2)]
+
+v1.5.3 / 2020-01-06
+===================
+
 * 1.5.3 [[adc3b71](https://github.com/applitools/eyes-testcafe/commit/adc3b7162df698e9ce5796310073f67ce7c7637f)]
 * update packages to get ua even in case of render failure [[430b200](https://github.com/applitools/eyes-testcafe/commit/430b200ef8c84f37bc8cfedab94033b082e820fb)]
 * fix typo and avoid concurrency message with no checkpoints message [[e9fd496](https://github.com/applitools/eyes-testcafe/commit/e9fd49611d5d7b95b3956165a482606b6a8f83bc)]
 * license [[81d3db4](https://github.com/applitools/eyes-testcafe/commit/81d3db4933c517a81448586ab8a13bbce9b7df74)]
+
+v1.5.2 / 2019-12-15
+===================
+
 * 1.5.2 [[fdb5495](https://github.com/applitools/eyes-testcafe/commit/fdb5495e8068807b66769823cba8d3460e30b56d)]
 * add string to checkWindow argument types in type defs [[8d3fdd5](https://github.com/applitools/eyes-testcafe/commit/8d3fdd53591ebe38267270dd7455da07a3230718)]
 * better proxy readme section [[e90018c](https://github.com/applitools/eyes-testcafe/commit/e90018cdf30172815de072987d7187dab4112cf4)]
+
+v1.5.1 / 2019-12-08
+===================
+
 * 1.5.1 [[934f4bf](https://github.com/applitools/eyes-testcafe/commit/934f4bf434b753ac8ea6730961c549689acbb434)]
+
+v1.5.0 / 2019-12-08
+===================
+
 * 1.5.0 [[3e525ef](https://github.com/applitools/eyes-testcafe/commit/3e525ef701eaa3088f706581aebe5f5ea03aa050)]
 * bump vgc to 13.4.0 to support multi browser versions [[ccb6ef3](https://github.com/applitools/eyes-testcafe/commit/ccb6ef369f16bc4db5d7f366fc89ad77dbc0c729)]
 * changelog [[1f9b9b3](https://github.com/applitools/eyes-testcafe/commit/1f9b9b3ee96ac0c8ed2154b6fc91c7c49c2951bc)]
