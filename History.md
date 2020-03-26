@@ -2,13 +2,12 @@
 v1.5.13 / 2020-03-26
 ====================
 
-* 1.5.13 [[2b6714e](https://github.com/applitools/eyes-testcafe/commit/2b6714e9891584e91a1ece807759c4720a07779b)]
+* fix process page css tree compilation error [[d2bc085](https://github.com/applitools/eyes-testcafe/commit/d2bc0855d220424297e6e05f1dde7ac4fbc03988)]
 
 v1.5.12 / 2020-03-26
 ====================
 
 * 1.5.12 [[9bbeb85](https://github.com/applitools/eyes-testcafe/commit/9bbeb85a252c36e83efdafbea2a3224cf2d1b345)]
-* fix process page css tree compilation error [[d2bc085](https://github.com/applitools/eyes-testcafe/commit/d2bc0855d220424297e6e05f1dde7ac4fbc03988)]
 
 v1.5.11 / 2020-03-10
 ====================
