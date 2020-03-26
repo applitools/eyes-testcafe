@@ -8,7 +8,7 @@ let testcafe = null;
 createTestCafe('localhost', 1339)
   .then(tc => {
     testcafe = tc;
-    const isLive = !process.env.LIVE;
+    const isLive = !['false', '0'].includes(process.env.LIVE) && !!process.env.LIVE;
     const runner = !isLive ? testcafe.createRunner() : testcafe.createLiveModeRunner();
     const browser = !isLive ? 'chrome:headless' : 'chrome';
 
@@ -17,4 +17,4 @@ createTestCafe('localhost', 1339)
       .browsers([browser])
       .run({});
   })
-  .finally(() => testcafe.close());
+  .finally(() => testcafe && testcafe.close());

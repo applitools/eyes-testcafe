@@ -4,11 +4,11 @@
 module.exports = {
   generateBundle: function(_outputOptions, bundle, _isWrite) {
     const bundleFile = bundle['processPageAndSerialize.js'];
-    const prependWindow = ['Symbol', 'Array', 'Set', 'Object'];
+    const prependWindow = ['Symbol', 'Array', 'Set', 'Object', 'Map'];
     prependWindow.forEach(token => {
       bundleFile.code = bundleFile.code
         // space or parentheses then token --> space or parentheses then window.token
-        .replace(new RegExp(`([ \(]+)(${token})`, 'g'), '$1window.$2')
+        .replace(new RegExp(`([ \(/]+)(${token}[^a-zA-Z:])`, 'g'), '$1window.$2')
         .trim();
     });
   },

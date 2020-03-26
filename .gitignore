@@ -5,3 +5,4 @@ cdt.json
 .debug
 .demo
 .applitools
+*.log

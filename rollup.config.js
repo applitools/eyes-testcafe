@@ -1,4 +1,5 @@
 import babel from 'rollup-plugin-babel';
+import json from '@rollup/plugin-json';
 const resolve = require('rollup-plugin-node-resolve');
 const commonjs = require('rollup-plugin-commonjs');
 const builtins = require('@joseph184/rollup-plugin-node-builtins');
@@ -14,6 +15,7 @@ module.exports = {
     name: 'processPageAndSerialize',
   },
   plugins: [
+    json(),
     resolve({}),
     commonjs({include: '**', ignoreGlobal: true}),
     builtins(),

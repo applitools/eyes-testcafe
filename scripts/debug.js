@@ -11,7 +11,7 @@ createTestCafe('localhost', 1339)
     const runner = testcafe.createRunner();
     return runner
       .src([testPath])
-      .browsers(['chrome'])
+      .browsers(['chrome:headless'])
       .run();
   })
   .finally(() => testcafe.close());

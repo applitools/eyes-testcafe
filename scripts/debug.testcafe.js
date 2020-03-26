@@ -1,14 +1,15 @@
 /* global fixture, test */
+const {ClientFunction} = require('testcafe');
+const processPageAndSerialize = require('../dist/processPageAndSerialize');
 
-const url = process.argv[2];
-if (url) {
-  console.log('Debug running for', url);
-} else {
-  console.error('debug script missing url ');
-}
+const url = 'https://applitools.com/helloworld';
+fixture`TestCafeDebug`.page(url);
 
-fixture`TestCafeDebug`.page(process.argv[2]);
-
-test('Testcafe Eyes Render', async () => {
-  await new Promise(r => setTimeout(r, 1000 * 60 * 60));
+/*
+ * Run this incase of transpiling errors in processPageAndSerialize,
+ * this shows logs for where the script failed.
+ */
+test('DEBUG SCRIPT', async _t => {
+  const func = ClientFunction(processPageAndSerialize);
+  await func();
 });
