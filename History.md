@@ -1,13 +1,22 @@
 
+v1.5.14 / 2020-03-31
+====================
+
+* 1.5.14 [[beff433](https://github.com/applitools/eyes-testcafe/commit/beff4338a1356bab83eef6e0bb26d28a9cb1ecb9)]
+* removed eyes-common dependency [[37e5078](https://github.com/applitools/eyes-testcafe/commit/37e5078f11fd1816a7fb16147a47878e4605be95)]
+* fix changelog [[46bafe9](https://github.com/applitools/eyes-testcafe/commit/46bafe927577256cdff1ec99d119ae4d9e4b93a6)]
+* changelog [[b1e27e4](https://github.com/applitools/eyes-testcafe/commit/b1e27e4468163d8a9237480733a0305c29f2051d)]
+
 v1.5.13 / 2020-03-26
 ====================
 
-* fix process page css tree compilation error [[d2bc085](https://github.com/applitools/eyes-testcafe/commit/d2bc0855d220424297e6e05f1dde7ac4fbc03988)]
+* 1.5.13 [[2b6714e](https://github.com/applitools/eyes-testcafe/commit/2b6714e9891584e91a1ece807759c4720a07779b)]
 
 v1.5.12 / 2020-03-26
 ====================
 
 * 1.5.12 [[9bbeb85](https://github.com/applitools/eyes-testcafe/commit/9bbeb85a252c36e83efdafbea2a3224cf2d1b345)]
+* fix process page css tree compilation error [[d2bc085](https://github.com/applitools/eyes-testcafe/commit/d2bc0855d220424297e6e05f1dde7ac4fbc03988)]
 
 v1.5.11 / 2020-03-10
 ====================
