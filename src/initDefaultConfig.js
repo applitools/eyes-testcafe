@@ -9,6 +9,7 @@ function initDefaultConfig(configPath = undefined) {
   const calculatedConfig = ConfigUtils.getConfig({
     configParams: [...visualGridConfigParams, ...testcafeConfigParams],
     configPath,
+    logger: console,
   });
   const defaultConfig = {
     agentId: `eyes-testcafe/${packageVersion}`,
