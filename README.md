@@ -388,7 +388,7 @@ test('test 2', async t => {
 * Note that now each test would result in a different Applitools [batch](#Configuration-properties:), if you want to keep all the tests in the same batch you can set [batchId:](#Configuration-properties:)
    
   ```js
-  const batchId = `bid_${Math.round(Math.random() * 100000000)}`
+  const batchId = `bid_${String(Math.random()).slice(2)}`
   fixture `hello world`.page`https://www.example.com/hello.html`
   test('test 1', async t => {
     const eye = new Eyes();
