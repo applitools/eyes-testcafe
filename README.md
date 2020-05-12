@@ -93,6 +93,8 @@ test('Cookies', async t => {
   - [waitForResults](#waitForResults)
   - [Best practices](#Best-practice-for-using-the-SDK)
 - [Concurrency](#Concurrency)
+  - [Running wih testcafe concurrency](#Running-wih-testcafe-concurrency)
+  - [Applitools concurrency](#Applitools-concurrency)
 - [Advanced configuration](#Advanced-configuration)
   - [Scoped configuration](#configuration-properties)
   - [Global configuration](#global-configuration-properties)
@@ -339,8 +341,8 @@ ___
 ## Best practice for using the SDK
 
 Every call to `eyes.open` and `eyes.close` defines a test in Applitools Eyes, and all the calls to `eyes.checkWindow` between them are called "steps". In order to get a test structure in Applitools that corresponds to the test structure in Testcafe, it's best to open/close tests in every `test` call. **You can use `afterEach` for calling `eyes.close()`**
-
-Also note that after all tests are done you should call eyes.waitForResults, **you can use `after()` for calling `eyes.waitForResults`**, this is is done for two reasons:
+ 
+After all tests are done you should call eyes.waitForResults, **you can use `after()` for calling `eyes.waitForResults`**, this is is done for two reasons:
 1. to signal testcafe to wait until all the tests have been completed.
 2. to obtain test results if needed.
 
@@ -352,11 +354,56 @@ fixture`Hello world`
 ```
 
 Applitools will take screenshots and perform the visual comparisons in the background. Performance of the tests will not be affected during the test run, but there will be a small phase at the end of the test run that waits for visual tests to end.
+
+* When running tests [concurrently](https://devexpress.github.io/testcafe/documentation/guides/basic-guides/run-tests.html#run-tests-concurrently) you should create an eyes instance for each test, see [Running wih testcafe concurrency.](#Running-wih-testcafe-concurrency)
 ___
 <br/>
 
 ## Concurrency
 
+### Running wih testcafe concurrency
+
+Since Applitools tests are started by calling `eyes.open()` and ended by calling `eyes.close()` then when running Testcafe [concurrently](https://devexpress.github.io/testcafe/documentation/guides/basic-guides/run-tests.html#run-tests-concurrently) you should create an eyes instance per test, so you can call `eyes.open()` and `eyes.close()` on a per test basis, see example:
+
+```js
+fixture `hello world`.page`https://www.example.com/hello.html`
+
+test('test 1', async t => {
+  const eyes = new Eyes();
+  await eyes.open({appName: 'TestCafe', testName: 'test 1', t});
+  await eyes.checkWindow({tag: 'Page 1'});
+  await eyes.close()
+  await eyes.waitForResults()
+});
+
+test('test 2', async t => {
+  const eyes = new Eyes();
+  await eyes.open({appName: 'TestCafe', testName: 'test 2', t});
+  await eyes.checkWindow({tag: 'Page 2'});
+  await eyes.close()
+  await eyes.waitForResults() 
+});
+```
+
+* Note that now each test would result in a different Applitools [batch](#Configuration-properties:), if you want to keep all the tests in the same batch you can set [batchId:](#Configuration-properties:)
+   
+  ```js
+  const batchId = `bid_${Math.round(Math.random() * 100000000)}`
+  fixture `hello world`.page`https://www.example.com/hello.html`
+  test('test 1', async t => {
+    const eye = new Eyes();
+    await eyes.open({batchId, t ...});
+    ...
+  });
+
+  test('test 2', async t => {
+    const eyes = new Eyes();
+    await eyes.open({batchId, t ...});
+  ...
+  });
+  ```
+
+### Applitools concurrency
 
 The default level of concurrency for free accounts is `1`. This means that visual tests will not run in parallel during your tests, and will therefore be slow.
 If your account does support a higher level of concurrency, it's possible to pass a different value by specifying it in the property `concurrency` in the applitools.config.js file (see [Advanced configuration](#advanced-configuration) section below).
