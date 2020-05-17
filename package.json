@@ -41,7 +41,7 @@
     "@applitools/dom-snapshot": "3.4.2",
     "@applitools/eyes-sdk-core": "9.2.0",
     "@applitools/functional-commons": "1.5.5",
-    "@applitools/visual-grid-client": "13.7.2",
+    "@applitools/visual-grid-client": "14.0.1",
     "chalk": "^2.4.2",
     "rimraf": "^2.7.1"
   },
