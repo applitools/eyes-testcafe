@@ -6,7 +6,7 @@ const {exec} = require('child_process');
 const {promisify: p} = require('util');
 const pexec = p(exec);
 
-describe.only('typescript', () => {
+describe('typescript', () => {
   it('compiles with defenition file', async () => {
     const exampleFile = resolve(__dirname, './ts-defs.example.ts');
     try {
