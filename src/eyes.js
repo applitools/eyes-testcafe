@@ -60,8 +60,7 @@ class Eyes {
       return;
     }
 
-    let result = await this._processPage(this._currentTest.t);
-    const referrer = result.referrer;
+    const result = await this._processPage(this._currentTest.t);
     blobsToBuffer(result);
     this._mapProxyUrls(result);
     blobsToResourceContents(result);
@@ -74,7 +73,7 @@ class Eyes {
     this._logger.log(
       `[checkWindow] checking for test '${this._currentTestName()}' with ${JSON.stringify(args)}`,
     );
-    return this._currentTest.eyes.checkWindow({...result, ...args, referrer});
+    return this._currentTest.eyes.checkWindow({...result, ...args});
   }
 
   async waitForResults(rejectOnErrors = true) {
