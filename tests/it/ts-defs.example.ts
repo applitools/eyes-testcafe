@@ -10,8 +10,10 @@ import {Selector} from 'testcafe'
 
     // await eyes.open({appName: 'TestCafeApp', testName: 'Testcafe Eyes.e2e helloworld b', t})
 
+    await eyes.checkWindow('only tag');
+
     await eyes.checkWindow({
-      tag: 'page loaded 4',      
+      tag: 'page loaded 4',
     });
 
     await eyes.checkWindow('some string')
