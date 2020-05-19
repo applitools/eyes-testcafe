@@ -115,6 +115,7 @@ class Eyes {
       config: {
         ...this._defaultConfig,
         ...args,
+        accessibilitySettings: args.accessibilityValidation,
       },
       t: args.t,
     });

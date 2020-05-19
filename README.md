@@ -85,8 +85,7 @@ test('Cookies', async t => {
     - [layout](#layout)
     - [strict](#strict)
     - [content](#content)
-    <!-- - [accessibility](#accessibility)
-    - [accessibilityLevel](#accessibilityLevel) -->
+    - [accessibility](#accessibility)
     - [scriptHooks](#scriptHooks)
     - [sendDom](#sendDom)
   - [Close](#Close)
@@ -264,27 +263,28 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
       ]
     });
     ```
-<!-- - #### accessibility
-    (optional): A single or an array of regions for checking accessibility on. For example:
 
-    ```js
-    eyes.checkWindow({
-      accessibility: [
-        {accessibilityType: 'RegularText', selector: '.some-div'},
-        {accessibilityType: 'RegularText', selector: Selector('.some-div-2')},
-        {accessibilityType: 'LargeText', selector: '//*[@id="main"]/h1', type: 'xpath'},
-        {accessibilityType: 'BoldText', top: 100, left: 0, width: 1000, height: 100},
-      ]
-    });
-    ```
+- #### accessibility
+  (optional): A single or an array of regions for checking accessibility on. For example:
 
-     Possible accessibilityType values are: `IgnoreContrast`,`RegularText`,`LargeText`,`BoldText` and `GraphicalObject`.
+  ```js
+  eyes.checkWindow({
+    accessibility: [
+      {accessibilityType: 'RegularText', selector: '.some-div'},
+      {accessibilityType: 'RegularText', selector: Selector('.some-div-2')},
+      {accessibilityType: 'LargeText', selector: '//*[@id="main"]/h1', type: 'xpath'},
+      {accessibilityType: 'BoldText', top: 100, left: 0, width: 1000, height: 100},
+    ]
+  });
+  ```
+
+    Possible accessibilityType values are: `IgnoreContrast`,`RegularText`,`LargeText`,`BoldText` and `GraphicalObject`.
 
 - #### accessibilityLevel
     (optional): The accessibility level to use for the screenshot. Possible values are `None`, `AA` and `AAA`.
     ```js
     cy.eyesCheckWindow({accessibilityLevel: 'AA'})
-    ``` -->
+    ```
     
 - #### scriptHooks 
   (optional): A set of scripts to be run by the browser during the rendering. It is intended to be used as a means to alter the page's state and structure at the time of rendering.
