@@ -37,7 +37,6 @@ import {Selector} from 'testcafe'
         beforeCaptureScreenshot: "document.body.style.backgroundColor = 'gold'"
       },
       sendDom: false,
-      accessibilityLevel: 'AA',
       accessibility: [
         {accessibilityType: 'RegularText', selector: '.some-div'},
         {accessibilityType: 'RegularText', selector: Selector('.some-div-2')},

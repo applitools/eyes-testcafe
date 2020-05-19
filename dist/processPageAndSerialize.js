@@ -53,7 +53,7 @@ module.exports = () => {
   function extractLinks(doc = document) {
     const srcsetRegexp = /(\S+)(?:\s+[\d.]+[wx])?(?:,|$)/g;
     const srcsetUrls = window.Array.from(doc.querySelectorAll('img[srcset],source[srcset]'), srcsetEl => execAll(srcsetRegexp, srcsetEl.getAttribute('srcset'), match => match[1])).reduce((acc, urls) => acc.concat(urls), []);
-    const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src],input[type="image"][src]')).map(srcEl => srcEl.getAttribute('src'));
+    const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src],input[type="image"][src],audio[src]')).map(srcEl => srcEl.getAttribute('src'));
     const imageUrls = window.Array.from(doc.querySelectorAll('image,use')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(u => u && u[0] !== '#');
     const objectUrls = window.Array.from(doc.querySelectorAll('object')).map(el => el.getAttribute('data')).filter(Boolean);
     const cssUrls = window.Array.from(doc.querySelectorAll('link[rel~="stylesheet"], link[as="stylesheet"]')).map(link => link.getAttribute('href'));
@@ -22036,6 +22036,53 @@ module.exports = () => {
 
   var lib = syntax;
 
+  const shorthandProperties = new window.Map([['background', new window.Set(['background-color', 'background-position', 'background-position-x', 'background-position-y', 'background-size', 'background-repeat', 'background-repeat-x', 'background-repeat-y', 'background-clip', 'background-origin', 'background-attachment', 'background-image'])], ['background-position', new window.Set(['background-position-x', 'background-position-y'])], ['background-repeat', new window.Set(['background-repeat-x', 'background-repeat-y'])], ['font', new window.Set(['font-style', 'font-variant-caps', 'font-weight', 'font-stretch', 'font-size', 'line-height', 'font-family', 'font-size-adjust', 'font-kerning', 'font-optical-sizing', 'font-variant-alternates', 'font-variant-east-asian', 'font-variant-ligatures', 'font-variant-numeric', 'font-variant-position', 'font-language-override', 'font-feature-settings', 'font-variation-settings'])], ['font-variant', new window.Set(['font-variant-caps', 'font-variant-numeric', 'font-variant-alternates', 'font-variant-ligatures', 'font-variant-east-asian'])], ['outline', new window.Set(['outline-width', 'outline-style', 'outline-color'])], ['border', new window.Set(['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width', 'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'])], ['border-width', new window.Set(['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width'])], ['border-style', new window.Set(['border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style'])], ['border-color', new window.Set(['border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'])], ['border-block', new window.Set(['border-block-start-width', 'border-block-end-width', 'border-block-start-style', 'border-block-end-style', 'border-block-start-color', 'border-block-end-color'])], ['border-block-start', new window.Set(['border-block-start-width', 'border-block-start-style', 'border-block-start-color'])], ['border-block-end', new window.Set(['border-block-end-width', 'border-block-end-style', 'border-block-end-color'])], ['border-inline', new window.Set(['border-inline-start-width', 'border-inline-end-width', 'border-inline-start-style', 'border-inline-end-style', 'border-inline-start-color', 'border-inline-end-color'])], ['border-inline-start', new window.Set(['border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color'])], ['border-inline-end', new window.Set(['border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color'])], ['border-image', new window.Set(['border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'])], ['border-radius', new window.Set(['border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius'])], ['padding', new window.Set(['padding-top', 'padding-right', 'padding-bottom', 'padding-left'])], ['padding-block', new window.Set(['padding-block-start', 'padding-block-end'])], ['padding-inline', new window.Set(['padding-inline-start', 'padding-inline-end'])], ['margin', new window.Set(['margin-top', 'margin-right', 'margin-bottom', 'margin-left'])], ['margin-block', new window.Set(['margin-block-start', 'margin-block-end'])], ['margin-inline', new window.Set(['margin-inline-start', 'margin-inline-end'])], ['inset', new window.Set(['top', 'right', 'bottom', 'left'])], ['inset-block', new window.Set(['inset-block-start', 'inset-block-end'])], ['inset-inline', new window.Set(['inset-inline-start', 'inset-inline-end'])], ['flex', new window.Set(['flex-grow', 'flex-shrink', 'flex-basis'])], ['flex-flow', new window.Set(['flex-direction', 'flex-wrap'])], ['gap', new window.Set(['row-gap', 'column-gap'])], ['transition', new window.Set(['transition-duration', 'transition-timing-function', 'transition-delay', 'transition-property'])], ['grid', new window.Set(['grid-template-rows', 'grid-template-columns', 'grid-template-areas', 'grid-auto-flow', 'grid-auto-columns', 'grid-auto-rows'])], ['grid-template', new window.Set(['grid-template-rows', 'grid-template-columns', 'grid-template-areas'])], ['grid-row', new window.Set(['grid-row-start', 'grid-row-end'])], ['grid-column', new window.Set(['grid-column-start', 'grid-column-end'])], ['grid-gap', new window.Set(['grid-row-gap', 'grid-column-gap'])], ['place-content', new window.Set(['align-content', 'justify-content'])], ['place-items', new window.Set(['align-items', 'justify-items'])], ['place-self', new window.Set(['align-self', 'justify-self'])], ['columns', new window.Set(['column-width', 'column-count'])], ['column-rule', new window.Set(['column-rule-width', 'column-rule-style', 'column-rule-color'])], ['list-style', new window.Set(['list-style-type', 'list-style-position', 'list-style-image'])], ['offset', new window.Set(['offset-position', 'offset-path', 'offset-distance', 'offset-rotate', 'offset-anchor'])], ['overflow', new window.Set(['overflow-x', 'overflow-y'])], ['overscroll-behavior', new window.Set(['overscroll-behavior-x', 'overscroll-behavior-y'])], ['scroll-margin', new window.Set(['scroll-margin-top', 'scroll-margin-right', 'scroll-margin-bottom', 'scroll-margin-left'])], ['scroll-padding', new window.Set(['scroll-padding-top', 'scroll-padding-right', 'scroll-padding-bottom', 'scroll-padding-left'])], ['text-decaration', new window.Set(['text-decoration-line', 'text-decoration-style', 'text-decoration-color'])], ['text-stroke', new window.Set(['text-stroke-color', 'text-stroke-width'])], ['animation', new window.Set(['animation-duration', 'animation-timing-function', 'animation-delay', 'animation-iteration-count', 'animation-direction', 'animation-fill-mode', 'animation-play-state', 'animation-name'])], ['mask', new window.Set(['mask-image', 'mask-mode', 'mask-repeat-x', 'mask-repeat-y', 'mask-position-x', 'mask-position-y', 'mask-clip', 'mask-origin', 'mask-size', 'mask-composite'])], ['mask-repeat', new window.Set(['mask-repeat-x', 'mask-repeat-y'])], ['mask-position', new window.Set(['mask-position-x', 'mask-position-y'])], ['perspective-origin', new window.Set(['perspective-origin-x', 'perspective-origin-y'])], ['transform-origin', new window.Set(['transform-origin-x', 'transform-origin-y', 'transform-origin-z'])]]);
+  const mozShorthandProperties = new window.Map([withVendor('animation', 'moz'), withVendor('border-image', 'moz'), withVendor('mask', 'moz'), withVendor('transition', 'moz'), withVendor('columns', 'moz'), withVendor('text-stroke', 'moz'), withVendor('column-rule', 'moz'), ['-moz-border-end', new window.Set(['-moz-border-end-color', '-moz-border-end-style', '-moz-border-end-width'])], ['-moz-border-start', new window.Set(['-moz-border-start-color', '-moz-border-start-style', '-moz-border-start-width'])], ['-moz-outline-radius', new window.Set(['-moz-outline-radius-topleft', '-moz-outline-radius-topright', '-moz-outline-radius-bottomright', '-moz-outline-radius-bottomleft'])]]);
+  const webkitShorthandProperties = new window.Map([withVendor('animation', 'webkit'), withVendor('border-radius', 'webkit'), withVendor('column-rule', 'webkit'), withVendor('columns', 'webkit'), withVendor('flex', 'webkit'), withVendor('flex-flow', 'webkit'), withVendor('mask', 'webkit'), withVendor('text-stroke', 'webkit'), withVendor('perspective-origin', 'webkit'), withVendor('transform-origin', 'webkit'), withVendor('transition', 'webkit'), ['-webkit-border-start', new window.Set(['-webkit-border-start-color', '-webkit-border-start-style', '-webkit-border-start-width'])], ['-webkit-border-before', new window.Set(['-webkit-border-before-color', '-webkit-border-before-style', '-webkit-border-before-width'])], ['-webkit-border-end', new window.Set(['-webkit-border-end-color', '-webkit-border-end-style', '-webkit-border-end-width'])], ['-webkit-border-after', new window.Set(['-webkit-border-after-color', '-webkit-border-after-style', '-webkit-border-after-width'])]]);
+  const experimentalLonghandProperties = new window.Map([['background-position-x', 'background-position'], ['background-position-y', 'background-position'], ['background-repeat-x', 'background-repeat'], ['background-repeat-y', 'background-repeat']]);
+  mozShorthandProperties.forEach((longhandSet, shorthand) => shorthandProperties.set(shorthand, longhandSet));
+  webkitShorthandProperties.forEach((longhandSet, shorthand) => shorthandProperties.set(shorthand, longhandSet));
+  const longhandProperties = new window.Set(window.Array.from(shorthandProperties.values()).reduce((longhandProperties, longhandSet) => longhandProperties.concat(window.Array.from(longhandSet)), []));
+
+  function withVendor(shorthand, vendor) {
+    const longhands = shorthandProperties.get(shorthand);
+
+    if (longhands) {
+      return [`-${vendor}-${shorthand}`, new window.Set(window.Array.from(longhands, longhand => `-${vendor}-${longhand}`))];
+    }
+  }
+
+  function isShorthandFor(shorthand, longhand) {
+    const longhands = shorthandProperties.get(shorthand);
+    return longhands ? longhands.has(longhand) : false;
+  }
+
+  function hasShorthand(longhand) {
+    return longhandProperties.has(longhand);
+  }
+
+  function hasShorthandWithin(longhand, shorthands) {
+    return shorthands.some(shorthand => isShorthandFor(shorthand, longhand));
+  }
+
+  function preferredShorthand(longhand) {
+    return experimentalLonghandProperties.get(longhand);
+  }
+
+  var isShorthandFor_1 = isShorthandFor;
+  var hasShorthand_1 = hasShorthand;
+  var hasShorthandWithin_1 = hasShorthandWithin;
+  var preferredShorthand_1 = preferredShorthand;
+  var styleProperties = {
+    isShorthandFor: isShorthandFor_1,
+    hasShorthand: hasShorthand_1,
+    hasShorthandWithin: hasShorthandWithin_1,
+    preferredShorthand: preferredShorthand_1
+  };
+
+  const {
+    preferredShorthand: preferredShorthand$1
+  } = styleProperties;
   const CSSOM_TYPES = {
     UNKNOWN_RULE: 0,
     STYLE_RULE: 1,
@@ -22150,9 +22197,9 @@ module.exports = () => {
       }
 
       if (props.block === 'style') {
-        rule.block = {
-          type: 'Block',
-          children: window.Array.from(cssomRule.style, property => ({
+        const children = window.Array.from(cssomRule.style).reduce((children, longhand) => {
+          const property = preferredShorthand$1(longhand) || longhand;
+          children.set(property, {
             type: 'Declaration',
             important: Boolean(cssomRule.style.getPropertyPriority(property)),
             property,
@@ -22160,7 +22207,12 @@ module.exports = () => {
               type: 'Raw',
               value: cssomRule.style.getPropertyValue(property)
             }
-          }))
+          });
+          return children;
+        }, new window.Map());
+        rule.block = {
+          type: 'Block',
+          children: window.Array.from(children.values())
         };
       } else if (props.block === 'nested') {
         rule.block = {
@@ -22243,43 +22295,6 @@ module.exports = () => {
   }
 
   var createAstFromTextContent_1 = createAstFromTextContent;
-
-  const shorthandProperties = new window.Map([['background', new window.Set(['background-color', 'background-position-x', 'background-position-y', 'background-size', 'background-repeat-x', 'background-repeat-y', 'background-clip', 'background-origin', 'background-attachment', 'background-image'])], ['background-position', new window.Set(['background-position-x', 'background-position-y'])], ['background-repeat', new window.Set(['background-repeat-x', 'background-repeat-y'])], ['font', new window.Set(['font-style', 'font-variant-caps', 'font-weight', 'font-stretch', 'font-size', 'line-height', 'font-family', 'font-size-adjust', 'font-kerning', 'font-optical-sizing', 'font-variant-alternates', 'font-variant-east-asian', 'font-variant-ligatures', 'font-variant-numeric', 'font-variant-position', 'font-language-override', 'font-feature-settings', 'font-variation-settings'])], ['font-variant', new window.Set(['font-variant-caps', 'font-variant-numeric', 'font-variant-alternates', 'font-variant-ligatures', 'font-variant-east-asian'])], ['outline', new window.Set(['outline-width', 'outline-style', 'outline-color'])], ['border', new window.Set(['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width', 'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'])], ['border-width', new window.Set(['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width'])], ['border-style', new window.Set(['border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style'])], ['border-color', new window.Set(['border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'])], ['border-block', new window.Set(['border-block-start-width', 'border-block-end-width', 'border-block-start-style', 'border-block-end-style', 'border-block-start-color', 'border-block-end-color'])], ['border-block-start', new window.Set(['border-block-start-width', 'border-block-start-style', 'border-block-start-color'])], ['border-block-end', new window.Set(['border-block-end-width', 'border-block-end-style', 'border-block-end-color'])], ['border-inline', new window.Set(['border-inline-start-width', 'border-inline-end-width', 'border-inline-start-style', 'border-inline-end-style', 'border-inline-start-color', 'border-inline-end-color'])], ['border-inline-start', new window.Set(['border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color'])], ['border-inline-end', new window.Set(['border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color'])], ['border-image', new window.Set(['border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'])], ['border-radius', new window.Set(['border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius'])], ['padding', new window.Set(['padding-top', 'padding-right', 'padding-bottom', 'padding-left'])], ['padding-block', new window.Set(['padding-block-start', 'padding-block-end'])], ['padding-inline', new window.Set(['padding-inline-start', 'padding-inline-end'])], ['margin', new window.Set(['margin-top', 'margin-right', 'margin-bottom', 'margin-left'])], ['margin-block', new window.Set(['margin-block-start', 'margin-block-end'])], ['margin-inline', new window.Set(['margin-inline-start', 'margin-inline-end'])], ['inset', new window.Set(['top', 'right', 'bottom', 'left'])], ['inset-block', new window.Set(['inset-block-start', 'inset-block-end'])], ['inset-inline', new window.Set(['inset-inline-start', 'inset-inline-end'])], ['flex', new window.Set(['flex-grow', 'flex-shrink', 'flex-basis'])], ['flex-flow', new window.Set(['flex-direction', 'flex-wrap'])], ['gap', new window.Set(['row-gap', 'column-gap'])], ['transition', new window.Set(['transition-duration', 'transition-timing-function', 'transition-delay', 'transition-property'])], ['grid', new window.Set(['grid-template-rows', 'grid-template-columns', 'grid-template-areas', 'grid-auto-flow', 'grid-auto-columns', 'grid-auto-rows'])], ['grid-template', new window.Set(['grid-template-rows', 'grid-template-columns', 'grid-template-areas'])], ['grid-row', new window.Set(['grid-row-start', 'grid-row-end'])], ['grid-column', new window.Set(['grid-column-start', 'grid-column-end'])], ['grid-gap', new window.Set(['grid-row-gap', 'grid-column-gap'])], ['place-content', new window.Set(['align-content', 'justify-content'])], ['place-items', new window.Set(['align-items', 'justify-items'])], ['place-self', new window.Set(['align-self', 'justify-self'])], ['columns', new window.Set(['column-width', 'column-count'])], ['column-rule', new window.Set(['column-rule-width', 'column-rule-style', 'column-rule-color'])], ['list-style', new window.Set(['list-style-type', 'list-style-position', 'list-style-image'])], ['offset', new window.Set(['offset-position', 'offset-path', 'offset-distance', 'offset-rotate', 'offset-anchor'])], ['overflow', new window.Set(['overflow-x', 'overflow-y'])], ['overscroll-behavior', new window.Set(['overscroll-behavior-x', 'overscroll-behavior-y'])], ['scroll-margin', new window.Set(['scroll-margin-top', 'scroll-margin-right', 'scroll-margin-bottom', 'scroll-margin-left'])], ['scroll-padding', new window.Set(['scroll-padding-top', 'scroll-padding-right', 'scroll-padding-bottom', 'scroll-padding-left'])], ['text-decaration', new window.Set(['text-decoration-line', 'text-decoration-style', 'text-decoration-color'])], ['text-stroke', new window.Set(['text-stroke-color', 'text-stroke-width'])], ['animation', new window.Set(['animation-duration', 'animation-timing-function', 'animation-delay', 'animation-iteration-count', 'animation-direction', 'animation-fill-mode', 'animation-play-state', 'animation-name'])], ['mask', new window.Set(['mask-image', 'mask-mode', 'mask-repeat-x', 'mask-repeat-y', 'mask-position-x', 'mask-position-y', 'mask-clip', 'mask-origin', 'mask-size', 'mask-composite'])], ['mask-repeat', new window.Set(['mask-repeat-x', 'mask-repeat-y'])], ['mask-position', new window.Set(['mask-position-x', 'mask-position-y'])], ['perspective-origin', new window.Set(['perspective-origin-x', 'perspective-origin-y'])], ['transform-origin', new window.Set(['transform-origin-x', 'transform-origin-y', 'transform-origin-z'])]]);
-  const mozShorthandProperties = new window.Map([withVendor('animation', 'moz'), withVendor('border-image', 'moz'), withVendor('mask', 'moz'), withVendor('transition', 'moz'), withVendor('columns', 'moz'), withVendor('text-stroke', 'moz'), withVendor('column-rule', 'moz'), ['-moz-border-end', new window.Set(['-moz-border-end-color', '-moz-border-end-style', '-moz-border-end-width'])], ['-moz-border-start', new window.Set(['-moz-border-start-color', '-moz-border-start-style', '-moz-border-start-width'])], ['-moz-outline-radius', new window.Set(['-moz-outline-radius-topleft', '-moz-outline-radius-topright', '-moz-outline-radius-bottomright', '-moz-outline-radius-bottomleft'])]]);
-  const webkitShorthandProperties = new window.Map([withVendor('animation', 'webkit'), withVendor('border-radius', 'webkit'), withVendor('column-rule', 'webkit'), withVendor('columns', 'webkit'), withVendor('flex', 'webkit'), withVendor('flex-flow', 'webkit'), withVendor('mask', 'webkit'), withVendor('text-stroke', 'webkit'), withVendor('perspective-origin', 'webkit'), withVendor('transform-origin', 'webkit'), withVendor('transition', 'webkit'), ['-webkit-border-start', new window.Set(['-webkit-border-start-color', '-webkit-border-start-style', '-webkit-border-start-width'])], ['-webkit-border-before', new window.Set(['-webkit-border-before-color', '-webkit-border-before-style', '-webkit-border-before-width'])], ['-webkit-border-end', new window.Set(['-webkit-border-end-color', '-webkit-border-end-style', '-webkit-border-end-width'])], ['-webkit-border-after', new window.Set(['-webkit-border-after-color', '-webkit-border-after-style', '-webkit-border-after-width'])]]);
-  mozShorthandProperties.forEach((longhandSet, shorthand) => shorthandProperties.set(shorthand, longhandSet));
-  webkitShorthandProperties.forEach((longhandSet, shorthand) => shorthandProperties.set(shorthand, longhandSet));
-  const longhandProperties = new window.Set(window.Array.from(shorthandProperties.entries()).reduce((longhandProperties, [shorthand, longhandSet]) => longhandProperties.concat(window.Array.from(longhandSet, longhand => [longhand, shorthand])), []));
-
-  function withVendor(shorthand, vendor) {
-    const longhands = shorthandProperties.get(shorthand);
-
-    if (longhands) {
-      return [`-${vendor}-${shorthand}`, new window.Set(window.Array.from(longhands, longhand => `-${vendor}-${longhand}`))];
-    }
-  }
-
-  function isShorthandFor(shorthand, longhand) {
-    const longhands = shorthandProperties.get(shorthand);
-    return longhands ? longhands.has(longhand) : false;
-  }
-
-  function hasShorthand(longhand) {
-    return longhandProperties.has(longhand);
-  }
-
-  function hasShorthandWithin(longhand, shorthands) {
-    return shorthands.some(shorthand => isShorthandFor(shorthand, longhand));
-  }
-
-  var isShorthandFor_1 = isShorthandFor;
-  var hasShorthand_1 = hasShorthand;
-  var hasShorthandWithin_1 = hasShorthandWithin;
-  var styleProperties = {
-    isShorthandFor: isShorthandFor_1,
-    hasShorthand: hasShorthand_1,
-    hasShorthandWithin: hasShorthandWithin_1
-  };
 
   const {
     isShorthandFor: isShorthandFor$1,
@@ -22496,6 +22511,7 @@ module.exports = () => {
   var processInlineCss_1 = processInlineCss;
 
   const NEED_MAP_INPUT_TYPES = new window.Set(['date', 'datetime-local', 'email', 'month', 'number', 'password', 'search', 'tel', 'text', 'time', 'url', 'week']);
+  const ON_EVENT_REGEX = /^on[a-z]+$/;
 
   function domNodesToCdt(docNode, baseUrl, log = noop$4) {
     const cdt = [{
@@ -22621,6 +22637,8 @@ module.exports = () => {
 
           if (/^blob:/.test(value)) {
             value = value.replace(/^blob:/, '');
+          } else if (ON_EVENT_REGEX.test(name)) {
+            value = '';
           }
 
           return {
@@ -22644,40 +22662,52 @@ module.exports = () => {
       }
 
       if (elementNode.tagName === 'INPUT' && NEED_MAP_INPUT_TYPES.has(elementNode.type) && (elementNode.attributes.value && elementNode.attributes.value.value) !== elementNode.value) {
-        const nodeAttr = node.attributes.find(a => a.name === 'value');
-
-        if (nodeAttr) {
-          nodeAttr.value = elementNode.value;
-        } else {
-          node.attributes.push({
-            name: 'value',
-            value: elementNode.value
-          });
-        }
+        addOrUpdateAttribute(node.attributes, 'value', elementNode.value);
       }
 
       if (elementNode.tagName === 'OPTION' && elementNode.parentElement.value === elementNode.value) {
-        const nodeAttr = node.attributes.find(a => a.name === 'selected');
+        addOrUpdateAttribute(node.attributes, 'selected', '');
+      }
 
-        if (!nodeAttr) {
-          node.attributes.push({
-            name: 'selected',
-            value: ''
-          });
-        }
+      if (elementNode.tagName === 'STYLE' && elementNode.sheet && elementNode.sheet.disabled) {
+        node.attributes.push({
+          name: 'data-applitools-disabled',
+          value: ''
+        });
+      }
+
+      if (elementNode.tagName === 'LINK' && elementNode.type === 'text/css' && elementNode.sheet && elementNode.sheet.disabled) {
+        addOrUpdateAttribute(node.attributes, 'disabled', '');
       }
 
       return node;
+    }
+
+    function addOrUpdateAttribute(attributes, name, value) {
+      const nodeAttr = attributes.find(a => a.name === name);
+
+      if (nodeAttr) {
+        nodeAttr.value = value;
+      } else {
+        attributes.push({
+          name,
+          value
+        });
+      }
     }
 
     function getScriptNode(elementNode) {
       return {
         nodeType: Node.ELEMENT_NODE,
         nodeName: 'SCRIPT',
-        attributes: nodeAttributes(elementNode).map(key => ({
-          name: elementNode.attributes[key].name,
-          value: elementNode.attributes[key].value
-        })).filter(attr => attr.name !== 'src'),
+        attributes: nodeAttributes(elementNode).map(key => {
+          const name = elementNode.attributes[key].name;
+          const value = ON_EVENT_REGEX.test(name) ? '' : elementNode.attributes[key].value;
+          return {
+            name,
+            value
+          };
+        }).filter(attr => attr.name !== 'src'),
         childNodeIndexes: []
       };
     }
@@ -22983,7 +23013,14 @@ module.exports = () => {
     styleSheetCache
   }) {
     return function findStyleSheetByUrl(url, documents) {
-      const allStylesheets = flat_1(documents.map(d => window.Array.from(d.styleSheets)));
+      const allStylesheets = flat_1(documents.map(d => {
+        try {
+          return window.Array.from(d.styleSheets);
+        } catch (_e) {
+          // A 'fake' documnetFragment doesn't have styleSheets
+          return [];
+        }
+      }));
       return styleSheetCache[url] || allStylesheets.find(styleSheet => {
         const styleUrl = styleSheet.href && toUnAnchoredUri_1(styleSheet.href);
         return styleUrl && sanitizeAuthUrl_1(styleUrl) === url;
