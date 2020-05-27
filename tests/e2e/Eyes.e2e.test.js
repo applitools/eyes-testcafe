@@ -7,7 +7,7 @@ const createTestCafe = require('testcafe');
 const testPath = resolve(__dirname, '*.testcafe.js');
 const testServer = require('../util/testServer');
 
-describe('Eyes', () => {
+describe.only('Eyes', () => {
   let closeTestServer;
   before(async () => {
     const server = await testServer({port: 7272});

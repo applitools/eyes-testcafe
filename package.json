@@ -39,9 +39,9 @@
   },
   "dependencies": {
     "@applitools/dom-snapshot": "3.5.2",
-    "@applitools/eyes-sdk-core": "10.2.0",
-    "@applitools/functional-commons": "1.5.5",
-    "@applitools/visual-grid-client": "14.1.0",
+    "@applitools/eyes-sdk-core": "10.3.1",
+    "@applitools/functional-commons": "1.6.0",
+    "@applitools/visual-grid-client": "14.3.1",
     "chalk": "^2.4.2",
     "rimraf": "^2.7.1"
   },
