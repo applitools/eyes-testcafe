@@ -12,7 +12,7 @@
     "test:sanity": "mocha --no-timeouts 'tests/!(e2e)/*.test.js'",
     "build:ds": "rollup -c rollup.config.js",
     "eslint": "eslint '**/*.js'",
-    "prepublishOnly": "npm run build:ds && npm version patch",
+    "prepublishOnly": "npm run build:ds && npm test",
     "changelog": "git changelog -x -p -f v$npm_package_version > History.md && git add ./History.md && git commit -am 'changelog'",
     "changelog:init": "git config changelog.format \"* %s [[%h]($(echo $npm_package_repository_url|cut -d+ -f2|cut -d. -f1-2)/commit/%H)]\"",
     "changelog:install": "sudo apt-get install git-extras"
@@ -38,10 +38,10 @@
     "url": "https://github.com/applitools/eyes-testcafe"
   },
   "dependencies": {
-    "@applitools/dom-snapshot": "3.5.2",
-    "@applitools/eyes-sdk-core": "10.3.1",
+    "@applitools/dom-snapshot": "3.5.3",
+    "@applitools/eyes-sdk-core": "11.0.5",
     "@applitools/functional-commons": "1.6.0",
-    "@applitools/visual-grid-client": "14.3.1",
+    "@applitools/visual-grid-client": "14.4.4",
     "chalk": "^2.4.2",
     "rimraf": "^2.7.1"
   },
