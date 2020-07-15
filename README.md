@@ -279,12 +279,6 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
   ```
 
     Possible accessibilityType values are: `IgnoreContrast`,`RegularText`,`LargeText`,`BoldText` and `GraphicalObject`.
-
-- #### accessibilityLevel
-    (optional): The accessibility level to use for the screenshot. Possible values are `None`, `AA` and `AAA`.
-    ```js
-    cy.eyesCheckWindow({accessibilityLevel: 'AA'})
-    ```
     
 - #### scriptHooks 
   (optional): A set of scripts to be run by the browser during the rendering. It is intended to be used as a means to alter the page's state and structure at the time of rendering.
@@ -304,6 +298,13 @@ eyes.checkWindow({ tag: 'your tag', target: 'your target mode' })
 
     ```js
     eyes.checkWindow({sendDom: false})
+    ```
+
+- #### ignoreDisplacements
+  (optional): A flag to specify whether Test Manager should intially display mismatches for image features that have only been displaced, as opposed to real mismatches.
+
+    ```js
+    eyes.checkWindow({ignoreDisplacements: true})
     ```
 
 ### **close**
@@ -438,9 +439,11 @@ The list above is also the order of precedence, which means that if you pass a p
 | `saveFailedTests`         | false                       | Set whether or not failed tests are saved by default. |
 | `saveNewTests`            | false                       | Set whether or not new tests are saved by default. |
 | `properties`              | undefined                   | Custom properties for the eyes test. The format is an array of objects with name/value properties. For example: `[{name: 'My prop', value:'My value'}]`. |
+| `ignoreDisplacements`     | false                       | Sets whether Test Manager should intially display mismatches for image features that have only been displaced, as opposed to real mismatches. |
 | `compareWithParentBranch` | false                       |  |
 | `ignoreBaseline`          | false                       |  |
 | `notifyOnCompletion`  | false | If `true` batch completion notifications are sent. |
+| `accessibilityValidation` | undefined | An object that specifies the accessibility level and guidelines version to use for the screenshots. Possible values for **level** are `None`, `AA` and `AAA`, and possible values for **guidelinesVersion** are `WCAG_2_0` and `WCAG_2_1`. For example: `{level: 'AA', guidelinesVersion: 'WCAG_2_0'}`|
 <br/>
 <!-- | `accessibilityLevel` | None | The accessibility level to use for the screenshots. Possible values are `None`, `AA` and `AAA`. | -->
 
