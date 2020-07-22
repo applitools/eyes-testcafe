@@ -22639,6 +22639,8 @@ module.exports = () => {
             value = value.replace(/^blob:/, '');
           } else if (ON_EVENT_REGEX.test(name)) {
             value = '';
+          } else if (elementNode.nodeName === 'IFRAME' && isAccessibleFrame_1(elementNode) && name === 'src' && elementNode.contentDocument.location.href !== 'about:blank' && elementNode.contentDocument.location.href !== absolutizeUrl_1(value, elementNode.ownerDocument.location.href)) {
+            value = elementNode.contentDocument.location.href;
           }
 
           return {
@@ -22665,7 +22667,7 @@ module.exports = () => {
         addOrUpdateAttribute(node.attributes, 'value', elementNode.value);
       }
 
-      if (elementNode.tagName === 'OPTION' && elementNode.parentElement.value === elementNode.value) {
+      if (elementNode.tagName === 'OPTION' && elementNode.parentElement.selectedOptions && window.Array.from(elementNode.parentElement.selectedOptions).indexOf(elementNode) > -1) {
         addOrUpdateAttribute(node.attributes, 'selected', '');
       }
 
@@ -22762,13 +22764,15 @@ module.exports = () => {
     return function getResourceUrlsAndBlobs({
       documents,
       urls,
-      forceCreateStyle = false
+      forceCreateStyle = false,
+      skipResources
     }) {
       return Promise.all(urls.map(url => processResource({
         url,
         documents,
         getResourceUrlsAndBlobs,
-        forceCreateStyle
+        forceCreateStyle,
+        skipResources
       }))).then(resourceUrlsAndBlobsArr => aggregateResourceUrlsAndBlobs(resourceUrlsAndBlobsArr));
     };
   }
@@ -22784,7 +22788,7 @@ module.exports = () => {
   function toUnAnchoredUri(url) {
     const m = url && url.match(/(^[^#]*)/);
     const res = m && m[1] || url;
-    return res && res.replace(/\?\s*$/, '') || url;
+    return res && res.replace(/\?\s*$/, '?') || url;
   }
 
   var toUnAnchoredUri_1 = toUnAnchoredUri;
@@ -22809,7 +22813,8 @@ module.exports = () => {
       url,
       documents,
       getResourceUrlsAndBlobs,
-      forceCreateStyle = false
+      forceCreateStyle = false,
+      skipResources
     }) {
       if (!cache[url]) {
         if (sessionCache && sessionCache.getItem(url)) {
@@ -22817,6 +22822,11 @@ module.exports = () => {
           log('doProcessResource from sessionStorage', url, 'deps:', resourceUrls.slice(1));
           cache[url] = Promise.resolve({
             resourceUrls
+          });
+        } else if (skipResources && skipResources.indexOf(url) > -1 || /https:\/\/fonts.googleapis.com/.test(url)) {
+          log('not processing resource from skip list (or google font):', url);
+          cache[url] = Promise.resolve({
+            resourceUrls: [url]
           });
         } else {
           const now = Date.now();
@@ -22838,6 +22848,11 @@ module.exports = () => {
               probablyCORS: true,
               url
             };
+          } else if (e.isTimeout) {
+            return {
+              isTimeout: true,
+              url
+            };
           } else {
             throw e;
           }
@@ -22845,13 +22860,28 @@ module.exports = () => {
           url,
           type,
           value,
-          probablyCORS
+          probablyCORS,
+          isTimeout
         }) => {
           if (probablyCORS) {
             log('not fetched due to CORS', `[${Date.now() - now}ms]`, url);
             sessionCache && sessionCache.setItem(url, []);
             return {
               resourceUrls: [url]
+            };
+          }
+
+          if (isTimeout) {
+            // TODO return errorStatusCode once VG supports it (https://trello.com/c/J5lBWutP/92-when-capturing-dom-add-non-200-urls-to-resource-map)
+            log('not fetched due to timeout, returning empty resource');
+            sessionCache && sessionCache.setItem(url, []);
+            return {
+              blobsObj: {
+                [url]: {
+                  type: 'application/x-applitools-empty',
+                  value: new ArrayBuffer()
+                }
+              }
             };
           }
 
@@ -22890,7 +22920,8 @@ module.exports = () => {
             return getResourceUrlsAndBlobs({
               documents,
               urls: absoluteDependentUrls,
-              forceCreateStyle
+              forceCreateStyle,
+              skipResources
             }).then(({
               resourceUrls,
               blobsObj
@@ -22975,23 +23006,45 @@ module.exports = () => {
 
   var makeExtractResourcesFromSvg_1 = makeExtractResourcesFromSvg;
 
-  function fetchUrl(url, fetch = window.fetch) {
-    // Why return a `new Promise` like this? Because people like Atlassian do horrible things.
-    // They monkey patched window.fetch, and made it so it throws a synchronous exception if the route is not well known.
-    // Returning a new Promise guarantees that `fetchUrl` is the async function that it declares to be.
-    return new Promise((resolve, reject) => {
-      return fetch(url, {
-        cache: 'force-cache',
-        credentials: 'same-origin'
-      }).then(resp => resp.status === 200 ? resp.arrayBuffer().then(buff => ({
-        url,
-        type: resp.headers.get('Content-Type'),
-        value: buff
-      })) : Promise.reject(new Error(`bad status code ${resp.status}`))).then(resolve).catch(err => reject(err));
-    });
+  function makeFetchUrl({
+    fetch = window.fetch,
+    AbortController = window.AbortController,
+    timeout = 10000
+  }) {
+    return function fetchUrl(url) {
+      // Why return a `new Promise` like this? Because people like Atlassian do horrible things.
+      // They monkey patched window.fetch, and made it so it throws a synchronous exception if the route is not well known.
+      // Returning a new Promise guarantees that `fetchUrl` is the async function that it declares to be.
+      return new Promise((resolve, reject) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          const err = new Error('fetchUrl timeout reached');
+          err.isTimeout = true;
+          reject(err);
+          controller.abort();
+        }, timeout);
+        return fetch(url, {
+          cache: 'force-cache',
+          credentials: 'same-origin',
+          signal: controller.signal
+        }).then(resp => {
+          clearTimeout(timeoutId);
+
+          if (resp.status === 200) {
+            return resp.arrayBuffer().then(buff => ({
+              url,
+              type: resp.headers.get('Content-Type'),
+              value: buff
+            }));
+          } else {
+            return Promise.reject(new Error(`bad status code ${resp.status}`));
+          }
+        }).then(resolve).catch(err => reject(err));
+      });
+    };
   }
 
-  var fetchUrl_1 = fetchUrl;
+  var fetchUrl = makeFetchUrl;
 
   function sanitizeAuthUrl(urlStr) {
     const url = new URL(urlStr);
@@ -23040,8 +23093,9 @@ module.exports = () => {
           [CSSRule.IMPORT_RULE]: () => {
             if (rule.styleSheet) {
               styleSheetCache[rule.styleSheet.href] = rule.styleSheet;
-              return rule.href;
             }
+
+            return rule.href;
           },
           [CSSRule.FONT_FACE_RULE]: () => getUrlFromCssText_1(rule.cssText),
           [CSSRule.SUPPORTS_RULE]: () => extractResourcesFromStyleSheet(rule),
@@ -23265,11 +23319,14 @@ module.exports = () => {
   function processPage(doc = document, {
     showLogs,
     useSessionCache,
-    dontFetchResources
+    dontFetchResources,
+    fetchTimeout,
+    skipResources
   } = {}) {
     /* MARKER FOR TEST - DO NOT DELETE */
     const log$1 = showLogs ? log(Date.now()) : noop$4;
     log$1('processPage start');
+    log$1(`skipResources length: ${skipResources && skipResources.length}`);
     const sessionCache$1 = useSessionCache && sessionCache({
       log: log$1
     });
@@ -23284,8 +23341,11 @@ module.exports = () => {
     const extractResourcesFromSvg = makeExtractResourcesFromSvg_1({
       extractResourceUrlsFromStyleTags: extractResourceUrlsFromStyleTags$1
     });
+    const fetchUrl$1 = fetchUrl({
+      timeout: fetchTimeout
+    });
     const processResource$1 = processResource({
-      fetchUrl: fetchUrl_1,
+      fetchUrl: fetchUrl$1,
       findStyleSheetByUrl: findStyleSheetByUrl$1,
       getCorsFreeStyleSheet: getCorsFreeStyleSheet_1,
       extractResourcesFromStyleSheet: extractResourcesFromStyleSheet$1,
@@ -23321,14 +23381,15 @@ module.exports = () => {
         blobsObj: {}
       }) : getResourceUrlsAndBlobs$1({
         documents: docRoots,
-        urls
+        urls,
+        skipResources
       }).then(result => {
         sessionCache$1 && sessionCache$1.persist();
         return result;
       });
       const canvasBlobs = buildCanvasBlobs_1(canvasElements);
       const frameDocs = extractFrames_1(docRoots);
-      const processFramesPromise = frameDocs.map(f => doProcessPage(f, f.defaultView.frameElement.src));
+      const processFramesPromise = frameDocs.map(f => doProcessPage(f));
       const processInlineFramesPromise = inlineFrames.map(({
         element,
         url
