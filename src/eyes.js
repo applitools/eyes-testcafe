@@ -5,7 +5,7 @@ const {presult} = require('@applitools/functional-commons');
 const {makeVisualGridClient} = require('@applitools/visual-grid-client');
 const processPageAndSerialize = require('../dist/processPageAndSerialize');
 const blobsToResourceContents = require('./blobsToResourceContents');
-const blobsToBuffer = require('./blobsToBuffer');
+const decodeFrame = require('./decodeFrame');
 const getProxyUrl = require('./getProxyUrl');
 const collectFrameData = require('./collectFrameData');
 const makeMapProxyUrls = require('./makeMapProxyUrls');
@@ -61,7 +61,7 @@ class Eyes {
     }
 
     const result = await this._processPage(this._currentTest.t);
-    blobsToBuffer(result);
+    decodeFrame(result);
     this._mapProxyUrls(result);
     blobsToResourceContents(result);
 

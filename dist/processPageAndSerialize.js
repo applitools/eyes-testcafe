@@ -53,7 +53,7 @@ module.exports = () => {
   function extractLinks(doc = document) {
     const srcsetRegexp = /(\S+)(?:\s+[\d.]+[wx])?(?:,|$)/g;
     const srcsetUrls = window.Array.from(doc.querySelectorAll('img[srcset],source[srcset]'), srcsetEl => execAll(srcsetRegexp, srcsetEl.getAttribute('srcset'), match => match[1])).reduce((acc, urls) => acc.concat(urls), []);
-    const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src],input[type="image"][src],audio[src]')).map(srcEl => srcEl.getAttribute('src'));
+    const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src],input[type="image"][src],audio[src],video[src]')).map(srcEl => srcEl.getAttribute('src'));
     const imageUrls = window.Array.from(doc.querySelectorAll('image,use')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(u => u && u[0] !== '#');
     const objectUrls = window.Array.from(doc.querySelectorAll('object')).map(el => el.getAttribute('data')).filter(Boolean);
     const cssUrls = window.Array.from(doc.querySelectorAll('link[rel~="stylesheet"], link[as="stylesheet"]')).map(link => link.getAttribute('href'));
@@ -22861,6 +22861,7 @@ module.exports = () => {
           type,
           value,
           probablyCORS,
+          errorStatusCode,
           isTimeout
         }) => {
           if (probablyCORS) {
@@ -22871,15 +22872,25 @@ module.exports = () => {
             };
           }
 
+          if (errorStatusCode) {
+            const blobsObj = {
+              [url]: {
+                errorStatusCode
+              }
+            };
+            sessionCache && sessionCache.setItem(url, []);
+            return {
+              blobsObj
+            };
+          }
+
           if (isTimeout) {
-            // TODO return errorStatusCode once VG supports it (https://trello.com/c/J5lBWutP/92-when-capturing-dom-add-non-200-urls-to-resource-map)
-            log('not fetched due to timeout, returning empty resource');
+            log('not fetched due to timeout, returning error status code 504 (Gateway timeout)');
             sessionCache && sessionCache.setItem(url, []);
             return {
               blobsObj: {
                 [url]: {
-                  type: 'application/x-applitools-empty',
-                  value: new ArrayBuffer()
+                  errorStatusCode: 504
                 }
               }
             };
@@ -23037,7 +23048,10 @@ module.exports = () => {
               value: buff
             }));
           } else {
-            return Promise.reject(new Error(`bad status code ${resp.status}`));
+            return {
+              url,
+              errorStatusCode: resp.status
+            };
           }
         }).then(resolve).catch(err => reject(err));
       });
@@ -23439,15 +23453,9 @@ module.exports = () => {
   }
 
   function serializeFrame(frame) {
-    frame.blobs = frame.blobs.map(({
-      url,
-      type,
-      value
-    }) => ({
-      url,
-      type,
-      value: arrayBufferToBase64_1(value)
-    }));
+    frame.blobs = frame.blobs.map(blob => blob.value ? window.Object.assign(blob, {
+      value: arrayBufferToBase64_1(blob.value)
+    }) : blob);
     frame.frames.forEach(serializeFrame);
     return frame;
   }
