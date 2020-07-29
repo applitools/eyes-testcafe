@@ -27,7 +27,14 @@ function makeClientFunctionWrapper({
           window[EYES_NAME_SPACE].clientFunctionResult = resultStr;
           return resultStr.length;
         }),
-      {dependencies: {EYES_NAME_SPACE, browserFunction, stringifyResult, ...dependencies}},
+      {
+        dependencies: {
+          EYES_NAME_SPACE,
+          browserFunction,
+          stringifyResult,
+          ...dependencies,
+        },
+      },
     );
 
     const getResult = clientFunctionExecuter(
@@ -38,17 +45,23 @@ function makeClientFunctionWrapper({
     );
 
     return async t => {
+      const testName = t.testRun.test.name;
       const getResultSizeWithT = getResultSize.with({boundTestRun: t});
       const getResultWithT = getResult.with({boundTestRun: t});
+      logger.log(`[${testName}] fetching ClientFunction result and its size`);
       const size = await getResultSizeWithT();
+      logger.log(`[${testName}] done fetching ClientFunction result and its size`);
+      logger.log(`[${testName}] calculating ClientFunction result chunks for processing`);
       const splits = Math.ceil(size / maxObjectSize);
-      logger.log(`starting to collect ClientFunction result of size ${size}`);
+      logger.log(`[${testName}] done calculating ClientFunction result chunks for processing`);
+      logger.log(`[${testName}] starting to collect ClientFunction result of size ${size}`);
       let result = '';
       for (let i = 0; i < splits; i++) {
         const start = i * maxObjectSize;
-        logger.log(`getting ClientFunction result chunk ${i + 1} of ${splits}`);
+        logger.log(`[${testName}] getting ClientFunction result chunk ${i + 1} of ${splits}`);
         result += await getResultWithT(start, start + maxObjectSize);
       }
+      logger.log(`[${testName}] done collecting ClientFunction result of size ${size}`);
       return parseResult(result);
     };
   };
