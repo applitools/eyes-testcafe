@@ -51,9 +51,7 @@ function makeClientFunctionWrapper({
       logger.log(`[${testName}] fetching ClientFunction result and its size`);
       const size = await getResultSizeWithT();
       logger.log(`[${testName}] done fetching ClientFunction result and its size`);
-      logger.log(`[${testName}] calculating ClientFunction result chunks for processing`);
       const splits = Math.ceil(size / maxObjectSize);
-      logger.log(`[${testName}] done calculating ClientFunction result chunks for processing`);
       logger.log(`[${testName}] starting to collect ClientFunction result of size ${size}`);
       let result = '';
       for (let i = 0; i < splits; i++) {
