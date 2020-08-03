@@ -18,15 +18,17 @@ function makeClientFunctionWrapper({
 }) {
   return async function(browserFunction, dependencies = {}) {
     const getResultSize = clientFunctionExecuter(
-      () =>
-        browserFunction().then((result = {}) => {
+      () => {
+        // eslint-disable-next-line no-undef
+        return browserFunction(functionArgs).then((result = {}) => {
           const resultStr = stringifyResult(result);
           if (!window[EYES_NAME_SPACE]) {
             window[EYES_NAME_SPACE] = {};
           }
           window[EYES_NAME_SPACE].clientFunctionResult = resultStr;
           return resultStr.length;
-        }),
+        });
+      },
       {
         dependencies: {
           EYES_NAME_SPACE,
