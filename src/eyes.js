@@ -110,7 +110,7 @@ class Eyes {
         functionArgs: [
           undefined, // will default processPage to document
           {
-            dontFetchResources: true,
+            dontFetchResources: !!process.env.APPLITOOLS_DISABLE_BROWSER_FETCHING,
             showLogs: !!process.env.APPLITOOLS_SHOW_LOGS,
           },
         ],
