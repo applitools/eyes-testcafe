@@ -4,10 +4,10 @@ const {describe, it, before, after} = require('mocha');
 const {expect} = require('chai');
 const {resolve} = require('path');
 const createTestCafe = require('testcafe');
-const testPath = resolve(__dirname, '*.testcafe.js');
+const testPath = resolve(__dirname, 'testcafe-tests/*.testcafe.js');
 const testServer = require('../util/testServer');
 
-describe('Eyes', () => {
+describe('Eyes e2e tests', () => {
   let closeTestServer;
   before(async () => {
     const server = await testServer({port: 7272});
