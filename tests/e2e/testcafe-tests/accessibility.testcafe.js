@@ -2,7 +2,7 @@
 import path from 'path';
 import Eyes from '../../../';
 const {expect} = require('chai');
-const configPath = path.resolve(__dirname, '../fixtures/applitools.config.js');
+const configPath = path.resolve(__dirname, '../../fixtures/applitools.config.js');
 const eyes = new Eyes({configPath});
 const fetch = require('node-fetch');
 

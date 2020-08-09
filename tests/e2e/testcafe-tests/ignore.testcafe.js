@@ -2,7 +2,7 @@
 import {Selector} from 'testcafe';
 import path from 'path';
 import Eyes from '../../../';
-const configPath = path.resolve(__dirname, '../fixtures/applitools.config.js');
+const configPath = path.resolve(__dirname, '../../fixtures/applitools.config.js');
 const eyes = new Eyes({configPath});
 
 fixture`Ignore`.page`http://localhost:7272/helloworld.html?diff1`
