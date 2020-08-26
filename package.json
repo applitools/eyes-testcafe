@@ -38,7 +38,7 @@
     "url": "https://github.com/applitools/eyes-testcafe"
   },
   "dependencies": {
-    "@applitools/dom-snapshot": "4.0.1",
+    "@applitools/dom-snapshot": "4.0.3",
     "@applitools/eyes-sdk-core": "11.5.1",
     "@applitools/functional-commons": "1.6.0",
     "@applitools/visual-grid-client": "14.6.2",
