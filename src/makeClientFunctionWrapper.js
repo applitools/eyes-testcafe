@@ -3,6 +3,7 @@
 const {ClientFunction} = require('testcafe');
 const EYES_NAME_SPACE = '__EYES__APPLITOOLS__';
 const MAX_OBJECT_SIZE = 1024 * 1024 * 4.0; // 4 MB
+const functionArgs = []; // needed for unit test to pass b/c of "dependencies" magic
 
 /*
  * Split the result to smaller chunks if it is too big.
@@ -47,7 +48,8 @@ function makeClientFunctionWrapper({
     );
 
     return async t => {
-      const testName = t.testRun.test.name;
+      const testName =
+        t && t.testRun && t.testRun.test ? t.testRun.test.name : Math.floor(Math.random() * 100);
       const getResultSizeWithT = getResultSize.with({boundTestRun: t});
       const getResultWithT = getResult.with({boundTestRun: t});
       logger.log(`[${testName}] fetching ClientFunction result and its size`);

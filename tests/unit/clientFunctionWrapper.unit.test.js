@@ -15,9 +15,12 @@ describe('makeClientFunctionWrapper', () => {
   });
 
   it('works', async () => {
-    const getResult = await clientFunctionWrapper(async () => ({
-      message: 'hello this is a string of some length',
-    }));
+    const getResult = await clientFunctionWrapper(
+      async () => ({
+        message: 'hello this is a string of some length',
+      }),
+      {functionArgs: []},
+    );
     expect(await getResult()).to.eql({
       message: 'hello this is a string of some length',
     });
