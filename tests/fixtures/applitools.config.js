@@ -1,6 +1,7 @@
 module.exports = {
   apiKey: process.env.APPLITOOLS_API_KEY,
   isDisabled: false,
+  disableBrowserFetching: true,
   // accessibilityLevel: 'AAA',
   // notifyOnCompletion: true,
   // proxy: {
@@ -11,4 +12,5 @@ module.exports = {
   // showLogs: true,
   // eyesTimeout: 1234,
   // tapDirPath: './',
+  //showLogs: true,
 };

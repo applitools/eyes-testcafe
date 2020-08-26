@@ -106,12 +106,15 @@ class Eyes {
 
   async _processPage(t) {
     if (!this._processPageClientFunction) {
+      this._logger.log(
+        `now running processPageAndSerialize with dontFetchResources set to ${this._defaultConfig.disableBrowserFetching}`,
+      );
       this._processPageClientFunction = await this._clientFunctionWrapper(processPageAndSerialize, {
         functionArgs: [
           undefined, // will default processPage to document
           {
-            dontFetchResources: !!process.env.APPLITOOLS_DISABLE_BROWSER_FETCHING,
-            showLogs: !!process.env.APPLITOOLS_SHOW_LOGS,
+            dontFetchResources: !!this._defaultConfig.disableBrowserFetching,
+            showLogs: !!this._defaultConfig.showLogs,
           },
         ],
       });
