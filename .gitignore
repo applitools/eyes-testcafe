@@ -7,3 +7,4 @@ cdt.json
 .applitools
 *.log
 tags
+.DS_Store
