@@ -38,7 +38,7 @@
     "url": "https://github.com/applitools/eyes-testcafe"
   },
   "dependencies": {
-    "@applitools/dom-snapshot": "4.0.0",
+    "@applitools/dom-snapshot": "4.0.4",
     "@applitools/eyes-sdk-core": "11.5.0",
     "@applitools/functional-commons": "1.6.0",
     "@applitools/visual-grid-client": "14.6.0",
@@ -66,6 +66,7 @@
     "rollup-plugin-node-resolve": "^4.2.4",
     "rollup-plugin-replace": "^2.2.0",
     "testcafe": "^1.8.4",
+    "testcafe-browser-provider-saucelabs": "^1.8.0",
     "typescript": "^3.9.2"
   }
 }

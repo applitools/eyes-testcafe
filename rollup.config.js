@@ -8,7 +8,7 @@ const wrapeAndExportPlugin = require('./src/wrapeAndExportPlugin');
 const prepareForClientFunctionPlugin = require('./src/prepareForClientFunctionPlugin');
 
 module.exports = {
-  input: 'node_modules/@applitools/dom-snapshot/src/browser/processPageAndSerialize.js',
+  input: 'node_modules/@applitools/dom-snapshot/dist/processPageAndSerializeCjs.js',
   output: {
     file: 'dist/processPageAndSerialize.js',
     format: 'iife',
