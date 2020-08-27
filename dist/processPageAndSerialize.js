@@ -23394,7 +23394,7 @@ module.exports = () => {
     dontFetchResources,
     fetchTimeout,
     skipResources
-  } = {dontFetchResources: true}) {
+  } = {}) {
     /* MARKER FOR TEST - DO NOT DELETE */
     const log$1 = showLogs ? log(Date.now()) : noop$4;
     log$1('processPage start');
