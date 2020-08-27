@@ -64,6 +64,12 @@ function makeClientFunctionWrapper({
         result += await getResultWithT(start, start + maxObjectSize);
       }
       logger.log(`[${testName}] done collecting ClientFunction result of size ${size}`);
+      const browserConsoleLogs = await t.getBrowserConsoleMessages();
+      if (process.env.APPLITOOLS_SHOW_LOGS && browserConsoleLogs) {
+        browserConsoleLogs.log.forEach(entry => {
+          console.log(entry);
+        });
+      }
       return parseResult(result);
     };
   };
