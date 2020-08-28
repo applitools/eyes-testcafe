@@ -3,7 +3,6 @@
 const {ClientFunction} = require('testcafe');
 const EYES_NAME_SPACE = '__EYES__APPLITOOLS__';
 const MAX_OBJECT_SIZE = 1024 * 1024 * 4.0; // 4 MB
-const functionArgs = []; // needed for unit test to pass b/c of "dependencies" magic
 
 /*
  * Split the result to smaller chunks if it is too big.
@@ -18,6 +17,7 @@ function makeClientFunctionWrapper({
   logger,
 }) {
   return async function(browserFunction, dependencies = {}) {
+    const functionArgs = dependencies.functionArgs; // needed for unit test to pass b/c of "dependencies" magic
     const getResultSize = clientFunctionExecuter(
       () => {
         // eslint-disable-next-line no-undef

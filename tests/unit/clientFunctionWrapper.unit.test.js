@@ -25,4 +25,16 @@ describe('makeClientFunctionWrapper', () => {
       message: 'hello this is a string of some length',
     });
   });
+  it('can pass functionArgs', async () => {
+    const functionArgs = [{dontFetchResources: true}];
+    const getResult = await clientFunctionWrapper(
+      async function() {
+        return arguments[0];
+      },
+      {
+        functionArgs,
+      },
+    );
+    expect(await getResult()).to.eql(functionArgs);
+  });
 });
