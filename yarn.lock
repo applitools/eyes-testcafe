@@ -9,26 +9,18 @@
   dependencies:
     "@applitools/functional-commons" "1.5.4"
 
-"@applitools/dom-snapshot@4.0.1":
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/@applitools/dom-snapshot/-/dom-snapshot-4.0.1.tgz#9988fcc3bc449eb63705a0a87955d5041291572d"
-  integrity sha512-hmawCI3FXGYTCKzvA9HH+bfAi1+1r65DCkOec+4/JrIL4gF29CtfMaIBOGDMp9uf077VWSBi56nXVvTqHsxtSw==
+"@applitools/dom-snapshot@4.0.0":
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/@applitools/dom-snapshot/-/dom-snapshot-4.0.0.tgz#e2828c2f311a0bb6273be387601b6cb9c0c4967d"
+  integrity sha512-GgDajCLVpOyK9yY7oajNqX0/2XUT51EVtV+sCYv90t5ICBTs5CPFkmHzfnurdi4mVwU6q1RrC56f8eqqo5ft7A==
   dependencies:
     "@applitools/functional-commons" "1.5.4"
     css-tree "^1.0.0-alpha.39"
 
-"@applitools/dom-snapshot@4.0.3":
-  version "4.0.3"
-  resolved "https://registry.yarnpkg.com/@applitools/dom-snapshot/-/dom-snapshot-4.0.3.tgz#a12ae2fceb551b5a1a7d2e7a6118569768464a21"
-  integrity sha512-es9yN7BZVGtn9u35qjT5ic73OHJQB4epSS7Fy0d+Rws7Nw7mJhPIZsK9zGXDw3orwBZAKAhorrfZ8tjOtUnnmQ==
-  dependencies:
-    "@applitools/functional-commons" "1.5.4"
-    css-tree "^1.0.0-alpha.39"
-
-"@applitools/eyes-sdk-core@11.5.1":
-  version "11.5.1"
-  resolved "https://registry.yarnpkg.com/@applitools/eyes-sdk-core/-/eyes-sdk-core-11.5.1.tgz#76345a0db1a378bd3db3298b5205b1772773718c"
-  integrity sha512-CslroMAQrOymcubqMIVTExIsZp+/MkuYLbVZ85M0/+KiKcGJDrOUwSPXwdEr1icuz4BzHklZq47wz7WEFQbpNw==
+"@applitools/eyes-sdk-core@11.5.0":
+  version "11.5.0"
+  resolved "https://registry.yarnpkg.com/@applitools/eyes-sdk-core/-/eyes-sdk-core-11.5.0.tgz#f84fe74f16a2d702d52ba0c2fd63648ead4c4a14"
+  integrity sha512-FPDWzsY8Kt5Lz3vi8kwUh+SUuh5g4MYd+qgvAPtOsdMpT5elY8lqbg3d3UK7VZkgMwlYDi1Yl8QZuvXiM6oMKw==
   dependencies:
     "@applitools/dom-capture" "7.2.6"
     "@applitools/isomorphic-fetch" "3.0.0"
@@ -41,6 +33,11 @@
     png-async "^0.9.4"
     stack-trace "^0.0.10"
     tunnel "0.0.6"
+
+"@applitools/feature-flags@2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@applitools/feature-flags/-/feature-flags-2.1.1.tgz#cf784e3b7ab4f322b0ebe62a5ea45ec56738b2d4"
+  integrity sha512-bhzTHOpTmIg1KzI/kcNyDgFeKiHrX+Tjja9MtDwkOBUJ52Ff2A7nH9rm1xWww4yY4Me3yTaG8F6U75X3UdXE5g==
 
 "@applitools/functional-commons@1.5.4":
   version "1.5.4"
@@ -111,13 +108,14 @@
   dependencies:
     debug "^4.1.0"
 
-"@applitools/visual-grid-client@14.6.2":
-  version "14.6.2"
-  resolved "https://registry.yarnpkg.com/@applitools/visual-grid-client/-/visual-grid-client-14.6.2.tgz#056418efa7f11db26708082f086f546917d4dafc"
-  integrity sha512-/TV2z+Cnh47FwJAKBToN7jrKD+WFW+R1PVjU2oYAtMOgTvmarsxVwOP+qkrqvdSfrEsD15F2FL4iN7dEY5NAug==
+"@applitools/visual-grid-client@14.6.0":
+  version "14.6.0"
+  resolved "https://registry.yarnpkg.com/@applitools/visual-grid-client/-/visual-grid-client-14.6.0.tgz#a2d1c3054fa7cab593afcf6bf6d2c1f19717068d"
+  integrity sha512-Z1ZULWaNzAfggiwExk4+4pkF1LAQEqZ5frgtH19/MQMZGopFnuo1D0o/HUPovxlXcppUhReb3zrfOxu7ImILbQ==
   dependencies:
-    "@applitools/dom-snapshot" "4.0.1"
-    "@applitools/eyes-sdk-core" "11.5.1"
+    "@applitools/dom-snapshot" "4.0.0"
+    "@applitools/eyes-sdk-core" "11.5.0"
+    "@applitools/feature-flags" "2.1.1"
     "@applitools/functional-commons" "1.5.4"
     "@applitools/http-commons" "2.3.12"
     "@applitools/isomorphic-fetch" "3.0.0"
@@ -2321,11 +2319,6 @@ diff@3.5.0:
   version "3.5.0"
   resolved "https://registry.yarnpkg.com/diff/-/diff-3.5.0.tgz#800c0dd1e0a8bfbc95835c202ad220fe317e5a12"
   integrity sha512-A46qtFgd+g7pDZinpnwiRJtxbC1hpgf0uzP3iG89scHk0AUC7A1TGxf5OiiOUv/JMZR8GOt8hL900hV0bOy5xA==
-
-diff@^4.0.2:
-  version "4.0.2"
-  resolved "https://registry.yarnpkg.com/diff/-/diff-4.0.2.tgz#60f3aecb89d5fae520c11aa19efc2bb982aade7d"
-  integrity sha512-58lmxKSA4BNyLz+HHMUzlOEpg09FV+ev6ZMe3vJihgdxzgcwZ8VoEEPmALCZG9LmqfVoNMMKpttIYTVG6uDY7A==
 
 diffie-hellman@^5.0.0:
   version "5.0.3"
@@ -5669,10 +5662,10 @@ table@^5.2.3:
     slice-ansi "^2.1.0"
     string-width "^3.0.0"
 
-testcafe-browser-tools@2.0.13:
-  version "2.0.13"
-  resolved "https://registry.yarnpkg.com/testcafe-browser-tools/-/testcafe-browser-tools-2.0.13.tgz#1b185539d64991ad0a4da11992beeb6b4bd5ba9d"
-  integrity sha512-r0AfCNsOJWXHAR+KADumfCffsH3LYoEbJXfmGOG47uEt1FBEw8cWTSWRBp5As+DaAmh9pi75P+ZF6K09WudM/g==
+testcafe-browser-tools@2.0.12:
+  version "2.0.12"
+  resolved "https://registry.yarnpkg.com/testcafe-browser-tools/-/testcafe-browser-tools-2.0.12.tgz#33b0173b5d7cd4c1327a94139f93630e6012ca65"
+  integrity sha512-5oNNYlcZiDspqJB6L8CfI4vxjzkvARSZv3pa+JrFAoqYmEA3VPiAvzrn+P0zi0D5jEPkKngW2KTpq6r3GfdDNw==
   dependencies:
     array-find "^1.0.0"
     dedent "^0.7.0"
@@ -5690,10 +5683,10 @@ testcafe-browser-tools@2.0.13:
     read-file-relative "^1.2.0"
     which-promise "^1.0.0"
 
-testcafe-hammerhead@17.1.13:
-  version "17.1.13"
-  resolved "https://registry.yarnpkg.com/testcafe-hammerhead/-/testcafe-hammerhead-17.1.13.tgz#e2ab9589e48aa145fa886c2303891e9e997d33fa"
-  integrity sha512-swNsC4gbs1vhKM9F9zmCcStA8oMg2FUTJZYUE30xL5ZdHae87x2tfg9T58jUcZK3CX0S9B2NCU1AJbwCsS0uqw==
+testcafe-hammerhead@17.1.9:
+  version "17.1.9"
+  resolved "https://registry.yarnpkg.com/testcafe-hammerhead/-/testcafe-hammerhead-17.1.9.tgz#759b6820398dfec1dbfc5fc1d2eca1a1b5eaf2c3"
+  integrity sha512-RxlUsCkspdrWEWb9S2n9hwqX2RwRp5CFjRTN7Ijx+vnCcHKn5VPBhDlSrZHRiQT1yfa9+FudNsjmmrmlAGvCSg==
   dependencies:
     acorn-hammerhead "^0.3.0"
     asar "^2.0.1"
@@ -5704,7 +5697,7 @@ testcafe-hammerhead@17.1.13:
     debug "4.1.1"
     esotope-hammerhead "0.5.5"
     iconv-lite "0.5.1"
-    lodash "^4.17.19"
+    lodash "^4.17.13"
     lru-cache "2.6.3"
     match-url-wildcard "0.0.4"
     merge-stream "^1.0.1"
@@ -5764,10 +5757,10 @@ testcafe-reporter-xunit@^2.1.0:
   resolved "https://registry.yarnpkg.com/testcafe-reporter-xunit/-/testcafe-reporter-xunit-2.1.0.tgz#e6d66c572ce15af266706af0fd610b2a841dd443"
   integrity sha1-5tZsVyzhWvJmcGrw/WELKoQd1EM=
 
-testcafe@^1.8.8:
-  version "1.9.1"
-  resolved "https://registry.yarnpkg.com/testcafe/-/testcafe-1.9.1.tgz#2e3183d69561bf90da611408436c5b34b22f799c"
-  integrity sha512-18yGuCJvcdaGFhS3l4NhDwRnvJ24/mwXVfM+gqZm6vxNdw2NCujzXh36/BNr0qP2MhAEN56Y96G8XKkzn+5zYg==
+testcafe@1.8.8:
+  version "1.8.8"
+  resolved "https://registry.yarnpkg.com/testcafe/-/testcafe-1.8.8.tgz#557e113c516a8c020c8f00dc718aaaebb50ac9b8"
+  integrity sha512-e8yLVU76fEWwh/UIkbTUSDa/e+J8BryErXqNf8itKHA/s9B6Mt9IfsVCCSYXUfx9DIruzcLNTsJ2q1xxc2KO+A==
   dependencies:
     "@types/node" "^10.12.19"
     async-exit-hook "^1.1.2"
@@ -5793,7 +5786,6 @@ testcafe@^1.8.8:
     dedent "^0.4.0"
     del "^3.0.0"
     device-specs "^1.0.0"
-    diff "^4.0.2"
     elegant-spinner "^1.0.1"
     emittery "^0.4.1"
     endpoint-utils "^1.0.2"
@@ -5832,8 +5824,8 @@ testcafe@^1.8.8:
     sanitize-filename "^1.6.0"
     source-map-support "^0.5.16"
     strip-bom "^2.0.0"
-    testcafe-browser-tools "2.0.13"
-    testcafe-hammerhead "17.1.13"
+    testcafe-browser-tools "2.0.12"
+    testcafe-hammerhead "17.1.9"
     testcafe-legacy-api "4.0.0"
     testcafe-reporter-json "^2.1.0"
     testcafe-reporter-list "^2.1.0"
