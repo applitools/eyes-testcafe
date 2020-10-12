@@ -5,7 +5,7 @@ import Eyes from '../../../';
 const configPath = path.resolve(__dirname, '../../fixtures/applitools.config.js');
 const eyes = new Eyes({configPath});
 
-fixture.only`Selector`.page`http://localhost:7272/helloworld.html`
+fixture`Selector`.page`http://localhost:7272/helloworld.html`
   .afterEach(async () => eyes.close())
   .after(async () => await eyes.waitForResults(true));
 
