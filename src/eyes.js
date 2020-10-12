@@ -83,7 +83,10 @@ class Eyes {
     await this._handleCloseBatch();
 
     results = results.map(this._removeTestResultsIfError.bind(this));
-    await handleBatchResultsFile({results, tapDirPath: this._defaultConfig.tapDirPath});
+    await handleBatchResultsFile({
+      results,
+      tapDirPath: this._defaultConfig.tapDirPath,
+    });
 
     const settle =
       rejectOnErrors && this._defaultConfig.failTestcafeOnDiff && this._containsFailure(results)
@@ -103,7 +106,18 @@ class Eyes {
 
   async _processPage(t) {
     if (!this._processPageClientFunction) {
-      this._processPageClientFunction = await this._clientFunctionWrapper(processPageAndSerialize);
+      this._logger.log(
+        `now running processPageAndSerialize with dontFetchResources set to ${this._defaultConfig.disableBrowserFetching}`,
+      );
+      this._processPageClientFunction = await this._clientFunctionWrapper(processPageAndSerialize, {
+        functionArgs: [
+          undefined, // will default processPage to document
+          {
+            dontFetchResources: !!this._defaultConfig.disableBrowserFetching,
+            showLogs: !!this._defaultConfig.showLogs,
+          },
+        ],
+      });
     }
     return await this._processPageClientFunction(t);
   }

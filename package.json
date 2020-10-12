@@ -1,6 +1,6 @@
 {
   "name": "@applitools/eyes-testcafe",
-  "version": "1.9.2",
+  "version": "1.10.0",
   "description": "Eyes Testcafe SDK",
   "main": "index.js",
   "types": "./ts/index.d.ts",
@@ -65,8 +65,8 @@
     "rollup-plugin-node-globals": "^1.4.0",
     "rollup-plugin-node-resolve": "^4.2.4",
     "rollup-plugin-replace": "^2.2.0",
-    "testcafe": "^1.8.4",
     "testcafe-browser-provider-saucelabs": "^1.8.0",
+    "testcafe": "1.8.8",
     "typescript": "^3.9.2"
   }
 }

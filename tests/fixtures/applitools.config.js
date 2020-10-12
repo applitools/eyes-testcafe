@@ -11,4 +11,5 @@ module.exports = {
   // showLogs: true,
   // eyesTimeout: 1234,
   // tapDirPath: './',
+  // disableBrowserFetching: true,
 };

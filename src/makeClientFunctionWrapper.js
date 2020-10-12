@@ -17,17 +17,27 @@ function makeClientFunctionWrapper({
   logger,
 }) {
   return async function(browserFunction, dependencies = {}) {
+    const functionArgs = dependencies.functionArgs; // needed for unit test to pass b/c of "dependencies" magic
     const getResultSize = clientFunctionExecuter(
-      () =>
-        browserFunction().then((result = {}) => {
+      () => {
+        // eslint-disable-next-line no-undef
+        return browserFunction(functionArgs).then((result = {}) => {
           const resultStr = stringifyResult(result);
           if (!window[EYES_NAME_SPACE]) {
             window[EYES_NAME_SPACE] = {};
           }
           window[EYES_NAME_SPACE].clientFunctionResult = resultStr;
           return resultStr.length;
-        }),
-      {dependencies: {EYES_NAME_SPACE, browserFunction, stringifyResult, ...dependencies}},
+        });
+      },
+      {
+        dependencies: {
+          EYES_NAME_SPACE,
+          browserFunction,
+          stringifyResult,
+          ...dependencies,
+        },
+      },
     );
 
     const getResult = clientFunctionExecuter(
@@ -38,16 +48,27 @@ function makeClientFunctionWrapper({
     );
 
     return async t => {
+      const testName =
+        t && t.testRun && t.testRun.test ? t.testRun.test.name : Math.floor(Math.random() * 100);
       const getResultSizeWithT = getResultSize.with({boundTestRun: t});
       const getResultWithT = getResult.with({boundTestRun: t});
+      logger.log(`[${testName}] fetching ClientFunction result and its size`);
       const size = await getResultSizeWithT();
+      logger.log(`[${testName}] done fetching ClientFunction result and its size`);
       const splits = Math.ceil(size / maxObjectSize);
-      logger.log(`starting to collect ClientFunction result of size ${size}`);
+      logger.log(`[${testName}] starting to collect ClientFunction result of size ${size}`);
       let result = '';
       for (let i = 0; i < splits; i++) {
         const start = i * maxObjectSize;
-        logger.log(`getting ClientFunction result chunk ${i + 1} of ${splits}`);
+        logger.log(`[${testName}] getting ClientFunction result chunk ${i + 1} of ${splits}`);
         result += await getResultWithT(start, start + maxObjectSize);
+      }
+      logger.log(`[${testName}] done collecting ClientFunction result of size ${size}`);
+      const browserConsoleLogs = t && (await t.getBrowserConsoleMessages());
+      if (process.env.APPLITOOLS_SHOW_LOGS && browserConsoleLogs) {
+        browserConsoleLogs.log.forEach(entry => {
+          console.log(entry);
+        });
       }
       return parseResult(result);
     };

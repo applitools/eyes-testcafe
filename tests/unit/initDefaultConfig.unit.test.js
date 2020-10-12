@@ -21,6 +21,7 @@ describe('initDefaultConfig', () => {
       showLogs: true,
       someKey: 'someValue',
       tapDirPath: 'SOME PATH',
+      disableBrowserFetching: false,
     });
   });
 });

@@ -1,5 +1,5 @@
 
-module.exports = () => {
+module.exports = (args) => {
   var processPageAndSerialize = (function () {
 	'use strict';
 
@@ -7181,5 +7181,5 @@ module.exports = () => {
 	return processPageAndSerializeCjs;
 
 }());
-  return processPageAndSerialize()
+  return processPageAndSerialize(...args)
 }

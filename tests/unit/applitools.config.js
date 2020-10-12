@@ -3,4 +3,5 @@ module.exports = {
   isDisabled: false,
   showLogs: true,
   someKey: 'someValue',
+  disableBrowserFetching: false,
 };

@@ -6,9 +6,9 @@ module.exports = {
     const bundleFile = bundle['processPageAndSerialize.js'];
 
     bundleFile.code = `
-module.exports = () => {
+module.exports = (args) => {
   ${bundleFile.code}
-  return processPageAndSerialize()
+  return processPageAndSerialize(...args)
 }`;
   },
 };

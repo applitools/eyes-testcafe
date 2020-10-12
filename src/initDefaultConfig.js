@@ -5,7 +5,7 @@ const {ConfigUtils, TypeUtils} = require('@applitools/eyes-sdk-core');
 const {configParams: visualGridConfigParams} = require('@applitools/visual-grid-client');
 
 function initDefaultConfig(configPath = undefined) {
-  const testcafeConfigParams = ['tapDirPath', 'failTestcafeOnDiff'];
+  const testcafeConfigParams = ['tapDirPath', 'failTestcafeOnDiff', 'disableBrowserFetching'];
   const calculatedConfig = ConfigUtils.getConfig({
     configParams: [...visualGridConfigParams, ...testcafeConfigParams],
     configPath,
