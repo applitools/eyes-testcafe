@@ -6,3 +6,5 @@ cdt.json
 .demo
 .applitools
 *.log
+tags
+.DS_Store
