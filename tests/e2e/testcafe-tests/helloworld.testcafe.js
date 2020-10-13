@@ -1,7 +1,7 @@
 /* global fixture, test */
 import path from 'path';
-import Eyes from '../../src/eyes';
-const configPath = path.resolve(__dirname, '../fixtures/applitools.config.js');
+import Eyes from '../../../';
+const configPath = path.resolve(__dirname, '../../fixtures/applitools.config.js');
 const eyes = new Eyes({configPath});
 
 fixture`Hello world`.page`http://localhost:7272/helloworld.html`

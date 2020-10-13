@@ -1,23468 +1,7184 @@
 
 module.exports = (args) => {
   var processPageAndSerialize = (function () {
-  'use strict';
-
-  // License: https://github.com/beatgammit/base64-js/blob/bf68aaa277d9de7007cc0c58279c411bb10670ac/LICENSE
-
-  function arrayBufferToBase64(ab) {
-    const lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.split('');
-    const uint8 = new Uint8Array(ab);
-    const len = uint8.length;
-    const extraBytes = len % 3; // if we have 1 byte left, pad 2 bytes
-
-    const parts = [];
-    const maxChunkLength = 16383; // must be multiple of 3
-
-    let tmp; // go through the array every three bytes, we'll deal with trailing stuff later
-
-    for (let i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
-      parts.push(encodeChunk(i, i + maxChunkLength > len2 ? len2 : i + maxChunkLength));
-    } // pad the end with zeros, but make sure to not forget the extra bytes
-
-
-    if (extraBytes === 1) {
-      tmp = uint8[len - 1];
-      parts.push(lookup[tmp >> 2] + lookup[tmp << 4 & 0x3f] + '==');
-    } else if (extraBytes === 2) {
-      tmp = (uint8[len - 2] << 8) + uint8[len - 1];
-      parts.push(lookup[tmp >> 10] + lookup[tmp >> 4 & 0x3f] + lookup[tmp << 2 & 0x3f] + '=');
-    }
-
-    return parts.join('');
-
-    function tripletToBase64(num) {
-      return lookup[num >> 18 & 0x3f] + lookup[num >> 12 & 0x3f] + lookup[num >> 6 & 0x3f] + lookup[num & 0x3f];
-    }
-
-    function encodeChunk(start, end) {
-      let tmp;
-      const output = [];
-
-      for (let i = start; i < end; i += 3) {
-        tmp = (uint8[i] << 16 & 0xff0000) + (uint8[i + 1] << 8 & 0xff00) + (uint8[i + 2] & 0xff);
-        output.push(tripletToBase64(tmp));
-      }
-
-      return output.join('');
-    }
-  }
-
-  var arrayBufferToBase64_1 = arrayBufferToBase64;
-
-  function extractLinks(doc = document) {
-    const srcsetRegexp = /(\S+)(?:\s+[\d.]+[wx])?(?:,|$)/g;
-    const srcsetUrls = window.Array.from(doc.querySelectorAll('img[srcset],source[srcset]'), srcsetEl => execAll(srcsetRegexp, srcsetEl.getAttribute('srcset'), match => match[1])).reduce((acc, urls) => acc.concat(urls), []);
-    const srcUrls = window.Array.from(doc.querySelectorAll('img[src],source[src],input[type="image"][src],audio[src],video[src]')).map(srcEl => srcEl.getAttribute('src'));
-    const imageUrls = window.Array.from(doc.querySelectorAll('image,use')).map(hrefEl => hrefEl.getAttribute('href') || hrefEl.getAttribute('xlink:href')).filter(u => u && u[0] !== '#');
-    const objectUrls = window.Array.from(doc.querySelectorAll('object')).map(el => el.getAttribute('data')).filter(Boolean);
-    const cssUrls = window.Array.from(doc.querySelectorAll('link[rel~="stylesheet"], link[as="stylesheet"]')).map(link => link.getAttribute('href'));
-    const videoPosterUrls = window.Array.from(doc.querySelectorAll('video[poster]')).map(videoEl => videoEl.getAttribute('poster'));
-    return window.Array.from(srcsetUrls).concat(window.Array.from(srcUrls)).concat(window.Array.from(imageUrls)).concat(window.Array.from(cssUrls)).concat(window.Array.from(videoPosterUrls)).concat(window.Array.from(objectUrls)); // can be replaced with matchAll once Safari supports it
-
-    function execAll(regexp, string, mapper) {
-      const matches = [];
-      const clonedRegexp = new RegExp(regexp.source, regexp.flags);
-      const isGlobal = clonedRegexp.global;
-      let match;
-
-      while (match = clonedRegexp.exec(string)) {
-        matches.push(mapper(match));
-        if (!isGlobal) break;
-      }
-
-      return matches;
-    }
-  }
-
-  var extractLinks_1 = extractLinks;
-
-  function uuid() {
-    return window.crypto.getRandomValues(new Uint32Array(1))[0];
-  }
-
-  var uuid_1 = uuid;
-
-  function isInlineFrame(frame) {
-    return !/^https?:.+/.test(frame.src) || frame.contentDocument && frame.contentDocument.location && ['about:blank', 'about:srcdoc'].includes(frame.contentDocument.location.href);
-  }
-
-  var isInlineFrame_1 = isInlineFrame;
-
-  function isAccessibleFrame(frame) {
-    try {
-      const doc = frame.contentDocument;
-      return Boolean(doc && doc.defaultView && doc.defaultView.frameElement);
-    } catch (err) {// for CORS frames
-    }
-  }
-
-  var isAccessibleFrame_1 = isAccessibleFrame;
-
-  function absolutizeUrl(url, absoluteUrl) {
-    return new URL(url, absoluteUrl).href;
-  }
-
-  var absolutizeUrl_1 = absolutizeUrl;
-
-  //
-  //                              list
-  //                            ┌──────┐
-  //             ┌──────────────┼─head │
-  //             │              │ tail─┼──────────────┐
-  //             │              └──────┘              │
-  //             ▼                                    ▼
-  //            item        item        item        item
-  //          ┌──────┐    ┌──────┐    ┌──────┐    ┌──────┐
-  //  null ◀──┼─prev │◀───┼─prev │◀───┼─prev │◀───┼─prev │
-  //          │ next─┼───▶│ next─┼───▶│ next─┼───▶│ next─┼──▶ null
-  //          ├──────┤    ├──────┤    ├──────┤    ├──────┤
-  //          │ data │    │ data │    │ data │    │ data │
-  //          └──────┘    └──────┘    └──────┘    └──────┘
-  //
-  function createItem(data) {
-    return {
-      prev: null,
-      next: null,
-      data: data
-    };
-  }
-
-  function allocateCursor(node, prev, next) {
-    var cursor;
-
-    if (cursors !== null) {
-      cursor = cursors;
-      cursors = cursors.cursor;
-      cursor.prev = prev;
-      cursor.next = next;
-      cursor.cursor = node.cursor;
-    } else {
-      cursor = {
-        prev: prev,
-        next: next,
-        cursor: node.cursor
-      };
-    }
-
-    node.cursor = cursor;
-    return cursor;
-  }
-
-  function releaseCursor(node) {
-    var cursor = node.cursor;
-    node.cursor = cursor.cursor;
-    cursor.prev = null;
-    cursor.next = null;
-    cursor.cursor = cursors;
-    cursors = cursor;
-  }
-
-  var cursors = null;
-
-  var List = function () {
-    this.cursor = null;
-    this.head = null;
-    this.tail = null;
-  };
-
-  List.createItem = createItem;
-  List.prototype.createItem = createItem;
-
-  List.prototype.updateCursors = function (prevOld, prevNew, nextOld, nextNew) {
-    var cursor = this.cursor;
-
-    while (cursor !== null) {
-      if (cursor.prev === prevOld) {
-        cursor.prev = prevNew;
-      }
-
-      if (cursor.next === nextOld) {
-        cursor.next = nextNew;
-      }
-
-      cursor = cursor.cursor;
-    }
-  };
-
-  List.prototype.getSize = function () {
-    var size = 0;
-    var cursor = this.head;
-
-    while (cursor) {
-      size++;
-      cursor = cursor.next;
-    }
-
-    return size;
-  };
-
-  List.prototype.fromArray = function (array) {
-    var cursor = null;
-    this.head = null;
-
-    for (var i = 0; i < array.length; i++) {
-      var item = createItem(array[i]);
-
-      if (cursor !== null) {
-        cursor.next = item;
-      } else {
-        this.head = item;
-      }
-
-      item.prev = cursor;
-      cursor = item;
-    }
-
-    this.tail = cursor;
-    return this;
-  };
-
-  List.prototype.toArray = function () {
-    var cursor = this.head;
-    var result = [];
-
-    while (cursor) {
-      result.push(cursor.data);
-      cursor = cursor.next;
-    }
-
-    return result;
-  };
-
-  List.prototype.toJSON = List.prototype.toArray;
-
-  List.prototype.isEmpty = function () {
-    return this.head === null;
-  };
-
-  List.prototype.first = function () {
-    return this.head && this.head.data;
-  };
-
-  List.prototype.last = function () {
-    return this.tail && this.tail.data;
-  };
-
-  List.prototype.each = function (fn, context) {
-    var item;
-
-    if (context === undefined) {
-      context = this;
-    } // push cursor
-
-
-    var cursor = allocateCursor(this, null, this.head);
-
-    while (cursor.next !== null) {
-      item = cursor.next;
-      cursor.next = item.next;
-      fn.call(context, item.data, item, this);
-    } // pop cursor
-
-
-    releaseCursor(this);
-  };
-
-  List.prototype.forEach = List.prototype.each;
-
-  List.prototype.eachRight = function (fn, context) {
-    var item;
-
-    if (context === undefined) {
-      context = this;
-    } // push cursor
-
-
-    var cursor = allocateCursor(this, this.tail, null);
-
-    while (cursor.prev !== null) {
-      item = cursor.prev;
-      cursor.prev = item.prev;
-      fn.call(context, item.data, item, this);
-    } // pop cursor
-
-
-    releaseCursor(this);
-  };
-
-  List.prototype.forEachRight = List.prototype.eachRight;
-
-  List.prototype.nextUntil = function (start, fn, context) {
-    if (start === null) {
-      return;
-    }
-
-    var item;
-
-    if (context === undefined) {
-      context = this;
-    } // push cursor
-
-
-    var cursor = allocateCursor(this, null, start);
-
-    while (cursor.next !== null) {
-      item = cursor.next;
-      cursor.next = item.next;
-
-      if (fn.call(context, item.data, item, this)) {
-        break;
-      }
-    } // pop cursor
-
-
-    releaseCursor(this);
-  };
-
-  List.prototype.prevUntil = function (start, fn, context) {
-    if (start === null) {
-      return;
-    }
-
-    var item;
-
-    if (context === undefined) {
-      context = this;
-    } // push cursor
-
-
-    var cursor = allocateCursor(this, start, null);
-
-    while (cursor.prev !== null) {
-      item = cursor.prev;
-      cursor.prev = item.prev;
-
-      if (fn.call(context, item.data, item, this)) {
-        break;
-      }
-    } // pop cursor
-
-
-    releaseCursor(this);
-  };
-
-  List.prototype.some = function (fn, context) {
-    var cursor = this.head;
-
-    if (context === undefined) {
-      context = this;
-    }
-
-    while (cursor !== null) {
-      if (fn.call(context, cursor.data, cursor, this)) {
-        return true;
-      }
-
-      cursor = cursor.next;
-    }
-
-    return false;
-  };
-
-  List.prototype.map = function (fn, context) {
-    var result = new List();
-    var cursor = this.head;
-
-    if (context === undefined) {
-      context = this;
-    }
-
-    while (cursor !== null) {
-      result.appendData(fn.call(context, cursor.data, cursor, this));
-      cursor = cursor.next;
-    }
-
-    return result;
-  };
-
-  List.prototype.filter = function (fn, context) {
-    var result = new List();
-    var cursor = this.head;
-
-    if (context === undefined) {
-      context = this;
-    }
-
-    while (cursor !== null) {
-      if (fn.call(context, cursor.data, cursor, this)) {
-        result.appendData(cursor.data);
-      }
-
-      cursor = cursor.next;
-    }
-
-    return result;
-  };
-
-  List.prototype.clear = function () {
-    this.head = null;
-    this.tail = null;
-  };
-
-  List.prototype.copy = function () {
-    var result = new List();
-    var cursor = this.head;
-
-    while (cursor !== null) {
-      result.insert(createItem(cursor.data));
-      cursor = cursor.next;
-    }
-
-    return result;
-  };
-
-  List.prototype.prepend = function (item) {
-    //      head
-    //    ^
-    // item
-    this.updateCursors(null, item, this.head, item); // insert to the beginning of the list
-
-    if (this.head !== null) {
-      // new item <- first item
-      this.head.prev = item; // new item -> first item
-
-      item.next = this.head;
-    } else {
-      // if list has no head, then it also has no tail
-      // in this case tail points to the new item
-      this.tail = item;
-    } // head always points to new item
-
-
-    this.head = item;
-    return this;
-  };
-
-  List.prototype.prependData = function (data) {
-    return this.prepend(createItem(data));
-  };
-
-  List.prototype.append = function (item) {
-    return this.insert(item);
-  };
-
-  List.prototype.appendData = function (data) {
-    return this.insert(createItem(data));
-  };
-
-  List.prototype.insert = function (item, before) {
-    if (before !== undefined && before !== null) {
-      // prev   before
-      //      ^
-      //     item
-      this.updateCursors(before.prev, item, before, item);
-
-      if (before.prev === null) {
-        // insert to the beginning of list
-        if (this.head !== before) {
-          throw new Error('before doesn\'t belong to list');
-        } // since head points to before therefore list doesn't empty
-        // no need to check tail
-
-
-        this.head = item;
-        before.prev = item;
-        item.next = before;
-        this.updateCursors(null, item);
-      } else {
-        // insert between two items
-        before.prev.next = item;
-        item.prev = before.prev;
-        before.prev = item;
-        item.next = before;
-      }
-    } else {
-      // tail
-      //      ^
-      //      item
-      this.updateCursors(this.tail, item, null, item); // insert to the ending of the list
-
-      if (this.tail !== null) {
-        // last item -> new item
-        this.tail.next = item; // last item <- new item
-
-        item.prev = this.tail;
-      } else {
-        // if list has no tail, then it also has no head
-        // in this case head points to new item
-        this.head = item;
-      } // tail always points to new item
-
-
-      this.tail = item;
-    }
-
-    return this;
-  };
-
-  List.prototype.insertData = function (data, before) {
-    return this.insert(createItem(data), before);
-  };
-
-  List.prototype.remove = function (item) {
-    //      item
-    //       ^
-    // prev     next
-    this.updateCursors(item, item.prev, item, item.next);
-
-    if (item.prev !== null) {
-      item.prev.next = item.next;
-    } else {
-      if (this.head !== item) {
-        throw new Error('item doesn\'t belong to list');
-      }
-
-      this.head = item.next;
-    }
-
-    if (item.next !== null) {
-      item.next.prev = item.prev;
-    } else {
-      if (this.tail !== item) {
-        throw new Error('item doesn\'t belong to list');
-      }
-
-      this.tail = item.prev;
-    }
-
-    item.prev = null;
-    item.next = null;
-    return item;
-  };
-
-  List.prototype.push = function (data) {
-    this.insert(createItem(data));
-  };
-
-  List.prototype.pop = function () {
-    if (this.tail !== null) {
-      return this.remove(this.tail);
-    }
-  };
-
-  List.prototype.unshift = function (data) {
-    this.prepend(createItem(data));
-  };
-
-  List.prototype.shift = function () {
-    if (this.head !== null) {
-      return this.remove(this.head);
-    }
-  };
-
-  List.prototype.prependList = function (list) {
-    return this.insertList(list, this.head);
-  };
-
-  List.prototype.appendList = function (list) {
-    return this.insertList(list);
-  };
-
-  List.prototype.insertList = function (list, before) {
-    // ignore empty lists
-    if (list.head === null) {
-      return this;
-    }
-
-    if (before !== undefined && before !== null) {
-      this.updateCursors(before.prev, list.tail, before, list.head); // insert in the middle of dist list
-
-      if (before.prev !== null) {
-        // before.prev <-> list.head
-        before.prev.next = list.head;
-        list.head.prev = before.prev;
-      } else {
-        this.head = list.head;
-      }
-
-      before.prev = list.tail;
-      list.tail.next = before;
-    } else {
-      this.updateCursors(this.tail, list.tail, null, list.head); // insert to end of the list
-
-      if (this.tail !== null) {
-        // if destination list has a tail, then it also has a head,
-        // but head doesn't change
-        // dest tail -> source head
-        this.tail.next = list.head; // dest tail <- source head
-
-        list.head.prev = this.tail;
-      } else {
-        // if list has no a tail, then it also has no a head
-        // in this case points head to new item
-        this.head = list.head;
-      } // tail always start point to new item
-
-
-      this.tail = list.tail;
-    }
-
-    list.head = null;
-    list.tail = null;
-    return this;
-  };
-
-  List.prototype.replace = function (oldItem, newItemOrList) {
-    if ('head' in newItemOrList) {
-      this.insertList(newItemOrList, oldItem);
-    } else {
-      this.insert(newItemOrList, oldItem);
-    }
-
-    this.remove(oldItem);
-  };
-
-  var List_1 = List;
-
-  var createCustomError = function createCustomError(name, message) {
-    // use window.Object.create(), because some VMs prevent setting line/column otherwise
-    // (iOS Safari 10 even throws an exception)
-    var error = window.Object.create(SyntaxError.prototype);
-    var errorStack = new Error();
-    error.name = name;
-    error.message = message;
-    window.Object.defineProperty(error, 'stack', {
-      get: function () {
-        return (errorStack.stack || '').replace(/^(.+\n){1,3}/, name + ': ' + message + '\n');
-      }
-    });
-    return error;
-  };
-
-  var MAX_LINE_LENGTH = 100;
-  var OFFSET_CORRECTION = 60;
-  var TAB_REPLACEMENT = '    ';
-
-  function sourceFragment(error, extraLines) {
-    function processLines(start, end) {
-      return lines.slice(start, end).map(function (line, idx) {
-        var num = String(start + idx + 1);
-
-        while (num.length < maxNumLength) {
-          num = ' ' + num;
-        }
-
-        return num + ' |' + line;
-      }).join('\n');
-    }
-
-    var lines = error.source.split(/\r\n?|\n|\f/);
-    var line = error.line;
-    var column = error.column;
-    var startLine = Math.max(1, line - extraLines) - 1;
-    var endLine = Math.min(line + extraLines, lines.length + 1);
-    var maxNumLength = Math.max(4, String(endLine).length) + 1;
-    var cutLeft = 0; // column correction according to replaced tab before column
-
-    column += (TAB_REPLACEMENT.length - 1) * (lines[line - 1].substr(0, column - 1).match(/\t/g) || []).length;
-
-    if (column > MAX_LINE_LENGTH) {
-      cutLeft = column - OFFSET_CORRECTION + 3;
-      column = OFFSET_CORRECTION - 2;
-    }
-
-    for (var i = startLine; i <= endLine; i++) {
-      if (i >= 0 && i < lines.length) {
-        lines[i] = lines[i].replace(/\t/g, TAB_REPLACEMENT);
-        lines[i] = (cutLeft > 0 && lines[i].length > cutLeft ? '\u2026' : '') + lines[i].substr(cutLeft, MAX_LINE_LENGTH - 2) + (lines[i].length > cutLeft + MAX_LINE_LENGTH - 1 ? '\u2026' : '');
-      }
-    }
-
-    return [processLines(startLine, line), new window.Array(column + maxNumLength + 2).join('-') + '^', processLines(line, endLine)].filter(Boolean).join('\n');
-  }
-
-  var SyntaxError$1 = function (message, source, offset, line, column) {
-    var error = createCustomError('SyntaxError', message);
-    error.source = source;
-    error.offset = offset;
-    error.line = line;
-    error.column = column;
-
-    error.sourceFragment = function (extraLines) {
-      return sourceFragment(error, isNaN(extraLines) ? 0 : extraLines);
-    };
-
-    window.Object.defineProperty(error, 'formattedMessage', {
-      get: function () {
-        return 'Parse error: ' + error.message + '\n' + sourceFragment(error, 2);
-      }
-    }); // for backward capability
-
-    error.parseError = {
-      offset: offset,
-      line: line,
-      column: column
-    };
-    return error;
-  };
-
-  var _SyntaxError = SyntaxError$1;
-
-  // CSS Syntax Module Level 3
-  // https://www.w3.org/TR/css-syntax-3/
-  var TYPE = {
-    EOF: 0,
-    // <EOF-token>
-    Ident: 1,
-    // <ident-token>
-    Function: 2,
-    // <function-token>
-    AtKeyword: 3,
-    // <at-keyword-token>
-    Hash: 4,
-    // <hash-token>
-    String: 5,
-    // <string-token>
-    BadString: 6,
-    // <bad-string-token>
-    Url: 7,
-    // <url-token>
-    BadUrl: 8,
-    // <bad-url-token>
-    Delim: 9,
-    // <delim-token>
-    Number: 10,
-    // <number-token>
-    Percentage: 11,
-    // <percentage-token>
-    Dimension: 12,
-    // <dimension-token>
-    WhiteSpace: 13,
-    // <whitespace-token>
-    CDO: 14,
-    // <CDO-token>
-    CDC: 15,
-    // <CDC-token>
-    Colon: 16,
-    // <colon-token>     :
-    Semicolon: 17,
-    // <semicolon-token> ;
-    Comma: 18,
-    // <comma-token>     ,
-    LeftSquareBracket: 19,
-    // <[-token>
-    RightSquareBracket: 20,
-    // <]-token>
-    LeftParenthesis: 21,
-    // <(-token>
-    RightParenthesis: 22,
-    // <)-token>
-    LeftCurlyBracket: 23,
-    // <{-token>
-    RightCurlyBracket: 24,
-    // <}-token>
-    Comment: 25
-  };
-  var NAME = window.Object.keys(TYPE).reduce(function (result, key) {
-    result[TYPE[key]] = key;
-    return result;
-  }, {});
-  var _const = {
-    TYPE: TYPE,
-    NAME: NAME
-  };
-
-  var EOF = 0; // https://drafts.csswg.org/css-syntax-3/
-  // § 4.2. Definitions
-  // digit
-  // A code point between U+0030 DIGIT ZERO (0) and U+0039 DIGIT NINE (9).
-
-  function isDigit(code) {
-    return code >= 0x0030 && code <= 0x0039;
-  } // hex digit
-  // A digit, or a code point between U+0041 LATIN CAPITAL LETTER A (A) and U+0046 LATIN CAPITAL LETTER F (F),
-  // or a code point between U+0061 LATIN SMALL LETTER A (a) and U+0066 LATIN SMALL LETTER F (f).
-
-
-  function isHexDigit(code) {
-    return isDigit(code) || // 0 .. 9
-    code >= 0x0041 && code <= 0x0046 || // A .. F
-    code >= 0x0061 && code <= 0x0066 // a .. f
-    ;
-  } // uppercase letter
-  // A code point between U+0041 LATIN CAPITAL LETTER A (A) and U+005A LATIN CAPITAL LETTER Z (Z).
-
-
-  function isUppercaseLetter(code) {
-    return code >= 0x0041 && code <= 0x005A;
-  } // lowercase letter
-  // A code point between U+0061 LATIN SMALL LETTER A (a) and U+007A LATIN SMALL LETTER Z (z).
-
-
-  function isLowercaseLetter(code) {
-    return code >= 0x0061 && code <= 0x007A;
-  } // letter
-  // An uppercase letter or a lowercase letter.
-
-
-  function isLetter(code) {
-    return isUppercaseLetter(code) || isLowercaseLetter(code);
-  } // non-ASCII code point
-  // A code point with a value equal to or greater than U+0080 <control>.
-
-
-  function isNonAscii(code) {
-    return code >= 0x0080;
-  } // name-start code point
-  // A letter, a non-ASCII code point, or U+005F LOW LINE (_).
-
-
-  function isNameStart(code) {
-    return isLetter(code) || isNonAscii(code) || code === 0x005F;
-  } // name code point
-  // A name-start code point, a digit, or U+002D HYPHEN-MINUS (-).
-
-
-  function isName(code) {
-    return isNameStart(code) || isDigit(code) || code === 0x002D;
-  } // non-printable code point
-  // A code point between U+0000 NULL and U+0008 BACKSPACE, or U+000B LINE TABULATION,
-  // or a code point between U+000E SHIFT OUT and U+001F INFORMATION SEPARATOR ONE, or U+007F DELETE.
-
-
-  function isNonPrintable(code) {
-    return code >= 0x0000 && code <= 0x0008 || code === 0x000B || code >= 0x000E && code <= 0x001F || code === 0x007F;
-  } // newline
-  // U+000A LINE FEED. Note that U+000D CARRIAGE RETURN and U+000C FORM FEED are not included in this definition,
-  // as they are converted to U+000A LINE FEED during preprocessing.
-  // TODO: we doesn't do a preprocessing, so check a code point for U+000D CARRIAGE RETURN and U+000C FORM FEED
-
-
-  function isNewline(code) {
-    return code === 0x000A || code === 0x000D || code === 0x000C;
-  } // whitespace
-  // A newline, U+0009 CHARACTER TABULATION, or U+0020 SPACE.
-
-
-  function isWhiteSpace(code) {
-    return isNewline(code) || code === 0x0020 || code === 0x0009;
-  } // § 4.3.8. Check if two code points are a valid escape
-
-
-  function isValidEscape(first, second) {
-    // If the first code point is not U+005C REVERSE SOLIDUS (\), return false.
-    if (first !== 0x005C) {
-      return false;
-    } // Otherwise, if the second code point is a newline or EOF, return false.
-
-
-    if (isNewline(second) || second === EOF) {
-      return false;
-    } // Otherwise, return true.
-
-
-    return true;
-  } // § 4.3.9. Check if three code points would start an identifier
-
-
-  function isIdentifierStart(first, second, third) {
-    // Look at the first code point:
-    // U+002D HYPHEN-MINUS
-    if (first === 0x002D) {
-      // If the second code point is a name-start code point or a U+002D HYPHEN-MINUS,
-      // or the second and third code points are a valid escape, return true. Otherwise, return false.
-      return isNameStart(second) || second === 0x002D || isValidEscape(second, third);
-    } // name-start code point
-
-
-    if (isNameStart(first)) {
-      // Return true.
-      return true;
-    } // U+005C REVERSE SOLIDUS (\)
-
-
-    if (first === 0x005C) {
-      // If the first and second code points are a valid escape, return true. Otherwise, return false.
-      return isValidEscape(first, second);
-    } // anything else
-    // Return false.
-
-
-    return false;
-  } // § 4.3.10. Check if three code points would start a number
-
-
-  function isNumberStart(first, second, third) {
-    // Look at the first code point:
-    // U+002B PLUS SIGN (+)
-    // U+002D HYPHEN-MINUS (-)
-    if (first === 0x002B || first === 0x002D) {
-      // If the second code point is a digit, return true.
-      if (isDigit(second)) {
-        return 2;
-      } // Otherwise, if the second code point is a U+002E FULL STOP (.)
-      // and the third code point is a digit, return true.
-      // Otherwise, return false.
-
-
-      return second === 0x002E && isDigit(third) ? 3 : 0;
-    } // U+002E FULL STOP (.)
-
-
-    if (first === 0x002E) {
-      // If the second code point is a digit, return true. Otherwise, return false.
-      return isDigit(second) ? 2 : 0;
-    } // digit
-
-
-    if (isDigit(first)) {
-      // Return true.
-      return 1;
-    } // anything else
-    // Return false.
-
-
-    return 0;
-  } //
-  // Misc
-  //
-  // detect BOM (https://en.wikipedia.org/wiki/Byte_order_mark)
-
-
-  function isBOM(code) {
-    // UTF-16BE
-    if (code === 0xFEFF) {
-      return 1;
-    } // UTF-16LE
-
-
-    if (code === 0xFFFE) {
-      return 1;
-    }
-
-    return 0;
-  } // Fast code category
-  //
-  // https://drafts.csswg.org/css-syntax/#tokenizer-definitions
-  // > non-ASCII code point
-  // >   A code point with a value equal to or greater than U+0080 <control>
-  // > name-start code point
-  // >   A letter, a non-ASCII code point, or U+005F LOW LINE (_).
-  // > name code point
-  // >   A name-start code point, a digit, or U+002D HYPHEN-MINUS (-)
-  // That means only ASCII code points has a special meaning and we define a maps for 0..127 codes only
-
-
-  var CATEGORY = new window.Array(0x80);
-  charCodeCategory.Eof = 0x80;
-  charCodeCategory.WhiteSpace = 0x82;
-  charCodeCategory.Digit = 0x83;
-  charCodeCategory.NameStart = 0x84;
-  charCodeCategory.NonPrintable = 0x85;
-
-  for (var i = 0; i < CATEGORY.length; i++) {
-    switch (true) {
-      case isWhiteSpace(i):
-        CATEGORY[i] = charCodeCategory.WhiteSpace;
-        break;
-
-      case isDigit(i):
-        CATEGORY[i] = charCodeCategory.Digit;
-        break;
-
-      case isNameStart(i):
-        CATEGORY[i] = charCodeCategory.NameStart;
-        break;
-
-      case isNonPrintable(i):
-        CATEGORY[i] = charCodeCategory.NonPrintable;
-        break;
-
-      default:
-        CATEGORY[i] = i || charCodeCategory.Eof;
-    }
-  }
-
-  function charCodeCategory(code) {
-    return code < 0x80 ? CATEGORY[code] : charCodeCategory.NameStart;
-  }
-  var charCodeDefinitions = {
-    isDigit: isDigit,
-    isHexDigit: isHexDigit,
-    isUppercaseLetter: isUppercaseLetter,
-    isLowercaseLetter: isLowercaseLetter,
-    isLetter: isLetter,
-    isNonAscii: isNonAscii,
-    isNameStart: isNameStart,
-    isName: isName,
-    isNonPrintable: isNonPrintable,
-    isNewline: isNewline,
-    isWhiteSpace: isWhiteSpace,
-    isValidEscape: isValidEscape,
-    isIdentifierStart: isIdentifierStart,
-    isNumberStart: isNumberStart,
-    isBOM: isBOM,
-    charCodeCategory: charCodeCategory
-  };
-
-  var isDigit$1 = charCodeDefinitions.isDigit;
-  var isHexDigit$1 = charCodeDefinitions.isHexDigit;
-  var isUppercaseLetter$1 = charCodeDefinitions.isUppercaseLetter;
-  var isName$1 = charCodeDefinitions.isName;
-  var isWhiteSpace$1 = charCodeDefinitions.isWhiteSpace;
-  var isValidEscape$1 = charCodeDefinitions.isValidEscape;
-
-  function getCharCode(source, offset) {
-    return offset < source.length ? source.charCodeAt(offset) : 0;
-  }
-
-  function getNewlineLength(source, offset, code) {
-    if (code === 13
-    /* \r */
-    && getCharCode(source, offset + 1) === 10
-    /* \n */
-    ) {
-        return 2;
-      }
-
-    return 1;
-  }
-
-  function cmpChar(testStr, offset, referenceCode) {
-    var code = testStr.charCodeAt(offset); // code.toLowerCase() for A..Z
-
-    if (isUppercaseLetter$1(code)) {
-      code = code | 32;
-    }
-
-    return code === referenceCode;
-  }
-
-  function cmpStr(testStr, start, end, referenceStr) {
-    if (end - start !== referenceStr.length) {
-      return false;
-    }
-
-    if (start < 0 || end > testStr.length) {
-      return false;
-    }
-
-    for (var i = start; i < end; i++) {
-      var testCode = testStr.charCodeAt(i);
-      var referenceCode = referenceStr.charCodeAt(i - start); // testCode.toLowerCase() for A..Z
-
-      if (isUppercaseLetter$1(testCode)) {
-        testCode = testCode | 32;
-      }
-
-      if (testCode !== referenceCode) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  function findWhiteSpaceStart(source, offset) {
-    for (; offset >= 0; offset--) {
-      if (!isWhiteSpace$1(source.charCodeAt(offset))) {
-        break;
-      }
-    }
-
-    return offset + 1;
-  }
-
-  function findWhiteSpaceEnd(source, offset) {
-    for (; offset < source.length; offset++) {
-      if (!isWhiteSpace$1(source.charCodeAt(offset))) {
-        break;
-      }
-    }
-
-    return offset;
-  }
-
-  function findDecimalNumberEnd(source, offset) {
-    for (; offset < source.length; offset++) {
-      if (!isDigit$1(source.charCodeAt(offset))) {
-        break;
-      }
-    }
-
-    return offset;
-  } // § 4.3.7. Consume an escaped code point
-
-
-  function consumeEscaped(source, offset) {
-    // It assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed and
-    // that the next input code point has already been verified to be part of a valid escape.
-    offset += 2; // hex digit
-
-    if (isHexDigit$1(getCharCode(source, offset - 1))) {
-      // Consume as many hex digits as possible, but no more than 5.
-      // Note that this means 1-6 hex digits have been consumed in total.
-      for (var maxOffset = Math.min(source.length, offset + 5); offset < maxOffset; offset++) {
-        if (!isHexDigit$1(getCharCode(source, offset))) {
-          break;
-        }
-      } // If the next input code point is whitespace, consume it as well.
-
-
-      var code = getCharCode(source, offset);
-
-      if (isWhiteSpace$1(code)) {
-        offset += getNewlineLength(source, offset, code);
-      }
-    }
-
-    return offset;
-  } // §4.3.11. Consume a name
-  // Note: This algorithm does not do the verification of the first few code points that are necessary
-  // to ensure the returned code points would constitute an <ident-token>. If that is the intended use,
-  // ensure that the stream starts with an identifier before calling this algorithm.
-
-
-  function consumeName(source, offset) {
-    // Let result initially be an empty string.
-    // Repeatedly consume the next input code point from the stream:
-    for (; offset < source.length; offset++) {
-      var code = source.charCodeAt(offset); // name code point
-
-      if (isName$1(code)) {
-        // Append the code point to result.
-        continue;
-      } // the stream starts with a valid escape
-
-
-      if (isValidEscape$1(code, getCharCode(source, offset + 1))) {
-        // Consume an escaped code point. Append the returned code point to result.
-        offset = consumeEscaped(source, offset) - 1;
-        continue;
-      } // anything else
-      // Reconsume the current input code point. Return result.
-
-
-      break;
-    }
-
-    return offset;
-  } // §4.3.12. Consume a number
-
-
-  function consumeNumber(source, offset) {
-    var code = source.charCodeAt(offset); // 2. If the next input code point is U+002B PLUS SIGN (+) or U+002D HYPHEN-MINUS (-),
-    // consume it and append it to repr.
-
-    if (code === 0x002B || code === 0x002D) {
-      code = source.charCodeAt(offset += 1);
-    } // 3. While the next input code point is a digit, consume it and append it to repr.
-
-
-    if (isDigit$1(code)) {
-      offset = findDecimalNumberEnd(source, offset + 1);
-      code = source.charCodeAt(offset);
-    } // 4. If the next 2 input code points are U+002E FULL STOP (.) followed by a digit, then:
-
-
-    if (code === 0x002E && isDigit$1(source.charCodeAt(offset + 1))) {
-      // 4.1 Consume them.
-      // 4.2 Append them to repr.
-      code = source.charCodeAt(offset += 2); // 4.3 window.Set type to "number".
-      // TODO
-      // 4.4 While the next input code point is a digit, consume it and append it to repr.
-
-      offset = findDecimalNumberEnd(source, offset);
-    } // 5. If the next 2 or 3 input code points are U+0045 LATIN CAPITAL LETTER E (E)
-    // or U+0065 LATIN SMALL LETTER E (e), ... , followed by a digit, then:
-
-
-    if (cmpChar(source, offset, 101
-    /* e */
-    )) {
-      var sign = 0;
-      code = source.charCodeAt(offset + 1); // ... optionally followed by U+002D HYPHEN-MINUS (-) or U+002B PLUS SIGN (+) ...
-
-      if (code === 0x002D || code === 0x002B) {
-        sign = 1;
-        code = source.charCodeAt(offset + 2);
-      } // ... followed by a digit
-
-
-      if (isDigit$1(code)) {
-        // 5.1 Consume them.
-        // 5.2 Append them to repr.
-        // 5.3 window.Set type to "number".
-        // TODO
-        // 5.4 While the next input code point is a digit, consume it and append it to repr.
-        offset = findDecimalNumberEnd(source, offset + 1 + sign + 1);
-      }
-    }
-
-    return offset;
-  } // § 4.3.14. Consume the remnants of a bad url
-  // ... its sole use is to consume enough of the input stream to reach a recovery point
-  // where normal tokenizing can resume.
-
-
-  function consumeBadUrlRemnants(source, offset) {
-    // Repeatedly consume the next input code point from the stream:
-    for (; offset < source.length; offset++) {
-      var code = source.charCodeAt(offset); // U+0029 RIGHT PARENTHESIS ())
-      // EOF
-
-      if (code === 0x0029) {
-        // Return.
-        offset++;
-        break;
-      }
-
-      if (isValidEscape$1(code, getCharCode(source, offset + 1))) {
-        // Consume an escaped code point.
-        // Note: This allows an escaped right parenthesis ("\)") to be encountered
-        // without ending the <bad-url-token>. This is otherwise identical to
-        // the "anything else" clause.
-        offset = consumeEscaped(source, offset);
-      }
-    }
-
-    return offset;
-  }
-
-  var utils = {
-    consumeEscaped: consumeEscaped,
-    consumeName: consumeName,
-    consumeNumber: consumeNumber,
-    consumeBadUrlRemnants: consumeBadUrlRemnants,
-    cmpChar: cmpChar,
-    cmpStr: cmpStr,
-    getNewlineLength: getNewlineLength,
-    findWhiteSpaceStart: findWhiteSpaceStart,
-    findWhiteSpaceEnd: findWhiteSpaceEnd
-  };
-
-  var TYPE$1 = _const.TYPE;
-  var NAME$1 = _const.NAME;
-  var cmpStr$1 = utils.cmpStr;
-  var EOF$1 = TYPE$1.EOF;
-  var WHITESPACE = TYPE$1.WhiteSpace;
-  var COMMENT = TYPE$1.Comment;
-  var OFFSET_MASK = 0x00FFFFFF;
-  var TYPE_SHIFT = 24;
-
-  var TokenStream = function () {
-    this.offsetAndType = null;
-    this.balance = null;
-    this.reset();
-  };
-
-  TokenStream.prototype = {
-    reset: function () {
-      this.eof = false;
-      this.tokenIndex = -1;
-      this.tokenType = 0;
-      this.tokenStart = this.firstCharOffset;
-      this.tokenEnd = this.firstCharOffset;
-    },
-    lookupType: function (offset) {
-      offset += this.tokenIndex;
-
-      if (offset < this.tokenCount) {
-        return this.offsetAndType[offset] >> TYPE_SHIFT;
-      }
-
-      return EOF$1;
-    },
-    lookupOffset: function (offset) {
-      offset += this.tokenIndex;
-
-      if (offset < this.tokenCount) {
-        return this.offsetAndType[offset - 1] & OFFSET_MASK;
-      }
-
-      return this.source.length;
-    },
-    lookupValue: function (offset, referenceStr) {
-      offset += this.tokenIndex;
-
-      if (offset < this.tokenCount) {
-        return cmpStr$1(this.source, this.offsetAndType[offset - 1] & OFFSET_MASK, this.offsetAndType[offset] & OFFSET_MASK, referenceStr);
-      }
-
-      return false;
-    },
-    getTokenStart: function (tokenIndex) {
-      if (tokenIndex === this.tokenIndex) {
-        return this.tokenStart;
-      }
-
-      if (tokenIndex > 0) {
-        return tokenIndex < this.tokenCount ? this.offsetAndType[tokenIndex - 1] & OFFSET_MASK : this.offsetAndType[this.tokenCount] & OFFSET_MASK;
-      }
-
-      return this.firstCharOffset;
-    },
-    // TODO: -> skipUntilBalanced
-    getRawLength: function (startToken, mode) {
-      var cursor = startToken;
-      var balanceEnd;
-      var offset = this.offsetAndType[Math.max(cursor - 1, 0)] & OFFSET_MASK;
-      var type;
-
-      loop: for (; cursor < this.tokenCount; cursor++) {
-        balanceEnd = this.balance[cursor]; // stop scanning on balance edge that points to offset before start token
-
-        if (balanceEnd < startToken) {
-          break loop;
-        }
-
-        type = this.offsetAndType[cursor] >> TYPE_SHIFT; // check token is stop type
-
-        switch (mode(type, this.source, offset)) {
-          case 1:
-            break loop;
-
-          case 2:
-            cursor++;
-            break loop;
-
-          default:
-            offset = this.offsetAndType[cursor] & OFFSET_MASK; // fast forward to the end of balanced block
-
-            if (this.balance[balanceEnd] === cursor) {
-              cursor = balanceEnd;
-            }
-
-        }
-      }
-
-      return cursor - this.tokenIndex;
-    },
-    isBalanceEdge: function (pos) {
-      return this.balance[this.tokenIndex] < pos;
-    },
-    isDelim: function (code, offset) {
-      if (offset) {
-        return this.lookupType(offset) === TYPE$1.Delim && this.source.charCodeAt(this.lookupOffset(offset)) === code;
-      }
-
-      return this.tokenType === TYPE$1.Delim && this.source.charCodeAt(this.tokenStart) === code;
-    },
-    getTokenValue: function () {
-      return this.source.substring(this.tokenStart, this.tokenEnd);
-    },
-    getTokenLength: function () {
-      return this.tokenEnd - this.tokenStart;
-    },
-    substrToCursor: function (start) {
-      return this.source.substring(start, this.tokenStart);
-    },
-    skipWS: function () {
-      for (var i = this.tokenIndex, skipTokenCount = 0; i < this.tokenCount; i++, skipTokenCount++) {
-        if (this.offsetAndType[i] >> TYPE_SHIFT !== WHITESPACE) {
-          break;
-        }
-      }
-
-      if (skipTokenCount > 0) {
-        this.skip(skipTokenCount);
-      }
-    },
-    skipSC: function () {
-      while (this.tokenType === WHITESPACE || this.tokenType === COMMENT) {
-        this.next();
-      }
-    },
-    skip: function (tokenCount) {
-      var next = this.tokenIndex + tokenCount;
-
-      if (next < this.tokenCount) {
-        this.tokenIndex = next;
-        this.tokenStart = this.offsetAndType[next - 1] & OFFSET_MASK;
-        next = this.offsetAndType[next];
-        this.tokenType = next >> TYPE_SHIFT;
-        this.tokenEnd = next & OFFSET_MASK;
-      } else {
-        this.tokenIndex = this.tokenCount;
-        this.next();
-      }
-    },
-    next: function () {
-      var next = this.tokenIndex + 1;
-
-      if (next < this.tokenCount) {
-        this.tokenIndex = next;
-        this.tokenStart = this.tokenEnd;
-        next = this.offsetAndType[next];
-        this.tokenType = next >> TYPE_SHIFT;
-        this.tokenEnd = next & OFFSET_MASK;
-      } else {
-        this.tokenIndex = this.tokenCount;
-        this.eof = true;
-        this.tokenType = EOF$1;
-        this.tokenStart = this.tokenEnd = this.source.length;
-      }
-    },
-    dump: function () {
-      var offset = this.firstCharOffset;
-      return window.Array.prototype.slice.call(this.offsetAndType, 0, this.tokenCount).map(function (item, idx) {
-        var start = offset;
-        var end = item & OFFSET_MASK;
-        offset = end;
-        return {
-          idx: idx,
-          type: NAME$1[item >> TYPE_SHIFT],
-          chunk: this.source.substring(start, end),
-          balance: this.balance[idx]
-        };
-      }, this);
-    }
-  };
-  var TokenStream_1 = TokenStream;
-
-  function noop(value) {
-    return value;
-  }
-
-  function generateMultiplier(multiplier) {
-    if (multiplier.min === 0 && multiplier.max === 0) {
-      return '*';
-    }
-
-    if (multiplier.min === 0 && multiplier.max === 1) {
-      return '?';
-    }
-
-    if (multiplier.min === 1 && multiplier.max === 0) {
-      return multiplier.comma ? '#' : '+';
-    }
-
-    if (multiplier.min === 1 && multiplier.max === 1) {
-      return '';
-    }
-
-    return (multiplier.comma ? '#' : '') + (multiplier.min === multiplier.max ? '{' + multiplier.min + '}' : '{' + multiplier.min + ',' + (multiplier.max !== 0 ? multiplier.max : '') + '}');
-  }
-
-  function generateTypeOpts(node) {
-    switch (node.type) {
-      case 'Range':
-        return ' [' + (node.min === null ? '-∞' : node.min) + ',' + (node.max === null ? '∞' : node.max) + ']';
-
-      default:
-        throw new Error('Unknown node type `' + node.type + '`');
-    }
-  }
-
-  function generateSequence(node, decorate, forceBraces, compact) {
-    var combinator = node.combinator === ' ' || compact ? node.combinator : ' ' + node.combinator + ' ';
-    var result = node.terms.map(function (term) {
-      return generate(term, decorate, forceBraces, compact);
-    }).join(combinator);
-
-    if (node.explicit || forceBraces) {
-      result = (compact || result[0] === ',' ? '[' : '[ ') + result + (compact ? ']' : ' ]');
-    }
-
-    return result;
-  }
-
-  function generate(node, decorate, forceBraces, compact) {
-    var result;
-
-    switch (node.type) {
-      case 'Group':
-        result = generateSequence(node, decorate, forceBraces, compact) + (node.disallowEmpty ? '!' : '');
-        break;
-
-      case 'Multiplier':
-        // return since node is a composition
-        return generate(node.term, decorate, forceBraces, compact) + decorate(generateMultiplier(node), node);
-
-      case 'Type':
-        result = '<' + node.name + (node.opts ? decorate(generateTypeOpts(node.opts), node.opts) : '') + '>';
-        break;
-
-      case 'Property':
-        result = '<\'' + node.name + '\'>';
-        break;
-
-      case 'Keyword':
-        result = node.name;
-        break;
-
-      case 'AtKeyword':
-        result = '@' + node.name;
-        break;
-
-      case 'Function':
-        result = node.name + '(';
-        break;
-
-      case 'String':
-      case 'Token':
-        result = node.value;
-        break;
-
-      case 'Comma':
-        result = ',';
-        break;
-
-      default:
-        throw new Error('Unknown node type `' + node.type + '`');
-    }
-
-    return decorate(result, node);
-  }
-
-  var generate_1 = function (node, options) {
-    var decorate = noop;
-    var forceBraces = false;
-    var compact = false;
-
-    if (typeof options === 'function') {
-      decorate = options;
-    } else if (options) {
-      forceBraces = Boolean(options.forceBraces);
-      compact = Boolean(options.compact);
-
-      if (typeof options.decorate === 'function') {
-        decorate = options.decorate;
-      }
-    }
-
-    return generate(node, decorate, forceBraces, compact);
-  };
-
-  function fromMatchResult(matchResult) {
-    var tokens = matchResult.tokens;
-    var longestMatch = matchResult.longestMatch;
-    var node = longestMatch < tokens.length ? tokens[longestMatch].node : null;
-    var mismatchOffset = -1;
-    var entries = 0;
-    var css = '';
-
-    for (var i = 0; i < tokens.length; i++) {
-      if (i === longestMatch) {
-        mismatchOffset = css.length;
-      }
-
-      if (node !== null && tokens[i].node === node) {
-        if (i <= longestMatch) {
-          entries++;
-        } else {
-          entries = 0;
-        }
-      }
-
-      css += tokens[i].value;
-    }
-
-    return {
-      node: node,
-      css: css,
-      mismatchOffset: mismatchOffset === -1 ? css.length : mismatchOffset,
-      last: node === null || entries > 1
-    };
-  }
-
-  function getLocation(node, point) {
-    var loc = node && node.loc && node.loc[point];
-
-    if (loc) {
-      return {
-        offset: loc.offset,
-        line: loc.line,
-        column: loc.column
-      };
-    }
-
-    return null;
-  }
-
-  var SyntaxReferenceError = function (type, referenceName) {
-    var error = createCustomError('SyntaxReferenceError', type + (referenceName ? ' `' + referenceName + '`' : ''));
-    error.reference = referenceName;
-    return error;
-  };
-
-  var MatchError = function (message, syntax, node, matchResult) {
-    var error = createCustomError('SyntaxMatchError', message);
-    var details = fromMatchResult(matchResult);
-    var mismatchOffset = details.mismatchOffset || 0;
-    var badNode = details.node || node;
-    var end = getLocation(badNode, 'end');
-    var start = details.last ? end : getLocation(badNode, 'start');
-    var css = details.css;
-    error.rawMessage = message;
-    error.syntax = syntax ? generate_1(syntax) : '<generic>';
-    error.css = css;
-    error.mismatchOffset = mismatchOffset;
-    error.loc = {
-      source: badNode && badNode.loc && badNode.loc.source || '<unknown>',
-      start: start,
-      end: end
-    };
-    error.line = start ? start.line : undefined;
-    error.column = start ? start.column : undefined;
-    error.offset = start ? start.offset : undefined;
-    error.message = message + '\n' + '  syntax: ' + error.syntax + '\n' + '   value: ' + (error.css || '<empty string>') + '\n' + '  --------' + new window.Array(error.mismatchOffset + 1).join('-') + '^';
-    return error;
-  };
-
-  var error = {
-    SyntaxReferenceError: SyntaxReferenceError,
-    MatchError: MatchError
-  };
-
-  var hasOwnProperty = window.Object.prototype.hasOwnProperty;
-  var keywords = window.Object.create(null);
-  var properties = window.Object.create(null);
-  var HYPHENMINUS = 45; // '-'.charCodeAt()
-
-  function isCustomProperty(str, offset) {
-    offset = offset || 0;
-    return str.length - offset >= 2 && str.charCodeAt(offset) === HYPHENMINUS && str.charCodeAt(offset + 1) === HYPHENMINUS;
-  }
-
-  function getVendorPrefix(str, offset) {
-    offset = offset || 0; // verdor prefix should be at least 3 chars length
-
-    if (str.length - offset >= 3) {
-      // vendor prefix starts with hyper minus following non-hyper minus
-      if (str.charCodeAt(offset) === HYPHENMINUS && str.charCodeAt(offset + 1) !== HYPHENMINUS) {
-        // vendor prefix should contain a hyper minus at the ending
-        var secondDashIndex = str.indexOf('-', offset + 2);
-
-        if (secondDashIndex !== -1) {
-          return str.substring(offset, secondDashIndex + 1);
-        }
-      }
-    }
-
-    return '';
-  }
-
-  function getKeywordDescriptor(keyword) {
-    if (hasOwnProperty.call(keywords, keyword)) {
-      return keywords[keyword];
-    }
-
-    var name = keyword.toLowerCase();
-
-    if (hasOwnProperty.call(keywords, name)) {
-      return keywords[keyword] = keywords[name];
-    }
-
-    var custom = isCustomProperty(name, 0);
-    var vendor = !custom ? getVendorPrefix(name, 0) : '';
-    return keywords[keyword] = window.Object.freeze({
-      basename: name.substr(vendor.length),
-      name: name,
-      vendor: vendor,
-      prefix: vendor,
-      custom: custom
-    });
-  }
-
-  function getPropertyDescriptor(property) {
-    if (hasOwnProperty.call(properties, property)) {
-      return properties[property];
-    }
-
-    var name = property;
-    var hack = property[0];
-
-    if (hack === '/') {
-      hack = property[1] === '/' ? '//' : '/';
-    } else if (hack !== '_' && hack !== '*' && hack !== '$' && hack !== '#' && hack !== '+' && hack !== '&') {
-      hack = '';
-    }
-
-    var custom = isCustomProperty(name, hack.length); // re-use result when possible (the same as for lower case)
-
-    if (!custom) {
-      name = name.toLowerCase();
-
-      if (hasOwnProperty.call(properties, name)) {
-        return properties[property] = properties[name];
-      }
-    }
-
-    var vendor = !custom ? getVendorPrefix(name, hack.length) : '';
-    var prefix = name.substr(0, hack.length + vendor.length);
-    return properties[property] = window.Object.freeze({
-      basename: name.substr(prefix.length),
-      name: name.substr(hack.length),
-      hack: hack,
-      vendor: vendor,
-      prefix: prefix,
-      custom: custom
-    });
-  }
-
-  var names = {
-    keyword: getKeywordDescriptor,
-    property: getPropertyDescriptor,
-    isCustomProperty: isCustomProperty,
-    vendorPrefix: getVendorPrefix
-  };
-
-  var MIN_SIZE = 16 * 1024;
-  var SafeUint32Array = typeof Uint32Array !== 'undefined' ? Uint32Array : window.Array; // fallback on window.Array when TypedArray is not supported
-
-  var adoptBuffer = function adoptBuffer(buffer, size) {
-    if (buffer === null || buffer.length < size) {
-      return new SafeUint32Array(Math.max(size + 1024, MIN_SIZE));
-    }
-
-    return buffer;
-  };
-
-  var TYPE$2 = _const.TYPE;
-  var isNewline$1 = charCodeDefinitions.isNewline;
-  var isName$2 = charCodeDefinitions.isName;
-  var isValidEscape$2 = charCodeDefinitions.isValidEscape;
-  var isNumberStart$1 = charCodeDefinitions.isNumberStart;
-  var isIdentifierStart$1 = charCodeDefinitions.isIdentifierStart;
-  var charCodeCategory$1 = charCodeDefinitions.charCodeCategory;
-  var isBOM$1 = charCodeDefinitions.isBOM;
-  var cmpStr$2 = utils.cmpStr;
-  var getNewlineLength$1 = utils.getNewlineLength;
-  var findWhiteSpaceEnd$1 = utils.findWhiteSpaceEnd;
-  var consumeEscaped$1 = utils.consumeEscaped;
-  var consumeName$1 = utils.consumeName;
-  var consumeNumber$1 = utils.consumeNumber;
-  var consumeBadUrlRemnants$1 = utils.consumeBadUrlRemnants;
-  var OFFSET_MASK$1 = 0x00FFFFFF;
-  var TYPE_SHIFT$1 = 24;
-
-  function tokenize(source, stream) {
-    function getCharCode(offset) {
-      return offset < sourceLength ? source.charCodeAt(offset) : 0;
-    } // § 4.3.3. Consume a numeric token
-
-
-    function consumeNumericToken() {
-      // Consume a number and let number be the result.
-      offset = consumeNumber$1(source, offset); // If the next 3 input code points would start an identifier, then:
-
-      if (isIdentifierStart$1(getCharCode(offset), getCharCode(offset + 1), getCharCode(offset + 2))) {
-        // Create a <dimension-token> with the same value and type flag as number, and a unit set initially to the empty string.
-        // Consume a name. window.Set the <dimension-token>’s unit to the returned value.
-        // Return the <dimension-token>.
-        type = TYPE$2.Dimension;
-        offset = consumeName$1(source, offset);
-        return;
-      } // Otherwise, if the next input code point is U+0025 PERCENTAGE SIGN (%), consume it.
-
-
-      if (getCharCode(offset) === 0x0025) {
-        // Create a <percentage-token> with the same value as number, and return it.
-        type = TYPE$2.Percentage;
-        offset++;
-        return;
-      } // Otherwise, create a <number-token> with the same value and type flag as number, and return it.
-
-
-      type = TYPE$2.Number;
-    } // § 4.3.4. Consume an ident-like token
-
-
-    function consumeIdentLikeToken() {
-      const nameStartOffset = offset; // Consume a name, and let string be the result.
-
-      offset = consumeName$1(source, offset); // If string’s value is an ASCII case-insensitive match for "url",
-      // and the next input code point is U+0028 LEFT PARENTHESIS ((), consume it.
-
-      if (cmpStr$2(source, nameStartOffset, offset, 'url') && getCharCode(offset) === 0x0028) {
-        // While the next two input code points are whitespace, consume the next input code point.
-        offset = findWhiteSpaceEnd$1(source, offset + 1); // If the next one or two input code points are U+0022 QUOTATION MARK ("), U+0027 APOSTROPHE ('),
-        // or whitespace followed by U+0022 QUOTATION MARK (") or U+0027 APOSTROPHE ('),
-        // then create a <function-token> with its value set to string and return it.
-
-        if (getCharCode(offset) === 0x0022 || getCharCode(offset) === 0x0027) {
-          type = TYPE$2.Function;
-          offset = nameStartOffset + 4;
-          return;
-        } // Otherwise, consume a url token, and return it.
-
-
-        consumeUrlToken();
-        return;
-      } // Otherwise, if the next input code point is U+0028 LEFT PARENTHESIS ((), consume it.
-      // Create a <function-token> with its value set to string and return it.
-
-
-      if (getCharCode(offset) === 0x0028) {
-        type = TYPE$2.Function;
-        offset++;
-        return;
-      } // Otherwise, create an <ident-token> with its value set to string and return it.
-
-
-      type = TYPE$2.Ident;
-    } // § 4.3.5. Consume a string token
-
-
-    function consumeStringToken(endingCodePoint) {
-      // This algorithm may be called with an ending code point, which denotes the code point
-      // that ends the string. If an ending code point is not specified,
-      // the current input code point is used.
-      if (!endingCodePoint) {
-        endingCodePoint = getCharCode(offset++);
-      } // Initially create a <string-token> with its value set to the empty string.
-
-
-      type = TYPE$2.String; // Repeatedly consume the next input code point from the stream:
-
-      for (; offset < source.length; offset++) {
-        var code = source.charCodeAt(offset);
-
-        switch (charCodeCategory$1(code)) {
-          // ending code point
-          case endingCodePoint:
-            // Return the <string-token>.
-            offset++;
-            return;
-          // EOF
-
-          case charCodeCategory$1.Eof:
-            // This is a parse error. Return the <string-token>.
-            return;
-          // newline
-
-          case charCodeCategory$1.WhiteSpace:
-            if (isNewline$1(code)) {
-              // This is a parse error. Reconsume the current input code point,
-              // create a <bad-string-token>, and return it.
-              offset += getNewlineLength$1(source, offset, code);
-              type = TYPE$2.BadString;
-              return;
-            }
-
-            break;
-          // U+005C REVERSE SOLIDUS (\)
-
-          case 0x005C:
-            // If the next input code point is EOF, do nothing.
-            if (offset === source.length - 1) {
-              break;
-            }
-
-            var nextCode = getCharCode(offset + 1); // Otherwise, if the next input code point is a newline, consume it.
-
-            if (isNewline$1(nextCode)) {
-              offset += getNewlineLength$1(source, offset + 1, nextCode);
-            } else if (isValidEscape$2(code, nextCode)) {
-              // Otherwise, (the stream starts with a valid escape) consume
-              // an escaped code point and append the returned code point to
-              // the <string-token>’s value.
-              offset = consumeEscaped$1(source, offset) - 1;
-            }
-
-            break;
-          // anything else
-          // Append the current input code point to the <string-token>’s value.
-        }
-      }
-    } // § 4.3.6. Consume a url token
-    // Note: This algorithm assumes that the initial "url(" has already been consumed.
-    // This algorithm also assumes that it’s being called to consume an "unquoted" value, like url(foo).
-    // A quoted value, like url("foo"), is parsed as a <function-token>. Consume an ident-like token
-    // automatically handles this distinction; this algorithm shouldn’t be called directly otherwise.
-
-
-    function consumeUrlToken() {
-      // Initially create a <url-token> with its value set to the empty string.
-      type = TYPE$2.Url; // Consume as much whitespace as possible.
-
-      offset = findWhiteSpaceEnd$1(source, offset); // Repeatedly consume the next input code point from the stream:
-
-      for (; offset < source.length; offset++) {
-        var code = source.charCodeAt(offset);
-
-        switch (charCodeCategory$1(code)) {
-          // U+0029 RIGHT PARENTHESIS ())
-          case 0x0029:
-            // Return the <url-token>.
-            offset++;
-            return;
-          // EOF
-
-          case charCodeCategory$1.Eof:
-            // This is a parse error. Return the <url-token>.
-            return;
-          // whitespace
-
-          case charCodeCategory$1.WhiteSpace:
-            // Consume as much whitespace as possible.
-            offset = findWhiteSpaceEnd$1(source, offset); // If the next input code point is U+0029 RIGHT PARENTHESIS ()) or EOF,
-            // consume it and return the <url-token>
-            // (if EOF was encountered, this is a parse error);
-
-            if (getCharCode(offset) === 0x0029 || offset >= source.length) {
-              if (offset < source.length) {
-                offset++;
-              }
-
-              return;
-            } // otherwise, consume the remnants of a bad url, create a <bad-url-token>,
-            // and return it.
-
-
-            offset = consumeBadUrlRemnants$1(source, offset);
-            type = TYPE$2.BadUrl;
-            return;
-          // U+0022 QUOTATION MARK (")
-          // U+0027 APOSTROPHE (')
-          // U+0028 LEFT PARENTHESIS (()
-          // non-printable code point
-
-          case 0x0022:
-          case 0x0027:
-          case 0x0028:
-          case charCodeCategory$1.NonPrintable:
-            // This is a parse error. Consume the remnants of a bad url,
-            // create a <bad-url-token>, and return it.
-            offset = consumeBadUrlRemnants$1(source, offset);
-            type = TYPE$2.BadUrl;
-            return;
-          // U+005C REVERSE SOLIDUS (\)
-
-          case 0x005C:
-            // If the stream starts with a valid escape, consume an escaped code point and
-            // append the returned code point to the <url-token>’s value.
-            if (isValidEscape$2(code, getCharCode(offset + 1))) {
-              offset = consumeEscaped$1(source, offset) - 1;
-              break;
-            } // Otherwise, this is a parse error. Consume the remnants of a bad url,
-            // create a <bad-url-token>, and return it.
-
-
-            offset = consumeBadUrlRemnants$1(source, offset);
-            type = TYPE$2.BadUrl;
-            return;
-          // anything else
-          // Append the current input code point to the <url-token>’s value.
-        }
-      }
-    }
-
-    if (!stream) {
-      stream = new TokenStream_1();
-    } // ensure source is a string
-
-
-    source = String(source || '');
-    var sourceLength = source.length;
-    var offsetAndType = adoptBuffer(stream.offsetAndType, sourceLength + 1); // +1 because of eof-token
-
-    var balance = adoptBuffer(stream.balance, sourceLength + 1);
-    var tokenCount = 0;
-    var start = isBOM$1(getCharCode(0));
-    var offset = start;
-    var balanceCloseType = 0;
-    var balanceStart = 0;
-    var balancePrev = 0; // https://drafts.csswg.org/css-syntax-3/#consume-token
-    // § 4.3.1. Consume a token
-
-    while (offset < sourceLength) {
-      var code = source.charCodeAt(offset);
-      var type = 0;
-      balance[tokenCount] = sourceLength;
-
-      switch (charCodeCategory$1(code)) {
-        // whitespace
-        case charCodeCategory$1.WhiteSpace:
-          // Consume as much whitespace as possible. Return a <whitespace-token>.
-          type = TYPE$2.WhiteSpace;
-          offset = findWhiteSpaceEnd$1(source, offset + 1);
-          break;
-        // U+0022 QUOTATION MARK (")
-
-        case 0x0022:
-          // Consume a string token and return it.
-          consumeStringToken();
-          break;
-        // U+0023 NUMBER SIGN (#)
-
-        case 0x0023:
-          // If the next input code point is a name code point or the next two input code points are a valid escape, then:
-          if (isName$2(getCharCode(offset + 1)) || isValidEscape$2(getCharCode(offset + 1), getCharCode(offset + 2))) {
-            // Create a <hash-token>.
-            type = TYPE$2.Hash; // If the next 3 input code points would start an identifier, set the <hash-token>’s type flag to "id".
-            // if (isIdentifierStart(getCharCode(offset + 1), getCharCode(offset + 2), getCharCode(offset + 3))) {
-            //     // TODO: set id flag
-            // }
-            // Consume a name, and set the <hash-token>’s value to the returned string.
-
-            offset = consumeName$1(source, offset + 1); // Return the <hash-token>.
-          } else {
-            // Otherwise, return a <delim-token> with its value set to the current input code point.
-            type = TYPE$2.Delim;
-            offset++;
-          }
-
-          break;
-        // U+0027 APOSTROPHE (')
-
-        case 0x0027:
-          // Consume a string token and return it.
-          consumeStringToken();
-          break;
-        // U+0028 LEFT PARENTHESIS (()
-
-        case 0x0028:
-          // Return a <(-token>.
-          type = TYPE$2.LeftParenthesis;
-          offset++;
-          break;
-        // U+0029 RIGHT PARENTHESIS ())
-
-        case 0x0029:
-          // Return a <)-token>.
-          type = TYPE$2.RightParenthesis;
-          offset++;
-          break;
-        // U+002B PLUS SIGN (+)
-
-        case 0x002B:
-          // If the input stream starts with a number, ...
-          if (isNumberStart$1(code, getCharCode(offset + 1), getCharCode(offset + 2))) {
-            // ... reconsume the current input code point, consume a numeric token, and return it.
-            consumeNumericToken();
-          } else {
-            // Otherwise, return a <delim-token> with its value set to the current input code point.
-            type = TYPE$2.Delim;
-            offset++;
-          }
-
-          break;
-        // U+002C COMMA (,)
-
-        case 0x002C:
-          // Return a <comma-token>.
-          type = TYPE$2.Comma;
-          offset++;
-          break;
-        // U+002D HYPHEN-MINUS (-)
-
-        case 0x002D:
-          // If the input stream starts with a number, reconsume the current input code point, consume a numeric token, and return it.
-          if (isNumberStart$1(code, getCharCode(offset + 1), getCharCode(offset + 2))) {
-            consumeNumericToken();
-          } else {
-            // Otherwise, if the next 2 input code points are U+002D HYPHEN-MINUS U+003E GREATER-THAN SIGN (->), consume them and return a <CDC-token>.
-            if (getCharCode(offset + 1) === 0x002D && getCharCode(offset + 2) === 0x003E) {
-              type = TYPE$2.CDC;
-              offset = offset + 3;
-            } else {
-              // Otherwise, if the input stream starts with an identifier, ...
-              if (isIdentifierStart$1(code, getCharCode(offset + 1), getCharCode(offset + 2))) {
-                // ... reconsume the current input code point, consume an ident-like token, and return it.
-                consumeIdentLikeToken();
-              } else {
-                // Otherwise, return a <delim-token> with its value set to the current input code point.
-                type = TYPE$2.Delim;
-                offset++;
-              }
-            }
-          }
-
-          break;
-        // U+002E FULL STOP (.)
-
-        case 0x002E:
-          // If the input stream starts with a number, ...
-          if (isNumberStart$1(code, getCharCode(offset + 1), getCharCode(offset + 2))) {
-            // ... reconsume the current input code point, consume a numeric token, and return it.
-            consumeNumericToken();
-          } else {
-            // Otherwise, return a <delim-token> with its value set to the current input code point.
-            type = TYPE$2.Delim;
-            offset++;
-          }
-
-          break;
-        // U+002F SOLIDUS (/)
-
-        case 0x002F:
-          // If the next two input code point are U+002F SOLIDUS (/) followed by a U+002A ASTERISK (*),
-          if (getCharCode(offset + 1) === 0x002A) {
-            // ... consume them and all following code points up to and including the first U+002A ASTERISK (*)
-            // followed by a U+002F SOLIDUS (/), or up to an EOF code point.
-            type = TYPE$2.Comment;
-            offset = source.indexOf('*/', offset + 2) + 2;
-
-            if (offset === 1) {
-              offset = source.length;
-            }
-          } else {
-            type = TYPE$2.Delim;
-            offset++;
-          }
-
-          break;
-        // U+003A COLON (:)
-
-        case 0x003A:
-          // Return a <colon-token>.
-          type = TYPE$2.Colon;
-          offset++;
-          break;
-        // U+003B SEMICOLON (;)
-
-        case 0x003B:
-          // Return a <semicolon-token>.
-          type = TYPE$2.Semicolon;
-          offset++;
-          break;
-        // U+003C LESS-THAN SIGN (<)
-
-        case 0x003C:
-          // If the next 3 input code points are U+0021 EXCLAMATION MARK U+002D HYPHEN-MINUS U+002D HYPHEN-MINUS (!--), ...
-          if (getCharCode(offset + 1) === 0x0021 && getCharCode(offset + 2) === 0x002D && getCharCode(offset + 3) === 0x002D) {
-            // ... consume them and return a <CDO-token>.
-            type = TYPE$2.CDO;
-            offset = offset + 4;
-          } else {
-            // Otherwise, return a <delim-token> with its value set to the current input code point.
-            type = TYPE$2.Delim;
-            offset++;
-          }
-
-          break;
-        // U+0040 COMMERCIAL AT (@)
-
-        case 0x0040:
-          // If the next 3 input code points would start an identifier, ...
-          if (isIdentifierStart$1(getCharCode(offset + 1), getCharCode(offset + 2), getCharCode(offset + 3))) {
-            // ... consume a name, create an <at-keyword-token> with its value set to the returned value, and return it.
-            type = TYPE$2.AtKeyword;
-            offset = consumeName$1(source, offset + 1);
-          } else {
-            // Otherwise, return a <delim-token> with its value set to the current input code point.
-            type = TYPE$2.Delim;
-            offset++;
-          }
-
-          break;
-        // U+005B LEFT SQUARE BRACKET ([)
-
-        case 0x005B:
-          // Return a <[-token>.
-          type = TYPE$2.LeftSquareBracket;
-          offset++;
-          break;
-        // U+005C REVERSE SOLIDUS (\)
-
-        case 0x005C:
-          // If the input stream starts with a valid escape, ...
-          if (isValidEscape$2(code, getCharCode(offset + 1))) {
-            // ... reconsume the current input code point, consume an ident-like token, and return it.
-            consumeIdentLikeToken();
-          } else {
-            // Otherwise, this is a parse error. Return a <delim-token> with its value set to the current input code point.
-            type = TYPE$2.Delim;
-            offset++;
-          }
-
-          break;
-        // U+005D RIGHT SQUARE BRACKET (])
-
-        case 0x005D:
-          // Return a <]-token>.
-          type = TYPE$2.RightSquareBracket;
-          offset++;
-          break;
-        // U+007B LEFT CURLY BRACKET ({)
-
-        case 0x007B:
-          // Return a <{-token>.
-          type = TYPE$2.LeftCurlyBracket;
-          offset++;
-          break;
-        // U+007D RIGHT CURLY BRACKET (})
-
-        case 0x007D:
-          // Return a <}-token>.
-          type = TYPE$2.RightCurlyBracket;
-          offset++;
-          break;
-        // digit
-
-        case charCodeCategory$1.Digit:
-          // Reconsume the current input code point, consume a numeric token, and return it.
-          consumeNumericToken();
-          break;
-        // name-start code point
-
-        case charCodeCategory$1.NameStart:
-          // Reconsume the current input code point, consume an ident-like token, and return it.
-          consumeIdentLikeToken();
-          break;
-        // EOF
-
-        case charCodeCategory$1.Eof:
-          // Return an <EOF-token>.
-          break;
-        // anything else
-
-        default:
-          // Return a <delim-token> with its value set to the current input code point.
-          type = TYPE$2.Delim;
-          offset++;
-      }
-
-      switch (type) {
-        case balanceCloseType:
-          balancePrev = balanceStart & OFFSET_MASK$1;
-          balanceStart = balance[balancePrev];
-          balanceCloseType = balanceStart >> TYPE_SHIFT$1;
-          balance[tokenCount] = balancePrev;
-          balance[balancePrev++] = tokenCount;
-
-          for (; balancePrev < tokenCount; balancePrev++) {
-            if (balance[balancePrev] === sourceLength) {
-              balance[balancePrev] = tokenCount;
-            }
-          }
-
-          break;
-
-        case TYPE$2.LeftParenthesis:
-        case TYPE$2.Function:
-          balance[tokenCount] = balanceStart;
-          balanceCloseType = TYPE$2.RightParenthesis;
-          balanceStart = balanceCloseType << TYPE_SHIFT$1 | tokenCount;
-          break;
-
-        case TYPE$2.LeftSquareBracket:
-          balance[tokenCount] = balanceStart;
-          balanceCloseType = TYPE$2.RightSquareBracket;
-          balanceStart = balanceCloseType << TYPE_SHIFT$1 | tokenCount;
-          break;
-
-        case TYPE$2.LeftCurlyBracket:
-          balance[tokenCount] = balanceStart;
-          balanceCloseType = TYPE$2.RightCurlyBracket;
-          balanceStart = balanceCloseType << TYPE_SHIFT$1 | tokenCount;
-          break;
-      }
-
-      offsetAndType[tokenCount++] = type << TYPE_SHIFT$1 | offset;
-    } // finalize buffers
-
-
-    offsetAndType[tokenCount] = TYPE$2.EOF << TYPE_SHIFT$1 | offset; // <EOF-token>
-
-    balance[tokenCount] = sourceLength;
-    balance[sourceLength] = sourceLength; // prevents false positive balance match with any token
-
-    while (balanceStart !== 0) {
-      balancePrev = balanceStart & OFFSET_MASK$1;
-      balanceStart = balance[balancePrev];
-      balance[balancePrev] = sourceLength;
-    } // update stream
-
-
-    stream.source = source;
-    stream.firstCharOffset = start;
-    stream.offsetAndType = offsetAndType;
-    stream.tokenCount = tokenCount;
-    stream.balance = balance;
-    stream.reset();
-    stream.next();
-    return stream;
-  } // extend tokenizer with constants
-
-
-  window.Object.keys(_const).forEach(function (key) {
-    tokenize[key] = _const[key];
-  }); // extend tokenizer with static methods from utils
-
-  window.Object.keys(charCodeDefinitions).forEach(function (key) {
-    tokenize[key] = charCodeDefinitions[key];
-  });
-  window.Object.keys(utils).forEach(function (key) {
-    tokenize[key] = utils[key];
-  });
-  var tokenizer = tokenize;
-
-  var isDigit$2 = tokenizer.isDigit;
-  var cmpChar$1 = tokenizer.cmpChar;
-  var TYPE$3 = tokenizer.TYPE;
-  var DELIM = TYPE$3.Delim;
-  var WHITESPACE$1 = TYPE$3.WhiteSpace;
-  var COMMENT$1 = TYPE$3.Comment;
-  var IDENT = TYPE$3.Ident;
-  var NUMBER = TYPE$3.Number;
-  var DIMENSION = TYPE$3.Dimension;
-  var PLUSSIGN = 0x002B; // U+002B PLUS SIGN (+)
-
-  var HYPHENMINUS$1 = 0x002D; // U+002D HYPHEN-MINUS (-)
-
-  var N = 0x006E; // U+006E LATIN SMALL LETTER N (n)
-
-  var DISALLOW_SIGN = true;
-  var ALLOW_SIGN = false;
-
-  function isDelim(token, code) {
-    return token !== null && token.type === DELIM && token.value.charCodeAt(0) === code;
-  }
-
-  function skipSC(token, offset, getNextToken) {
-    while (token !== null && (token.type === WHITESPACE$1 || token.type === COMMENT$1)) {
-      token = getNextToken(++offset);
-    }
-
-    return offset;
-  }
-
-  function checkInteger(token, valueOffset, disallowSign, offset) {
-    if (!token) {
-      return 0;
-    }
-
-    var code = token.value.charCodeAt(valueOffset);
-
-    if (code === PLUSSIGN || code === HYPHENMINUS$1) {
-      if (disallowSign) {
-        // Number sign is not allowed
-        return 0;
-      }
-
-      valueOffset++;
-    }
-
-    for (; valueOffset < token.value.length; valueOffset++) {
-      if (!isDigit$2(token.value.charCodeAt(valueOffset))) {
-        // Integer is expected
-        return 0;
-      }
-    }
-
-    return offset + 1;
-  } // ... <signed-integer>
-  // ... ['+' | '-'] <signless-integer>
-
-
-  function consumeB(token, offset_, getNextToken) {
-    var sign = false;
-    var offset = skipSC(token, offset_, getNextToken);
-    token = getNextToken(offset);
-
-    if (token === null) {
-      return offset_;
-    }
-
-    if (token.type !== NUMBER) {
-      if (isDelim(token, PLUSSIGN) || isDelim(token, HYPHENMINUS$1)) {
-        sign = true;
-        offset = skipSC(getNextToken(++offset), offset, getNextToken);
-        token = getNextToken(offset);
-
-        if (token === null && token.type !== NUMBER) {
-          return 0;
-        }
-      } else {
-        return offset_;
-      }
-    }
-
-    if (!sign) {
-      var code = token.value.charCodeAt(0);
-
-      if (code !== PLUSSIGN && code !== HYPHENMINUS$1) {
-        // Number sign is expected
-        return 0;
-      }
-    }
-
-    return checkInteger(token, sign ? 0 : 1, sign, offset);
-  } // An+B microsyntax https://www.w3.org/TR/css-syntax-3/#anb
-
-
-  var genericAnPlusB = function anPlusB(token, getNextToken) {
-    /* eslint-disable brace-style*/
-    var offset = 0;
-
-    if (!token) {
-      return 0;
-    } // <integer>
-
-
-    if (token.type === NUMBER) {
-      return checkInteger(token, 0, ALLOW_SIGN, offset); // b
-    } // -n
-    // -n <signed-integer>
-    // -n ['+' | '-'] <signless-integer>
-    // -n- <signless-integer>
-    // <dashndashdigit-ident>
-    else if (token.type === IDENT && token.value.charCodeAt(0) === HYPHENMINUS$1) {
-        // expect 1st char is N
-        if (!cmpChar$1(token.value, 1, N)) {
-          return 0;
-        }
-
-        switch (token.value.length) {
-          // -n
-          // -n <signed-integer>
-          // -n ['+' | '-'] <signless-integer>
-          case 2:
-            return consumeB(getNextToken(++offset), offset, getNextToken);
-          // -n- <signless-integer>
-
-          case 3:
-            if (token.value.charCodeAt(2) !== HYPHENMINUS$1) {
-              return 0;
-            }
-
-            offset = skipSC(getNextToken(++offset), offset, getNextToken);
-            token = getNextToken(offset);
-            return checkInteger(token, 0, DISALLOW_SIGN, offset);
-          // <dashndashdigit-ident>
-
-          default:
-            if (token.value.charCodeAt(2) !== HYPHENMINUS$1) {
-              return 0;
-            }
-
-            return checkInteger(token, 3, DISALLOW_SIGN, offset);
-        }
-      } // '+'? n
-      // '+'? n <signed-integer>
-      // '+'? n ['+' | '-'] <signless-integer>
-      // '+'? n- <signless-integer>
-      // '+'? <ndashdigit-ident>
-      else if (token.type === IDENT || isDelim(token, PLUSSIGN) && getNextToken(offset + 1).type === IDENT) {
-          // just ignore a plus
-          if (token.type !== IDENT) {
-            token = getNextToken(++offset);
-          }
-
-          if (token === null || !cmpChar$1(token.value, 0, N)) {
-            return 0;
-          }
-
-          switch (token.value.length) {
-            // '+'? n
-            // '+'? n <signed-integer>
-            // '+'? n ['+' | '-'] <signless-integer>
-            case 1:
-              return consumeB(getNextToken(++offset), offset, getNextToken);
-            // '+'? n- <signless-integer>
-
-            case 2:
-              if (token.value.charCodeAt(1) !== HYPHENMINUS$1) {
-                return 0;
-              }
-
-              offset = skipSC(getNextToken(++offset), offset, getNextToken);
-              token = getNextToken(offset);
-              return checkInteger(token, 0, DISALLOW_SIGN, offset);
-            // '+'? <ndashdigit-ident>
-
-            default:
-              if (token.value.charCodeAt(1) !== HYPHENMINUS$1) {
-                return 0;
-              }
-
-              return checkInteger(token, 2, DISALLOW_SIGN, offset);
-          }
-        } // <ndashdigit-dimension>
-        // <ndash-dimension> <signless-integer>
-        // <n-dimension>
-        // <n-dimension> <signed-integer>
-        // <n-dimension> ['+' | '-'] <signless-integer>
-        else if (token.type === DIMENSION) {
-            var code = token.value.charCodeAt(0);
-            var sign = code === PLUSSIGN || code === HYPHENMINUS$1 ? 1 : 0;
-
-            for (var i = sign; i < token.value.length; i++) {
-              if (!isDigit$2(token.value.charCodeAt(i))) {
-                break;
-              }
-            }
-
-            if (i === sign) {
-              // Integer is expected
-              return 0;
-            }
-
-            if (!cmpChar$1(token.value, i, N)) {
-              return 0;
-            } // <n-dimension>
-            // <n-dimension> <signed-integer>
-            // <n-dimension> ['+' | '-'] <signless-integer>
-
-
-            if (i + 1 === token.value.length) {
-              return consumeB(getNextToken(++offset), offset, getNextToken);
-            } else {
-              if (token.value.charCodeAt(i + 1) !== HYPHENMINUS$1) {
-                return 0;
-              } // <ndash-dimension> <signless-integer>
-
-
-              if (i + 2 === token.value.length) {
-                offset = skipSC(getNextToken(++offset), offset, getNextToken);
-                token = getNextToken(offset);
-                return checkInteger(token, 0, DISALLOW_SIGN, offset);
-              } // <ndashdigit-dimension>
-              else {
-                  return checkInteger(token, i + 2, DISALLOW_SIGN, offset);
-                }
-            }
-          }
-
-    return 0;
-  };
-
-  var isHexDigit$2 = tokenizer.isHexDigit;
-  var cmpChar$2 = tokenizer.cmpChar;
-  var TYPE$4 = tokenizer.TYPE;
-  var IDENT$1 = TYPE$4.Ident;
-  var DELIM$1 = TYPE$4.Delim;
-  var NUMBER$1 = TYPE$4.Number;
-  var DIMENSION$1 = TYPE$4.Dimension;
-  var PLUSSIGN$1 = 0x002B; // U+002B PLUS SIGN (+)
-
-  var HYPHENMINUS$2 = 0x002D; // U+002D HYPHEN-MINUS (-)
-
-  var QUESTIONMARK = 0x003F; // U+003F QUESTION MARK (?)
-
-  var U = 0x0075; // U+0075 LATIN SMALL LETTER U (u)
-
-  function isDelim$1(token, code) {
-    return token !== null && token.type === DELIM$1 && token.value.charCodeAt(0) === code;
-  }
-
-  function startsWith(token, code) {
-    return token.value.charCodeAt(0) === code;
-  }
-
-  function hexSequence(token, offset, allowDash) {
-    for (var pos = offset, hexlen = 0; pos < token.value.length; pos++) {
-      var code = token.value.charCodeAt(pos);
-
-      if (code === HYPHENMINUS$2 && allowDash && hexlen !== 0) {
-        if (hexSequence(token, offset + hexlen + 1, false) > 0) {
-          return 6; // dissallow following question marks
-        }
-
-        return 0; // dash at the ending of a hex sequence is not allowed
-      }
-
-      if (!isHexDigit$2(code)) {
-        return 0; // not a hex digit
-      }
-
-      if (++hexlen > 6) {
-        return 0; // too many hex digits
-      }
-    }
-
-    return hexlen;
-  }
-
-  function withQuestionMarkSequence(consumed, length, getNextToken) {
-    if (!consumed) {
-      return 0; // nothing consumed
-    }
-
-    while (isDelim$1(getNextToken(length), QUESTIONMARK)) {
-      if (++consumed > 6) {
-        return 0; // too many question marks
-      }
-
-      length++;
-    }
-
-    return length;
-  } // https://drafts.csswg.org/css-syntax/#urange
-  // Informally, the <urange> production has three forms:
-  // U+0001
-  //      Defines a range consisting of a single code point, in this case the code point "1".
-  // U+0001-00ff
-  //      Defines a range of codepoints between the first and the second value, in this case
-  //      the range between "1" and "ff" (255 in decimal) inclusive.
-  // U+00??
-  //      Defines a range of codepoints where the "?" characters range over all hex digits,
-  //      in this case defining the same as the value U+0000-00ff.
-  // In each form, a maximum of 6 digits is allowed for each hexadecimal number (if you treat "?" as a hexadecimal digit).
-  //
-  // <urange> =
-  //   u '+' <ident-token> '?'* |
-  //   u <dimension-token> '?'* |
-  //   u <number-token> '?'* |
-  //   u <number-token> <dimension-token> |
-  //   u <number-token> <number-token> |
-  //   u '+' '?'+
-
-
-  var genericUrange = function urange(token, getNextToken) {
-    var length = 0; // should start with `u` or `U`
-
-    if (token === null || token.type !== IDENT$1 || !cmpChar$2(token.value, 0, U)) {
-      return 0;
-    }
-
-    token = getNextToken(++length);
-
-    if (token === null) {
-      return 0;
-    } // u '+' <ident-token> '?'*
-    // u '+' '?'+
-
-
-    if (isDelim$1(token, PLUSSIGN$1)) {
-      token = getNextToken(++length);
-
-      if (token === null) {
-        return 0;
-      }
-
-      if (token.type === IDENT$1) {
-        // u '+' <ident-token> '?'*
-        return withQuestionMarkSequence(hexSequence(token, 0, true), ++length, getNextToken);
-      }
-
-      if (isDelim$1(token, QUESTIONMARK)) {
-        // u '+' '?'+
-        return withQuestionMarkSequence(1, ++length, getNextToken);
-      } // Hex digit or question mark is expected
-
-
-      return 0;
-    } // u <number-token> '?'*
-    // u <number-token> <dimension-token>
-    // u <number-token> <number-token>
-
-
-    if (token.type === NUMBER$1) {
-      if (!startsWith(token, PLUSSIGN$1)) {
-        return 0;
-      }
-
-      var consumedHexLength = hexSequence(token, 1, true);
-
-      if (consumedHexLength === 0) {
-        return 0;
-      }
-
-      token = getNextToken(++length);
-
-      if (token === null) {
-        // u <number-token> <eof>
-        return length;
-      }
-
-      if (token.type === DIMENSION$1 || token.type === NUMBER$1) {
-        // u <number-token> <dimension-token>
-        // u <number-token> <number-token>
-        if (!startsWith(token, HYPHENMINUS$2) || !hexSequence(token, 1, false)) {
-          return 0;
-        }
-
-        return length + 1;
-      } // u <number-token> '?'*
-
-
-      return withQuestionMarkSequence(consumedHexLength, length, getNextToken);
-    } // u <dimension-token> '?'*
-
-
-    if (token.type === DIMENSION$1) {
-      if (!startsWith(token, PLUSSIGN$1)) {
-        return 0;
-      }
-
-      return withQuestionMarkSequence(hexSequence(token, 1, true), ++length, getNextToken);
-    }
-
-    return 0;
-  };
-
-  var isIdentifierStart$2 = tokenizer.isIdentifierStart;
-  var isHexDigit$3 = tokenizer.isHexDigit;
-  var isDigit$3 = tokenizer.isDigit;
-  var cmpStr$3 = tokenizer.cmpStr;
-  var consumeNumber$2 = tokenizer.consumeNumber;
-  var TYPE$5 = tokenizer.TYPE;
-  var cssWideKeywords = ['unset', 'initial', 'inherit'];
-  var calcFunctionNames = ['calc(', '-moz-calc(', '-webkit-calc(']; // https://www.w3.org/TR/css-values-3/#lengths
-
-  var LENGTH = {
-    // absolute length units
-    'px': true,
-    'mm': true,
-    'cm': true,
-    'in': true,
-    'pt': true,
-    'pc': true,
-    'q': true,
-    // relative length units
-    'em': true,
-    'ex': true,
-    'ch': true,
-    'rem': true,
-    // viewport-percentage lengths
-    'vh': true,
-    'vw': true,
-    'vmin': true,
-    'vmax': true,
-    'vm': true
-  };
-  var ANGLE = {
-    'deg': true,
-    'grad': true,
-    'rad': true,
-    'turn': true
-  };
-  var TIME = {
-    's': true,
-    'ms': true
-  };
-  var FREQUENCY = {
-    'hz': true,
-    'khz': true
-  }; // https://www.w3.org/TR/css-values-3/#resolution (https://drafts.csswg.org/css-values/#resolution)
-
-  var RESOLUTION = {
-    'dpi': true,
-    'dpcm': true,
-    'dppx': true,
-    'x': true // https://github.com/w3c/csswg-drafts/issues/461
-
-  }; // https://drafts.csswg.org/css-grid/#fr-unit
-
-  var FLEX = {
-    'fr': true
-  }; // https://www.w3.org/TR/css3-speech/#mixing-props-voice-volume
-
-  var DECIBEL = {
-    'db': true
-  }; // https://www.w3.org/TR/css3-speech/#voice-props-voice-pitch
-
-  var SEMITONES = {
-    'st': true
-  }; // safe char code getter
-
-  function charCode(str, index) {
-    return index < str.length ? str.charCodeAt(index) : 0;
-  }
-
-  function eqStr(actual, expected) {
-    return cmpStr$3(actual, 0, actual.length, expected);
-  }
-
-  function eqStrAny(actual, expected) {
-    for (var i = 0; i < expected.length; i++) {
-      if (eqStr(actual, expected[i])) {
-        return true;
-      }
-    }
-
-    return false;
-  } // IE postfix hack, i.e. 123\0 or 123px\9
-
-
-  function isPostfixIeHack(str, offset) {
-    if (offset !== str.length - 2) {
-      return false;
-    }
-
-    return str.charCodeAt(offset) === 0x005C && // U+005C REVERSE SOLIDUS (\)
-    isDigit$3(str.charCodeAt(offset + 1));
-  }
-
-  function outOfRange(opts, value, numEnd) {
-    if (opts && opts.type === 'Range') {
-      var num = Number(numEnd !== undefined && numEnd !== value.length ? value.substr(0, numEnd) : value);
-
-      if (isNaN(num)) {
-        return true;
-      }
-
-      if (opts.min !== null && num < opts.min) {
-        return true;
-      }
-
-      if (opts.max !== null && num > opts.max) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  function consumeFunction(token, getNextToken) {
-    var startIdx = token.index;
-    var length = 0; // balanced token consuming
-
-    do {
-      length++;
-
-      if (token.balance <= startIdx) {
-        break;
-      }
-    } while (token = getNextToken(length));
-
-    return length;
-  } // TODO: implement
-  // can be used wherever <length>, <frequency>, <angle>, <time>, <percentage>, <number>, or <integer> values are allowed
-  // https://drafts.csswg.org/css-values/#calc-notation
-
-
-  function calc(next) {
-    return function (token, getNextToken, opts) {
-      if (token === null) {
-        return 0;
-      }
-
-      if (token.type === TYPE$5.Function && eqStrAny(token.value, calcFunctionNames)) {
-        return consumeFunction(token, getNextToken);
-      }
-
-      return next(token, getNextToken, opts);
-    };
-  }
-
-  function tokenType(expectedTokenType) {
-    return function (token) {
-      if (token === null || token.type !== expectedTokenType) {
-        return 0;
-      }
-
-      return 1;
-    };
-  }
-
-  function func(name) {
-    name = name + '(';
-    return function (token, getNextToken) {
-      if (token !== null && eqStr(token.value, name)) {
-        return consumeFunction(token, getNextToken);
-      }
-
-      return 0;
-    };
-  } // =========================
-  // Complex types
-  //
-  // https://drafts.csswg.org/css-values-4/#custom-idents
-  // 4.2. Author-defined Identifiers: the <custom-ident> type
-  // Some properties accept arbitrary author-defined identifiers as a component value.
-  // This generic data type is denoted by <custom-ident>, and represents any valid CSS identifier
-  // that would not be misinterpreted as a pre-defined keyword in that property’s value definition.
-  //
-  // See also: https://developer.mozilla.org/en-US/docs/Web/CSS/custom-ident
-
-
-  function customIdent(token) {
-    if (token === null || token.type !== TYPE$5.Ident) {
-      return 0;
-    }
-
-    var name = token.value.toLowerCase(); // The CSS-wide keywords are not valid <custom-ident>s
-
-    if (eqStrAny(name, cssWideKeywords)) {
-      return 0;
-    } // The default keyword is reserved and is also not a valid <custom-ident>
-
-
-    if (eqStr(name, 'default')) {
-      return 0;
-    } // TODO: ignore property specific keywords (as described https://developer.mozilla.org/en-US/docs/Web/CSS/custom-ident)
-    // Specifications using <custom-ident> must specify clearly what other keywords
-    // are excluded from <custom-ident>, if any—for example by saying that any pre-defined keywords
-    // in that property’s value definition are excluded. Excluded keywords are excluded
-    // in all ASCII case permutations.
-
-
-    return 1;
-  } // https://drafts.csswg.org/css-variables/#typedef-custom-property-name
-  // A custom property is any property whose name starts with two dashes (U+002D HYPHEN-MINUS), like --foo.
-  // The <custom-property-name> production corresponds to this: it’s defined as any valid identifier
-  // that starts with two dashes, except -- itself, which is reserved for future use by CSS.
-  // NOTE: Current implementation treat `--` as a valid name since most (all?) major browsers treat it as valid.
-
-
-  function customPropertyName(token) {
-    // ... defined as any valid identifier
-    if (token === null || token.type !== TYPE$5.Ident) {
-      return 0;
-    } // ... that starts with two dashes (U+002D HYPHEN-MINUS)
-
-
-    if (charCode(token.value, 0) !== 0x002D || charCode(token.value, 1) !== 0x002D) {
-      return 0;
-    }
-
-    return 1;
-  } // https://drafts.csswg.org/css-color-4/#hex-notation
-  // The syntax of a <hex-color> is a <hash-token> token whose value consists of 3, 4, 6, or 8 hexadecimal digits.
-  // In other words, a hex color is written as a hash character, "#", followed by some number of digits 0-9 or
-  // letters a-f (the case of the letters doesn’t matter - #00ff00 is identical to #00FF00).
-
-
-  function hexColor(token) {
-    if (token === null || token.type !== TYPE$5.Hash) {
-      return 0;
-    }
-
-    var length = token.value.length; // valid values (length): #rgb (4), #rgba (5), #rrggbb (7), #rrggbbaa (9)
-
-    if (length !== 4 && length !== 5 && length !== 7 && length !== 9) {
-      return 0;
-    }
-
-    for (var i = 1; i < length; i++) {
-      if (!isHexDigit$3(token.value.charCodeAt(i))) {
-        return 0;
-      }
-    }
-
-    return 1;
-  }
-
-  function idSelector(token) {
-    if (token === null || token.type !== TYPE$5.Hash) {
-      return 0;
-    }
-
-    if (!isIdentifierStart$2(charCode(token.value, 1), charCode(token.value, 2), charCode(token.value, 3))) {
-      return 0;
-    }
-
-    return 1;
-  } // https://drafts.csswg.org/css-syntax/#any-value
-  // It represents the entirety of what a valid declaration can have as its value.
-
-
-  function declarationValue(token, getNextToken) {
-    if (!token) {
-      return 0;
-    }
-
-    var length = 0;
-    var level = 0;
-    var startIdx = token.index; // The <declaration-value> production matches any sequence of one or more tokens,
-    // so long as the sequence ...
-
-    scan: do {
-      switch (token.type) {
-        // ... does not contain <bad-string-token>, <bad-url-token>,
-        case TYPE$5.BadString:
-        case TYPE$5.BadUrl:
-          break scan;
-        // ... unmatched <)-token>, <]-token>, or <}-token>,
-
-        case TYPE$5.RightCurlyBracket:
-        case TYPE$5.RightParenthesis:
-        case TYPE$5.RightSquareBracket:
-          if (token.balance > token.index || token.balance < startIdx) {
-            break scan;
-          }
-
-          level--;
-          break;
-        // ... or top-level <semicolon-token> tokens
-
-        case TYPE$5.Semicolon:
-          if (level === 0) {
-            break scan;
-          }
-
-          break;
-        // ... or <delim-token> tokens with a value of "!"
-
-        case TYPE$5.Delim:
-          if (token.value === '!' && level === 0) {
-            break scan;
-          }
-
-          break;
-
-        case TYPE$5.Function:
-        case TYPE$5.LeftParenthesis:
-        case TYPE$5.LeftSquareBracket:
-        case TYPE$5.LeftCurlyBracket:
-          level++;
-          break;
-      }
-
-      length++; // until balance closing
-
-      if (token.balance <= startIdx) {
-        break;
-      }
-    } while (token = getNextToken(length));
-
-    return length;
-  } // https://drafts.csswg.org/css-syntax/#any-value
-  // The <any-value> production is identical to <declaration-value>, but also
-  // allows top-level <semicolon-token> tokens and <delim-token> tokens
-  // with a value of "!". It represents the entirety of what valid CSS can be in any context.
-
-
-  function anyValue(token, getNextToken) {
-    if (!token) {
-      return 0;
-    }
-
-    var startIdx = token.index;
-    var length = 0; // The <any-value> production matches any sequence of one or more tokens,
-    // so long as the sequence ...
-
-    scan: do {
-      switch (token.type) {
-        // ... does not contain <bad-string-token>, <bad-url-token>,
-        case TYPE$5.BadString:
-        case TYPE$5.BadUrl:
-          break scan;
-        // ... unmatched <)-token>, <]-token>, or <}-token>,
-
-        case TYPE$5.RightCurlyBracket:
-        case TYPE$5.RightParenthesis:
-        case TYPE$5.RightSquareBracket:
-          if (token.balance > token.index || token.balance < startIdx) {
-            break scan;
-          }
-
-          break;
-      }
-
-      length++; // until balance closing
-
-      if (token.balance <= startIdx) {
-        break;
-      }
-    } while (token = getNextToken(length));
-
-    return length;
-  } // =========================
-  // Dimensions
-  //
-
-
-  function dimension(type) {
-    return function (token, getNextToken, opts) {
-      if (token === null || token.type !== TYPE$5.Dimension) {
-        return 0;
-      }
-
-      var numberEnd = consumeNumber$2(token.value, 0); // check unit
-
-      if (type !== null) {
-        // check for IE postfix hack, i.e. 123px\0 or 123px\9
-        var reverseSolidusOffset = token.value.indexOf('\\', numberEnd);
-        var unit = reverseSolidusOffset === -1 || !isPostfixIeHack(token.value, reverseSolidusOffset) ? token.value.substr(numberEnd) : token.value.substring(numberEnd, reverseSolidusOffset);
-
-        if (type.hasOwnProperty(unit.toLowerCase()) === false) {
-          return 0;
-        }
-      } // check range if specified
-
-
-      if (outOfRange(opts, token.value, numberEnd)) {
-        return 0;
-      }
-
-      return 1;
-    };
-  } // =========================
-  // Percentage
-  //
-  // §5.5. Percentages: the <percentage> type
-  // https://drafts.csswg.org/css-values-4/#percentages
-
-
-  function percentage(token, getNextToken, opts) {
-    // ... corresponds to the <percentage-token> production
-    if (token === null || token.type !== TYPE$5.Percentage) {
-      return 0;
-    } // check range if specified
-
-
-    if (outOfRange(opts, token.value, token.value.length - 1)) {
-      return 0;
-    }
-
-    return 1;
-  } // =========================
-  // Numeric
-  //
-  // https://drafts.csswg.org/css-values-4/#numbers
-  // The value <zero> represents a literal number with the value 0. Expressions that merely
-  // evaluate to a <number> with the value 0 (for example, calc(0)) do not match <zero>;
-  // only literal <number-token>s do.
-
-
-  function zero(next) {
-    if (typeof next !== 'function') {
-      next = function () {
-        return 0;
-      };
-    }
-
-    return function (token, getNextToken, opts) {
-      if (token !== null && token.type === TYPE$5.Number) {
-        if (Number(token.value) === 0) {
-          return 1;
-        }
-      }
-
-      return next(token, getNextToken, opts);
-    };
-  } // § 5.3. Real Numbers: the <number> type
-  // https://drafts.csswg.org/css-values-4/#numbers
-  // Number values are denoted by <number>, and represent real numbers, possibly with a fractional component.
-  // ... It corresponds to the <number-token> production
-
-
-  function number(token, getNextToken, opts) {
-    if (token === null) {
-      return 0;
-    }
-
-    var numberEnd = consumeNumber$2(token.value, 0);
-    var isNumber = numberEnd === token.value.length;
-
-    if (!isNumber && !isPostfixIeHack(token.value, numberEnd)) {
-      return 0;
-    } // check range if specified
-
-
-    if (outOfRange(opts, token.value, numberEnd)) {
-      return 0;
-    }
-
-    return 1;
-  } // §5.2. Integers: the <integer> type
-  // https://drafts.csswg.org/css-values-4/#integers
-
-
-  function integer(token, getNextToken, opts) {
-    // ... corresponds to a subset of the <number-token> production
-    if (token === null || token.type !== TYPE$5.Number) {
-      return 0;
-    } // The first digit of an integer may be immediately preceded by `-` or `+` to indicate the integer’s sign.
-
-
-    var i = token.value.charCodeAt(0) === 0x002B || // U+002B PLUS SIGN (+)
-    token.value.charCodeAt(0) === 0x002D ? 1 : 0; // U+002D HYPHEN-MINUS (-)
-    // When written literally, an integer is one or more decimal digits 0 through 9 ...
-
-    for (; i < token.value.length; i++) {
-      if (!isDigit$3(token.value.charCodeAt(i))) {
-        return 0;
-      }
-    } // check range if specified
-
-
-    if (outOfRange(opts, token.value, i)) {
-      return 0;
-    }
-
-    return 1;
-  }
-
-  var generic = {
-    // token types
-    'ident-token': tokenType(TYPE$5.Ident),
-    'function-token': tokenType(TYPE$5.Function),
-    'at-keyword-token': tokenType(TYPE$5.AtKeyword),
-    'hash-token': tokenType(TYPE$5.Hash),
-    'string-token': tokenType(TYPE$5.String),
-    'bad-string-token': tokenType(TYPE$5.BadString),
-    'url-token': tokenType(TYPE$5.Url),
-    'bad-url-token': tokenType(TYPE$5.BadUrl),
-    'delim-token': tokenType(TYPE$5.Delim),
-    'number-token': tokenType(TYPE$5.Number),
-    'percentage-token': tokenType(TYPE$5.Percentage),
-    'dimension-token': tokenType(TYPE$5.Dimension),
-    'whitespace-token': tokenType(TYPE$5.WhiteSpace),
-    'CDO-token': tokenType(TYPE$5.CDO),
-    'CDC-token': tokenType(TYPE$5.CDC),
-    'colon-token': tokenType(TYPE$5.Colon),
-    'semicolon-token': tokenType(TYPE$5.Semicolon),
-    'comma-token': tokenType(TYPE$5.Comma),
-    '[-token': tokenType(TYPE$5.LeftSquareBracket),
-    ']-token': tokenType(TYPE$5.RightSquareBracket),
-    '(-token': tokenType(TYPE$5.LeftParenthesis),
-    ')-token': tokenType(TYPE$5.RightParenthesis),
-    '{-token': tokenType(TYPE$5.LeftCurlyBracket),
-    '}-token': tokenType(TYPE$5.RightCurlyBracket),
-    // token type aliases
-    'string': tokenType(TYPE$5.String),
-    'ident': tokenType(TYPE$5.Ident),
-    // complex types
-    'custom-ident': customIdent,
-    'custom-property-name': customPropertyName,
-    'hex-color': hexColor,
-    'id-selector': idSelector,
-    // element( <id-selector> )
-    'an-plus-b': genericAnPlusB,
-    'urange': genericUrange,
-    'declaration-value': declarationValue,
-    'any-value': anyValue,
-    // dimensions
-    'dimension': calc(dimension(null)),
-    'angle': calc(dimension(ANGLE)),
-    'decibel': calc(dimension(DECIBEL)),
-    'frequency': calc(dimension(FREQUENCY)),
-    'flex': calc(dimension(FLEX)),
-    'length': calc(zero(dimension(LENGTH))),
-    'resolution': calc(dimension(RESOLUTION)),
-    'semitones': calc(dimension(SEMITONES)),
-    'time': calc(dimension(TIME)),
-    // percentage
-    'percentage': calc(percentage),
-    // numeric
-    'zero': zero(),
-    'number': calc(number),
-    'integer': calc(integer),
-    // old IE stuff
-    '-ms-legacy-expression': func('expression')
-  };
-
-  var _SyntaxError$1 = function SyntaxError(message, input, offset) {
-    var error = createCustomError('SyntaxError', message);
-    error.input = input;
-    error.offset = offset;
-    error.rawMessage = message;
-    error.message = error.rawMessage + '\n' + '  ' + error.input + '\n' + '--' + new window.Array((error.offset || error.input.length) + 1).join('-') + '^';
-    return error;
-  };
-
-  var TAB = 9;
-  var N$1 = 10;
-  var F = 12;
-  var R = 13;
-  var SPACE = 32;
-
-  var Tokenizer = function (str) {
-    this.str = str;
-    this.pos = 0;
-  };
-
-  Tokenizer.prototype = {
-    charCodeAt: function (pos) {
-      return pos < this.str.length ? this.str.charCodeAt(pos) : 0;
-    },
-    charCode: function () {
-      return this.charCodeAt(this.pos);
-    },
-    nextCharCode: function () {
-      return this.charCodeAt(this.pos + 1);
-    },
-    nextNonWsCode: function (pos) {
-      return this.charCodeAt(this.findWsEnd(pos));
-    },
-    findWsEnd: function (pos) {
-      for (; pos < this.str.length; pos++) {
-        var code = this.str.charCodeAt(pos);
-
-        if (code !== R && code !== N$1 && code !== F && code !== SPACE && code !== TAB) {
-          break;
-        }
-      }
-
-      return pos;
-    },
-    substringToPos: function (end) {
-      return this.str.substring(this.pos, this.pos = end);
-    },
-    eat: function (code) {
-      if (this.charCode() !== code) {
-        this.error('Expect `' + String.fromCharCode(code) + '`');
-      }
-
-      this.pos++;
-    },
-    peek: function () {
-      return this.pos < this.str.length ? this.str.charAt(this.pos++) : '';
-    },
-    error: function (message) {
-      throw new _SyntaxError$1(message, this.str, this.pos);
-    }
-  };
-  var tokenizer$1 = Tokenizer;
-
-  var TAB$1 = 9;
-  var N$2 = 10;
-  var F$1 = 12;
-  var R$1 = 13;
-  var SPACE$1 = 32;
-  var EXCLAMATIONMARK = 33; // !
-
-  var NUMBERSIGN = 35; // #
-
-  var AMPERSAND = 38; // &
-
-  var APOSTROPHE = 39; // '
-
-  var LEFTPARENTHESIS = 40; // (
-
-  var RIGHTPARENTHESIS = 41; // )
-
-  var ASTERISK = 42; // *
-
-  var PLUSSIGN$2 = 43; // +
-
-  var COMMA = 44; // ,
-
-  var HYPERMINUS = 45; // -
-
-  var LESSTHANSIGN = 60; // <
-
-  var GREATERTHANSIGN = 62; // >
-
-  var QUESTIONMARK$1 = 63; // ?
-
-  var COMMERCIALAT = 64; // @
-
-  var LEFTSQUAREBRACKET = 91; // [
-
-  var RIGHTSQUAREBRACKET = 93; // ]
-
-  var LEFTCURLYBRACKET = 123; // {
-
-  var VERTICALLINE = 124; // |
-
-  var RIGHTCURLYBRACKET = 125; // }
-
-  var INFINITY = 8734; // ∞
-
-  var NAME_CHAR = createCharMap(function (ch) {
-    return /[a-zA-Z0-9\-]/.test(ch);
-  });
-  var COMBINATOR_PRECEDENCE = {
-    ' ': 1,
-    '&&': 2,
-    '||': 3,
-    '|': 4
-  };
-
-  function createCharMap(fn) {
-    var array = typeof Uint32Array === 'function' ? new Uint32Array(128) : new window.Array(128);
-
-    for (var i = 0; i < 128; i++) {
-      array[i] = fn(String.fromCharCode(i)) ? 1 : 0;
-    }
-
-    return array;
-  }
-
-  function scanSpaces(tokenizer) {
-    return tokenizer.substringToPos(tokenizer.findWsEnd(tokenizer.pos));
-  }
-
-  function scanWord(tokenizer) {
-    var end = tokenizer.pos;
-
-    for (; end < tokenizer.str.length; end++) {
-      var code = tokenizer.str.charCodeAt(end);
-
-      if (code >= 128 || NAME_CHAR[code] === 0) {
-        break;
-      }
-    }
-
-    if (tokenizer.pos === end) {
-      tokenizer.error('Expect a keyword');
-    }
-
-    return tokenizer.substringToPos(end);
-  }
-
-  function scanNumber(tokenizer) {
-    var end = tokenizer.pos;
-
-    for (; end < tokenizer.str.length; end++) {
-      var code = tokenizer.str.charCodeAt(end);
-
-      if (code < 48 || code > 57) {
-        break;
-      }
-    }
-
-    if (tokenizer.pos === end) {
-      tokenizer.error('Expect a number');
-    }
-
-    return tokenizer.substringToPos(end);
-  }
-
-  function scanString(tokenizer) {
-    var end = tokenizer.str.indexOf('\'', tokenizer.pos + 1);
-
-    if (end === -1) {
-      tokenizer.pos = tokenizer.str.length;
-      tokenizer.error('Expect an apostrophe');
-    }
-
-    return tokenizer.substringToPos(end + 1);
-  }
-
-  function readMultiplierRange(tokenizer) {
-    var min = null;
-    var max = null;
-    tokenizer.eat(LEFTCURLYBRACKET);
-    min = scanNumber(tokenizer);
-
-    if (tokenizer.charCode() === COMMA) {
-      tokenizer.pos++;
-
-      if (tokenizer.charCode() !== RIGHTCURLYBRACKET) {
-        max = scanNumber(tokenizer);
-      }
-    } else {
-      max = min;
-    }
-
-    tokenizer.eat(RIGHTCURLYBRACKET);
-    return {
-      min: Number(min),
-      max: max ? Number(max) : 0
-    };
-  }
-
-  function readMultiplier(tokenizer) {
-    var range = null;
-    var comma = false;
-
-    switch (tokenizer.charCode()) {
-      case ASTERISK:
-        tokenizer.pos++;
-        range = {
-          min: 0,
-          max: 0
-        };
-        break;
-
-      case PLUSSIGN$2:
-        tokenizer.pos++;
-        range = {
-          min: 1,
-          max: 0
-        };
-        break;
-
-      case QUESTIONMARK$1:
-        tokenizer.pos++;
-        range = {
-          min: 0,
-          max: 1
-        };
-        break;
-
-      case NUMBERSIGN:
-        tokenizer.pos++;
-        comma = true;
-
-        if (tokenizer.charCode() === LEFTCURLYBRACKET) {
-          range = readMultiplierRange(tokenizer);
-        } else {
-          range = {
-            min: 1,
-            max: 0
-          };
-        }
-
-        break;
-
-      case LEFTCURLYBRACKET:
-        range = readMultiplierRange(tokenizer);
-        break;
-
-      default:
-        return null;
-    }
-
-    return {
-      type: 'Multiplier',
-      comma: comma,
-      min: range.min,
-      max: range.max,
-      term: null
-    };
-  }
-
-  function maybeMultiplied(tokenizer, node) {
-    var multiplier = readMultiplier(tokenizer);
-
-    if (multiplier !== null) {
-      multiplier.term = node;
-      return multiplier;
-    }
-
-    return node;
-  }
-
-  function maybeToken(tokenizer) {
-    var ch = tokenizer.peek();
-
-    if (ch === '') {
-      return null;
-    }
-
-    return {
-      type: 'Token',
-      value: ch
-    };
-  }
-
-  function readProperty(tokenizer) {
-    var name;
-    tokenizer.eat(LESSTHANSIGN);
-    tokenizer.eat(APOSTROPHE);
-    name = scanWord(tokenizer);
-    tokenizer.eat(APOSTROPHE);
-    tokenizer.eat(GREATERTHANSIGN);
-    return maybeMultiplied(tokenizer, {
-      type: 'Property',
-      name: name
-    });
-  } // https://drafts.csswg.org/css-values-3/#numeric-ranges
-  // 4.1. Range Restrictions and Range Definition Notation
-  //
-  // Range restrictions can be annotated in the numeric type notation using CSS bracketed
-  // range notation—[min,max]—within the angle brackets, after the identifying keyword,
-  // indicating a closed range between (and including) min and max.
-  // For example, <integer [0, 10]> indicates an integer between 0 and 10, inclusive.
-
-
-  function readTypeRange(tokenizer) {
-    // use null for Infinity to make AST format JSON serializable/deserializable
-    var min = null; // -Infinity
-
-    var max = null; // Infinity
-
-    var sign = 1;
-    tokenizer.eat(LEFTSQUAREBRACKET);
-
-    if (tokenizer.charCode() === HYPERMINUS) {
-      tokenizer.peek();
-      sign = -1;
-    }
-
-    if (sign == -1 && tokenizer.charCode() === INFINITY) {
-      tokenizer.peek();
-    } else {
-      min = sign * Number(scanNumber(tokenizer));
-    }
-
-    scanSpaces(tokenizer);
-    tokenizer.eat(COMMA);
-    scanSpaces(tokenizer);
-
-    if (tokenizer.charCode() === INFINITY) {
-      tokenizer.peek();
-    } else {
-      sign = 1;
-
-      if (tokenizer.charCode() === HYPERMINUS) {
-        tokenizer.peek();
-        sign = -1;
-      }
-
-      max = sign * Number(scanNumber(tokenizer));
-    }
-
-    tokenizer.eat(RIGHTSQUAREBRACKET); // If no range is indicated, either by using the bracketed range notation
-    // or in the property description, then [−∞,∞] is assumed.
-
-    if (min === null && max === null) {
-      return null;
-    }
-
-    return {
-      type: 'Range',
-      min: min,
-      max: max
-    };
-  }
-
-  function readType(tokenizer) {
-    var name;
-    var opts = null;
-    tokenizer.eat(LESSTHANSIGN);
-    name = scanWord(tokenizer);
-
-    if (tokenizer.charCode() === LEFTPARENTHESIS && tokenizer.nextCharCode() === RIGHTPARENTHESIS) {
-      tokenizer.pos += 2;
-      name += '()';
-    }
-
-    if (tokenizer.charCodeAt(tokenizer.findWsEnd(tokenizer.pos)) === LEFTSQUAREBRACKET) {
-      scanSpaces(tokenizer);
-      opts = readTypeRange(tokenizer);
-    }
-
-    tokenizer.eat(GREATERTHANSIGN);
-    return maybeMultiplied(tokenizer, {
-      type: 'Type',
-      name: name,
-      opts: opts
-    });
-  }
-
-  function readKeywordOrFunction(tokenizer) {
-    var name;
-    name = scanWord(tokenizer);
-
-    if (tokenizer.charCode() === LEFTPARENTHESIS) {
-      tokenizer.pos++;
-      return {
-        type: 'Function',
-        name: name
-      };
-    }
-
-    return maybeMultiplied(tokenizer, {
-      type: 'Keyword',
-      name: name
-    });
-  }
-
-  function regroupTerms(terms, combinators) {
-    function createGroup(terms, combinator) {
-      return {
-        type: 'Group',
-        terms: terms,
-        combinator: combinator,
-        disallowEmpty: false,
-        explicit: false
-      };
-    }
-
-    combinators = window.Object.keys(combinators).sort(function (a, b) {
-      return COMBINATOR_PRECEDENCE[a] - COMBINATOR_PRECEDENCE[b];
-    });
-
-    while (combinators.length > 0) {
-      var combinator = combinators.shift();
-
-      for (var i = 0, subgroupStart = 0; i < terms.length; i++) {
-        var term = terms[i];
-
-        if (term.type === 'Combinator') {
-          if (term.value === combinator) {
-            if (subgroupStart === -1) {
-              subgroupStart = i - 1;
-            }
-
-            terms.splice(i, 1);
-            i--;
-          } else {
-            if (subgroupStart !== -1 && i - subgroupStart > 1) {
-              terms.splice(subgroupStart, i - subgroupStart, createGroup(terms.slice(subgroupStart, i), combinator));
-              i = subgroupStart + 1;
-            }
-
-            subgroupStart = -1;
-          }
-        }
-      }
-
-      if (subgroupStart !== -1 && combinators.length) {
-        terms.splice(subgroupStart, i - subgroupStart, createGroup(terms.slice(subgroupStart, i), combinator));
-      }
-    }
-
-    return combinator;
-  }
-
-  function readImplicitGroup(tokenizer) {
-    var terms = [];
-    var combinators = {};
-    var token;
-    var prevToken = null;
-    var prevTokenPos = tokenizer.pos;
-
-    while (token = peek(tokenizer)) {
-      if (token.type !== 'Spaces') {
-        if (token.type === 'Combinator') {
-          // check for combinator in group beginning and double combinator sequence
-          if (prevToken === null || prevToken.type === 'Combinator') {
-            tokenizer.pos = prevTokenPos;
-            tokenizer.error('Unexpected combinator');
-          }
-
-          combinators[token.value] = true;
-        } else if (prevToken !== null && prevToken.type !== 'Combinator') {
-          combinators[' '] = true; // a b
-
-          terms.push({
-            type: 'Combinator',
-            value: ' '
-          });
-        }
-
-        terms.push(token);
-        prevToken = token;
-        prevTokenPos = tokenizer.pos;
-      }
-    } // check for combinator in group ending
-
-
-    if (prevToken !== null && prevToken.type === 'Combinator') {
-      tokenizer.pos -= prevTokenPos;
-      tokenizer.error('Unexpected combinator');
-    }
-
-    return {
-      type: 'Group',
-      terms: terms,
-      combinator: regroupTerms(terms, combinators) || ' ',
-      disallowEmpty: false,
-      explicit: false
-    };
-  }
-
-  function readGroup(tokenizer) {
-    var result;
-    tokenizer.eat(LEFTSQUAREBRACKET);
-    result = readImplicitGroup(tokenizer);
-    tokenizer.eat(RIGHTSQUAREBRACKET);
-    result.explicit = true;
-
-    if (tokenizer.charCode() === EXCLAMATIONMARK) {
-      tokenizer.pos++;
-      result.disallowEmpty = true;
-    }
-
-    return result;
-  }
-
-  function peek(tokenizer) {
-    var code = tokenizer.charCode();
-
-    if (code < 128 && NAME_CHAR[code] === 1) {
-      return readKeywordOrFunction(tokenizer);
-    }
-
-    switch (code) {
-      case RIGHTSQUAREBRACKET:
-        // don't eat, stop scan a group
-        break;
-
-      case LEFTSQUAREBRACKET:
-        return maybeMultiplied(tokenizer, readGroup(tokenizer));
-
-      case LESSTHANSIGN:
-        return tokenizer.nextCharCode() === APOSTROPHE ? readProperty(tokenizer) : readType(tokenizer);
-
-      case VERTICALLINE:
-        return {
-          type: 'Combinator',
-          value: tokenizer.substringToPos(tokenizer.nextCharCode() === VERTICALLINE ? tokenizer.pos + 2 : tokenizer.pos + 1)
-        };
-
-      case AMPERSAND:
-        tokenizer.pos++;
-        tokenizer.eat(AMPERSAND);
-        return {
-          type: 'Combinator',
-          value: '&&'
-        };
-
-      case COMMA:
-        tokenizer.pos++;
-        return {
-          type: 'Comma'
-        };
-
-      case APOSTROPHE:
-        return maybeMultiplied(tokenizer, {
-          type: 'String',
-          value: scanString(tokenizer)
-        });
-
-      case SPACE$1:
-      case TAB$1:
-      case N$2:
-      case R$1:
-      case F$1:
-        return {
-          type: 'Spaces',
-          value: scanSpaces(tokenizer)
-        };
-
-      case COMMERCIALAT:
-        code = tokenizer.nextCharCode();
-
-        if (code < 128 && NAME_CHAR[code] === 1) {
-          tokenizer.pos++;
-          return {
-            type: 'AtKeyword',
-            name: scanWord(tokenizer)
-          };
-        }
-
-        return maybeToken(tokenizer);
-
-      case ASTERISK:
-      case PLUSSIGN$2:
-      case QUESTIONMARK$1:
-      case NUMBERSIGN:
-      case EXCLAMATIONMARK:
-        // prohibited tokens (used as a multiplier start)
-        break;
-
-      case LEFTCURLYBRACKET:
-        // LEFTCURLYBRACKET is allowed since mdn/data uses it w/o quoting
-        // check next char isn't a number, because it's likely a disjoined multiplier
-        code = tokenizer.nextCharCode();
-
-        if (code < 48 || code > 57) {
-          return maybeToken(tokenizer);
-        }
-
-        break;
-
-      default:
-        return maybeToken(tokenizer);
-    }
-  }
-
-  function parse(source) {
-    var tokenizer = new tokenizer$1(source);
-    var result = readImplicitGroup(tokenizer);
-
-    if (tokenizer.pos !== source.length) {
-      tokenizer.error('Unexpected input');
-    } // reduce redundant groups with single group term
-
-
-    if (result.terms.length === 1 && result.terms[0].type === 'Group') {
-      result = result.terms[0];
-    }
-
-    return result;
-  } // warm up parse to elimitate code branches that never execute
-  // fix soft deoptimizations (insufficient type feedback)
-
-
-  parse('[a&&<b>#|<\'c\'>*||e() f{2} /,(% g#{1,2} h{2,})]!');
-  var parse_1 = parse;
-
-  var noop$1 = function () {};
-
-  function ensureFunction(value) {
-    return typeof value === 'function' ? value : noop$1;
-  }
-
-  var walk = function (node, options, context) {
-    function walk(node) {
-      enter.call(context, node);
-
-      switch (node.type) {
-        case 'Group':
-          node.terms.forEach(walk);
-          break;
-
-        case 'Multiplier':
-          walk(node.term);
-          break;
-
-        case 'Type':
-        case 'Property':
-        case 'Keyword':
-        case 'AtKeyword':
-        case 'Function':
-        case 'String':
-        case 'Token':
-        case 'Comma':
-          break;
-
-        default:
-          throw new Error('Unknown type: ' + node.type);
-      }
-
-      leave.call(context, node);
-    }
-
-    var enter = noop$1;
-    var leave = noop$1;
-
-    if (typeof options === 'function') {
-      enter = options;
-    } else if (options) {
-      enter = ensureFunction(options.enter);
-      leave = ensureFunction(options.leave);
-    }
-
-    if (enter === noop$1 && leave === noop$1) {
-      throw new Error('Neither `enter` nor `leave` walker handler is set or both aren\'t a function');
-    }
-
-    walk(node);
-  };
-
-  var tokenStream = new TokenStream_1();
-  var astToTokens = {
-    decorator: function (handlers) {
-      var curNode = null;
-      var prev = {
-        len: 0,
-        node: null
-      };
-      var nodes = [prev];
-      var buffer = '';
-      return {
-        children: handlers.children,
-        node: function (node) {
-          var tmp = curNode;
-          curNode = node;
-          handlers.node.call(this, node);
-          curNode = tmp;
-        },
-        chunk: function (chunk) {
-          buffer += chunk;
-
-          if (prev.node !== curNode) {
-            nodes.push({
-              len: chunk.length,
-              node: curNode
-            });
-          } else {
-            prev.len += chunk.length;
-          }
-        },
-        result: function () {
-          return prepareTokens(buffer, nodes);
-        }
-      };
-    }
-  };
-
-  function prepareTokens(str, nodes) {
-    var tokens = [];
-    var nodesOffset = 0;
-    var nodesIndex = 0;
-    var currentNode = nodes ? nodes[nodesIndex].node : null;
-    tokenizer(str, tokenStream);
-
-    while (!tokenStream.eof) {
-      if (nodes) {
-        while (nodesIndex < nodes.length && nodesOffset + nodes[nodesIndex].len <= tokenStream.tokenStart) {
-          nodesOffset += nodes[nodesIndex++].len;
-          currentNode = nodes[nodesIndex].node;
-        }
-      }
-
-      tokens.push({
-        type: tokenStream.tokenType,
-        value: tokenStream.getTokenValue(),
-        index: tokenStream.tokenIndex,
-        // TODO: remove it, temporary solution
-        balance: tokenStream.balance[tokenStream.tokenIndex],
-        // TODO: remove it, temporary solution
-        node: currentNode
-      });
-      tokenStream.next(); // console.log({ ...tokens[tokens.length - 1], node: undefined });
-    }
-
-    return tokens;
-  }
-
-  var prepareTokens_1 = function (value, syntax) {
-    if (typeof value === 'string') {
-      return prepareTokens(value, null);
-    }
-
-    return syntax.generate(value, astToTokens);
-  };
-
-  var MATCH = {
-    type: 'Match'
-  };
-  var MISMATCH = {
-    type: 'Mismatch'
-  };
-  var DISALLOW_EMPTY = {
-    type: 'DisallowEmpty'
-  };
-  var LEFTPARENTHESIS$1 = 40; // (
-
-  var RIGHTPARENTHESIS$1 = 41; // )
-
-  function createCondition(match, thenBranch, elseBranch) {
-    // reduce node count
-    if (thenBranch === MATCH && elseBranch === MISMATCH) {
-      return match;
-    }
-
-    if (match === MATCH && thenBranch === MATCH && elseBranch === MATCH) {
-      return match;
-    }
-
-    if (match.type === 'If' && match.else === MISMATCH && thenBranch === MATCH) {
-      thenBranch = match.then;
-      match = match.match;
-    }
-
-    return {
-      type: 'If',
-      match: match,
-      then: thenBranch,
-      else: elseBranch
-    };
-  }
-
-  function isFunctionType(name) {
-    return name.length > 2 && name.charCodeAt(name.length - 2) === LEFTPARENTHESIS$1 && name.charCodeAt(name.length - 1) === RIGHTPARENTHESIS$1;
-  }
-
-  function isEnumCapatible(term) {
-    return term.type === 'Keyword' || term.type === 'AtKeyword' || term.type === 'Function' || term.type === 'Type' && isFunctionType(term.name);
-  }
-
-  function buildGroupMatchGraph(combinator, terms, atLeastOneTermMatched) {
-    switch (combinator) {
-      case ' ':
-        // Juxtaposing components means that all of them must occur, in the given order.
-        //
-        // a b c
-        // =
-        // match a
-        //   then match b
-        //     then match c
-        //       then MATCH
-        //       else MISMATCH
-        //     else MISMATCH
-        //   else MISMATCH
-        var result = MATCH;
-
-        for (var i = terms.length - 1; i >= 0; i--) {
-          var term = terms[i];
-          result = createCondition(term, result, MISMATCH);
-        }
-        return result;
-
-      case '|':
-        // A bar (|) separates two or more alternatives: exactly one of them must occur.
-        //
-        // a | b | c
-        // =
-        // match a
-        //   then MATCH
-        //   else match b
-        //     then MATCH
-        //     else match c
-        //       then MATCH
-        //       else MISMATCH
-        var result = MISMATCH;
-        var map = null;
-
-        for (var i = terms.length - 1; i >= 0; i--) {
-          var term = terms[i]; // reduce sequence of keywords into a Enum
-
-          if (isEnumCapatible(term)) {
-            if (map === null && i > 0 && isEnumCapatible(terms[i - 1])) {
-              map = window.Object.create(null);
-              result = createCondition({
-                type: 'Enum',
-                map: map
-              }, MATCH, result);
-            }
-
-            if (map !== null) {
-              var key = (isFunctionType(term.name) ? term.name.slice(0, -1) : term.name).toLowerCase();
-
-              if (key in map === false) {
-                map[key] = term;
-                continue;
-              }
-            }
-          }
-
-          map = null; // create a new conditonal node
-
-          result = createCondition(term, MATCH, result);
-        }
-        return result;
-
-      case '&&':
-        // A double ampersand (&&) separates two or more components,
-        // all of which must occur, in any order.
-        // Use MatchOnce for groups with a large number of terms,
-        // since &&-groups produces at least N!-node trees
-        if (terms.length > 5) {
-          return {
-            type: 'MatchOnce',
-            terms: terms,
-            all: true
-          };
-        } // Use a combination tree for groups with small number of terms
-        //
-        // a && b && c
-        // =
-        // match a
-        //   then [b && c]
-        //   else match b
-        //     then [a && c]
-        //     else match c
-        //       then [a && b]
-        //       else MISMATCH
-        //
-        // a && b
-        // =
-        // match a
-        //   then match b
-        //     then MATCH
-        //     else MISMATCH
-        //   else match b
-        //     then match a
-        //       then MATCH
-        //       else MISMATCH
-        //     else MISMATCH
-
-
-        var result = MISMATCH;
-
-        for (var i = terms.length - 1; i >= 0; i--) {
-          var term = terms[i];
-          var thenClause;
-
-          if (terms.length > 1) {
-            thenClause = buildGroupMatchGraph(combinator, terms.filter(function (newGroupTerm) {
-              return newGroupTerm !== term;
-            }), false);
-          } else {
-            thenClause = MATCH;
-          }
-
-          result = createCondition(term, thenClause, result);
-        }
-        return result;
-
-      case '||':
-        // A double bar (||) separates two or more options:
-        // one or more of them must occur, in any order.
-        // Use MatchOnce for groups with a large number of terms,
-        // since ||-groups produces at least N!-node trees
-        if (terms.length > 5) {
-          return {
-            type: 'MatchOnce',
-            terms: terms,
-            all: false
-          };
-        } // Use a combination tree for groups with small number of terms
-        //
-        // a || b || c
-        // =
-        // match a
-        //   then [b || c]
-        //   else match b
-        //     then [a || c]
-        //     else match c
-        //       then [a || b]
-        //       else MISMATCH
-        //
-        // a || b
-        // =
-        // match a
-        //   then match b
-        //     then MATCH
-        //     else MATCH
-        //   else match b
-        //     then match a
-        //       then MATCH
-        //       else MATCH
-        //     else MISMATCH
-
-
-        var result = atLeastOneTermMatched ? MATCH : MISMATCH;
-
-        for (var i = terms.length - 1; i >= 0; i--) {
-          var term = terms[i];
-          var thenClause;
-
-          if (terms.length > 1) {
-            thenClause = buildGroupMatchGraph(combinator, terms.filter(function (newGroupTerm) {
-              return newGroupTerm !== term;
-            }), true);
-          } else {
-            thenClause = MATCH;
-          }
-
-          result = createCondition(term, thenClause, result);
-        }
-        return result;
-    }
-  }
-
-  function buildMultiplierMatchGraph(node) {
-    var result = MATCH;
-    var matchTerm = buildMatchGraph(node.term);
-
-    if (node.max === 0) {
-      // disable repeating of empty match to prevent infinite loop
-      matchTerm = createCondition(matchTerm, DISALLOW_EMPTY, MISMATCH); // an occurrence count is not limited, make a cycle;
-      // to collect more terms on each following matching mismatch
-
-      result = createCondition(matchTerm, null, // will be a loop
-      MISMATCH);
-      result.then = createCondition(MATCH, MATCH, result // make a loop
-      );
-
-      if (node.comma) {
-        result.then.else = createCondition({
-          type: 'Comma',
-          syntax: node
-        }, result, MISMATCH);
-      }
-    } else {
-      // create a match node chain for [min .. max] interval with optional matches
-      for (var i = node.min || 1; i <= node.max; i++) {
-        if (node.comma && result !== MATCH) {
-          result = createCondition({
-            type: 'Comma',
-            syntax: node
-          }, result, MISMATCH);
-        }
-
-        result = createCondition(matchTerm, createCondition(MATCH, MATCH, result), MISMATCH);
-      }
-    }
-
-    if (node.min === 0) {
-      // allow zero match
-      result = createCondition(MATCH, MATCH, result);
-    } else {
-      // create a match node chain to collect [0 ... min - 1] required matches
-      for (var i = 0; i < node.min - 1; i++) {
-        if (node.comma && result !== MATCH) {
-          result = createCondition({
-            type: 'Comma',
-            syntax: node
-          }, result, MISMATCH);
-        }
-
-        result = createCondition(matchTerm, result, MISMATCH);
-      }
-    }
-
-    return result;
-  }
-
-  function buildMatchGraph(node) {
-    if (typeof node === 'function') {
-      return {
-        type: 'Generic',
-        fn: node
-      };
-    }
-
-    switch (node.type) {
-      case 'Group':
-        var result = buildGroupMatchGraph(node.combinator, node.terms.map(buildMatchGraph), false);
-
-        if (node.disallowEmpty) {
-          result = createCondition(result, DISALLOW_EMPTY, MISMATCH);
-        }
-
-        return result;
-
-      case 'Multiplier':
-        return buildMultiplierMatchGraph(node);
-
-      case 'Type':
-      case 'Property':
-        return {
-          type: node.type,
-          name: node.name,
-          syntax: node
-        };
-
-      case 'Keyword':
-        return {
-          type: node.type,
-          name: node.name.toLowerCase(),
-          syntax: node
-        };
-
-      case 'AtKeyword':
-        return {
-          type: node.type,
-          name: '@' + node.name.toLowerCase(),
-          syntax: node
-        };
-
-      case 'Function':
-        return {
-          type: node.type,
-          name: node.name.toLowerCase() + '(',
-          syntax: node
-        };
-
-      case 'String':
-        // convert a one char length String to a Token
-        if (node.value.length === 3) {
-          return {
-            type: 'Token',
-            value: node.value.charAt(1),
-            syntax: node
-          };
-        } // otherwise use it as is
-
-
-        return {
-          type: node.type,
-          value: node.value.substr(1, node.value.length - 2).replace(/\\'/g, '\''),
-          syntax: node
-        };
-
-      case 'Token':
-        return {
-          type: node.type,
-          value: node.value,
-          syntax: node
-        };
-
-      case 'Comma':
-        return {
-          type: node.type,
-          syntax: node
-        };
-
-      default:
-        throw new Error('Unknown node type:', node.type);
-    }
-  }
-
-  var matchGraph = {
-    MATCH: MATCH,
-    MISMATCH: MISMATCH,
-    DISALLOW_EMPTY: DISALLOW_EMPTY,
-    buildMatchGraph: function (syntaxTree, ref) {
-      if (typeof syntaxTree === 'string') {
-        syntaxTree = parse_1(syntaxTree);
-      }
-
-      return {
-        type: 'MatchGraph',
-        match: buildMatchGraph(syntaxTree),
-        syntax: ref || null,
-        source: syntaxTree
-      };
-    }
-  };
-
-  var hasOwnProperty$1 = window.Object.prototype.hasOwnProperty;
-  var MATCH$1 = matchGraph.MATCH;
-  var MISMATCH$1 = matchGraph.MISMATCH;
-  var DISALLOW_EMPTY$1 = matchGraph.DISALLOW_EMPTY;
-  var TYPE$6 = _const.TYPE;
-  var STUB = 0;
-  var TOKEN = 1;
-  var OPEN_SYNTAX = 2;
-  var CLOSE_SYNTAX = 3;
-  var EXIT_REASON_MATCH = 'Match';
-  var EXIT_REASON_MISMATCH = 'Mismatch';
-  var EXIT_REASON_ITERATION_LIMIT = 'Maximum iteration number exceeded (please fill an issue on https://github.com/csstree/csstree/issues)';
-  var ITERATION_LIMIT = 15000;
-  var totalIterationCount = 0;
-
-  function reverseList(list) {
-    var prev = null;
-    var next = null;
-    var item = list;
-
-    while (item !== null) {
-      next = item.prev;
-      item.prev = prev;
-      prev = item;
-      item = next;
-    }
-
-    return prev;
-  }
-
-  function areStringsEqualCaseInsensitive(testStr, referenceStr) {
-    if (testStr.length !== referenceStr.length) {
-      return false;
-    }
-
-    for (var i = 0; i < testStr.length; i++) {
-      var testCode = testStr.charCodeAt(i);
-      var referenceCode = referenceStr.charCodeAt(i); // testCode.toLowerCase() for U+0041 LATIN CAPITAL LETTER A (A) .. U+005A LATIN CAPITAL LETTER Z (Z).
-
-      if (testCode >= 0x0041 && testCode <= 0x005A) {
-        testCode = testCode | 32;
-      }
-
-      if (testCode !== referenceCode) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  function isCommaContextStart(token) {
-    if (token === null) {
-      return true;
-    }
-
-    return token.type === TYPE$6.Comma || token.type === TYPE$6.Function || token.type === TYPE$6.LeftParenthesis || token.type === TYPE$6.LeftSquareBracket || token.type === TYPE$6.LeftCurlyBracket || token.type === TYPE$6.Delim;
-  }
-
-  function isCommaContextEnd(token) {
-    if (token === null) {
-      return true;
-    }
-
-    return token.type === TYPE$6.RightParenthesis || token.type === TYPE$6.RightSquareBracket || token.type === TYPE$6.RightCurlyBracket || token.type === TYPE$6.Delim;
-  }
-
-  function internalMatch(tokens, state, syntaxes) {
-    function moveToNextToken() {
-      do {
-        tokenIndex++;
-        token = tokenIndex < tokens.length ? tokens[tokenIndex] : null;
-      } while (token !== null && (token.type === TYPE$6.WhiteSpace || token.type === TYPE$6.Comment));
-    }
-
-    function getNextToken(offset) {
-      var nextIndex = tokenIndex + offset;
-      return nextIndex < tokens.length ? tokens[nextIndex] : null;
-    }
-
-    function stateSnapshotFromSyntax(nextState, prev) {
-      return {
-        nextState: nextState,
-        matchStack: matchStack,
-        syntaxStack: syntaxStack,
-        thenStack: thenStack,
-        tokenIndex: tokenIndex,
-        prev: prev
-      };
-    }
-
-    function pushThenStack(nextState) {
-      thenStack = {
-        nextState: nextState,
-        matchStack: matchStack,
-        syntaxStack: syntaxStack,
-        prev: thenStack
-      };
-    }
-
-    function pushElseStack(nextState) {
-      elseStack = stateSnapshotFromSyntax(nextState, elseStack);
-    }
-
-    function addTokenToMatch() {
-      matchStack = {
-        type: TOKEN,
-        syntax: state.syntax,
-        token: token,
-        prev: matchStack
-      };
-      moveToNextToken();
-      syntaxStash = null;
-
-      if (tokenIndex > longestMatch) {
-        longestMatch = tokenIndex;
-      }
-    }
-
-    function openSyntax() {
-      syntaxStack = {
-        syntax: state.syntax,
-        opts: state.syntax.opts || syntaxStack !== null && syntaxStack.opts || null,
-        prev: syntaxStack
-      };
-      matchStack = {
-        type: OPEN_SYNTAX,
-        syntax: state.syntax,
-        token: matchStack.token,
-        prev: matchStack
-      };
-    }
-
-    function closeSyntax() {
-      if (matchStack.type === OPEN_SYNTAX) {
-        matchStack = matchStack.prev;
-      } else {
-        matchStack = {
-          type: CLOSE_SYNTAX,
-          syntax: syntaxStack.syntax,
-          token: matchStack.token,
-          prev: matchStack
-        };
-      }
-
-      syntaxStack = syntaxStack.prev;
-    }
-
-    var syntaxStack = null;
-    var thenStack = null;
-    var elseStack = null; // null – stashing allowed, nothing stashed
-    // false – stashing disabled, nothing stashed
-    // anithing else – fail stashable syntaxes, some syntax stashed
-
-    var syntaxStash = null;
-    var iterationCount = 0; // count iterations and prevent infinite loop
-
-    var exitReason = null;
-    var token = null;
-    var tokenIndex = -1;
-    var longestMatch = 0;
-    var matchStack = {
-      type: STUB,
-      syntax: null,
-      token: null,
-      prev: null
-    };
-    moveToNextToken();
-
-    while (exitReason === null && ++iterationCount < ITERATION_LIMIT) {
-      // function mapList(list, fn) {
-      //     var result = [];
-      //     while (list) {
-      //         result.unshift(fn(list));
-      //         list = list.prev;
-      //     }
-      //     return result;
-      // }
-      // console.log('--\n',
-      //     '#' + iterationCount,
-      //     require('util').inspect({
-      //         match: mapList(matchStack, x => x.type === TOKEN ? x.token && x.token.value : x.syntax ? ({ [OPEN_SYNTAX]: '<', [CLOSE_SYNTAX]: '</' }[x.type] || x.type) + '!' + x.syntax.name : null),
-      //         token: token && token.value,
-      //         tokenIndex,
-      //         syntax: syntax.type + (syntax.id ? ' #' + syntax.id : '')
-      //     }, { depth: null })
-      // );
-      switch (state.type) {
-        case 'Match':
-          if (thenStack === null) {
-            // turn to MISMATCH when some tokens left unmatched
-            if (token !== null) {
-              // doesn't mismatch if just one token left and it's an IE hack
-              if (tokenIndex !== tokens.length - 1 || token.value !== '\\0' && token.value !== '\\9') {
-                state = MISMATCH$1;
-                break;
-              }
-            } // break the main loop, return a result - MATCH
-
-
-            exitReason = EXIT_REASON_MATCH;
-            break;
-          } // go to next syntax (`then` branch)
-
-
-          state = thenStack.nextState; // check match is not empty
-
-          if (state === DISALLOW_EMPTY$1) {
-            if (thenStack.matchStack === matchStack) {
-              state = MISMATCH$1;
-              break;
-            } else {
-              state = MATCH$1;
-            }
-          } // close syntax if needed
-
-
-          while (thenStack.syntaxStack !== syntaxStack) {
-            closeSyntax();
-          } // pop stack
-
-
-          thenStack = thenStack.prev;
-          break;
-
-        case 'Mismatch':
-          // when some syntax is stashed
-          if (syntaxStash !== null && syntaxStash !== false) {
-            // there is no else branches or a branch reduce match stack
-            if (elseStack === null || tokenIndex > elseStack.tokenIndex) {
-              // restore state from the stash
-              elseStack = syntaxStash;
-              syntaxStash = false; // disable stashing
-            }
-          } else if (elseStack === null) {
-            // no else branches -> break the main loop
-            // return a result - MISMATCH
-            exitReason = EXIT_REASON_MISMATCH;
-            break;
-          } // go to next syntax (`else` branch)
-
-
-          state = elseStack.nextState; // restore all the rest stack states
-
-          thenStack = elseStack.thenStack;
-          syntaxStack = elseStack.syntaxStack;
-          matchStack = elseStack.matchStack;
-          tokenIndex = elseStack.tokenIndex;
-          token = tokenIndex < tokens.length ? tokens[tokenIndex] : null; // pop stack
-
-          elseStack = elseStack.prev;
-          break;
-
-        case 'MatchGraph':
-          state = state.match;
-          break;
-
-        case 'If':
-          // IMPORTANT: else stack push must go first,
-          // since it stores the state of thenStack before changes
-          if (state.else !== MISMATCH$1) {
-            pushElseStack(state.else);
-          }
-
-          if (state.then !== MATCH$1) {
-            pushThenStack(state.then);
-          }
-
-          state = state.match;
-          break;
-
-        case 'MatchOnce':
-          state = {
-            type: 'MatchOnceBuffer',
-            syntax: state,
-            index: 0,
-            mask: 0
-          };
-          break;
-
-        case 'MatchOnceBuffer':
-          var terms = state.syntax.terms;
-
-          if (state.index === terms.length) {
-            // no matches at all or it's required all terms to be matched
-            if (state.mask === 0 || state.syntax.all) {
-              state = MISMATCH$1;
-              break;
-            } // a partial match is ok
-
-
-            state = MATCH$1;
-            break;
-          } // all terms are matched
-
-
-          if (state.mask === (1 << terms.length) - 1) {
-            state = MATCH$1;
-            break;
-          }
-
-          for (; state.index < terms.length; state.index++) {
-            var matchFlag = 1 << state.index;
-
-            if ((state.mask & matchFlag) === 0) {
-              // IMPORTANT: else stack push must go first,
-              // since it stores the state of thenStack before changes
-              pushElseStack(state);
-              pushThenStack({
-                type: 'AddMatchOnce',
-                syntax: state.syntax,
-                mask: state.mask | matchFlag
-              }); // match
-
-              state = terms[state.index++];
-              break;
-            }
-          }
-
-          break;
-
-        case 'AddMatchOnce':
-          state = {
-            type: 'MatchOnceBuffer',
-            syntax: state.syntax,
-            index: 0,
-            mask: state.mask
-          };
-          break;
-
-        case 'Enum':
-          if (token !== null) {
-            var name = token.value.toLowerCase(); // drop \0 and \9 hack from keyword name
-
-            if (name.indexOf('\\') !== -1) {
-              name = name.replace(/\\[09].*$/, '');
-            }
-
-            if (hasOwnProperty$1.call(state.map, name)) {
-              state = state.map[name];
-              break;
-            }
-          }
-
-          state = MISMATCH$1;
-          break;
-
-        case 'Generic':
-          var opts = syntaxStack !== null ? syntaxStack.opts : null;
-          var lastTokenIndex = tokenIndex + Math.floor(state.fn(token, getNextToken, opts));
-
-          if (!isNaN(lastTokenIndex) && lastTokenIndex > tokenIndex) {
-            while (tokenIndex < lastTokenIndex) {
-              addTokenToMatch();
-            }
-
-            state = MATCH$1;
-          } else {
-            state = MISMATCH$1;
-          }
-
-          break;
-
-        case 'Type':
-        case 'Property':
-          var syntaxDict = state.type === 'Type' ? 'types' : 'properties';
-          var dictSyntax = hasOwnProperty$1.call(syntaxes, syntaxDict) ? syntaxes[syntaxDict][state.name] : null;
-
-          if (!dictSyntax || !dictSyntax.match) {
-            throw new Error('Bad syntax reference: ' + (state.type === 'Type' ? '<' + state.name + '>' : '<\'' + state.name + '\'>'));
-          } // stash a syntax for types with low priority
-
-
-          if (syntaxStash !== false && token !== null && state.type === 'Type') {
-            var lowPriorityMatching = // https://drafts.csswg.org/css-values-4/#custom-idents
-            // When parsing positionally-ambiguous keywords in a property value, a <custom-ident> production
-            // can only claim the keyword if no other unfulfilled production can claim it.
-            state.name === 'custom-ident' && token.type === TYPE$6.Ident || // https://drafts.csswg.org/css-values-4/#lengths
-            // ... if a `0` could be parsed as either a <number> or a <length> in a property (such as line-height),
-            // it must parse as a <number>
-            state.name === 'length' && token.value === '0';
-
-            if (lowPriorityMatching) {
-              if (syntaxStash === null) {
-                syntaxStash = stateSnapshotFromSyntax(state, elseStack);
-              }
-
-              state = MISMATCH$1;
-              break;
-            }
-          }
-
-          openSyntax();
-          state = dictSyntax.match;
-          break;
-
-        case 'Keyword':
-          var name = state.name;
-
-          if (token !== null) {
-            var keywordName = token.value; // drop \0 and \9 hack from keyword name
-
-            if (keywordName.indexOf('\\') !== -1) {
-              keywordName = keywordName.replace(/\\[09].*$/, '');
-            }
-
-            if (areStringsEqualCaseInsensitive(keywordName, name)) {
-              addTokenToMatch();
-              state = MATCH$1;
-              break;
-            }
-          }
-
-          state = MISMATCH$1;
-          break;
-
-        case 'AtKeyword':
-        case 'Function':
-          if (token !== null && areStringsEqualCaseInsensitive(token.value, state.name)) {
-            addTokenToMatch();
-            state = MATCH$1;
-            break;
-          }
-
-          state = MISMATCH$1;
-          break;
-
-        case 'Token':
-          if (token !== null && token.value === state.value) {
-            addTokenToMatch();
-            state = MATCH$1;
-            break;
-          }
-
-          state = MISMATCH$1;
-          break;
-
-        case 'Comma':
-          if (token !== null && token.type === TYPE$6.Comma) {
-            if (isCommaContextStart(matchStack.token)) {
-              state = MISMATCH$1;
-            } else {
-              addTokenToMatch();
-              state = isCommaContextEnd(token) ? MISMATCH$1 : MATCH$1;
-            }
-          } else {
-            state = isCommaContextStart(matchStack.token) || isCommaContextEnd(token) ? MATCH$1 : MISMATCH$1;
-          }
-
-          break;
-
-        case 'String':
-          var string = '';
-
-          for (var lastTokenIndex = tokenIndex; lastTokenIndex < tokens.length && string.length < state.value.length; lastTokenIndex++) {
-            string += tokens[lastTokenIndex].value;
-          }
-
-          if (areStringsEqualCaseInsensitive(string, state.value)) {
-            while (tokenIndex < lastTokenIndex) {
-              addTokenToMatch();
-            }
-
-            state = MATCH$1;
-          } else {
-            state = MISMATCH$1;
-          }
-
-          break;
-
-        default:
-          throw new Error('Unknown node type: ' + state.type);
-      }
-    }
-
-    totalIterationCount += iterationCount;
-
-    switch (exitReason) {
-      case null:
-        console.warn('[csstree-match] BREAK after ' + ITERATION_LIMIT + ' iterations');
-        exitReason = EXIT_REASON_ITERATION_LIMIT;
-        matchStack = null;
-        break;
-
-      case EXIT_REASON_MATCH:
-        while (syntaxStack !== null) {
-          closeSyntax();
-        }
-
-        break;
-
-      default:
-        matchStack = null;
-    }
-
-    return {
-      tokens: tokens,
-      reason: exitReason,
-      iterations: iterationCount,
-      match: matchStack,
-      longestMatch: longestMatch
-    };
-  }
-
-  function matchAsList(tokens, matchGraph, syntaxes) {
-    var matchResult = internalMatch(tokens, matchGraph, syntaxes || {});
-
-    if (matchResult.match !== null) {
-      var item = reverseList(matchResult.match).prev;
-      matchResult.match = [];
-
-      while (item !== null) {
-        switch (item.type) {
-          case STUB:
-            break;
-
-          case OPEN_SYNTAX:
-          case CLOSE_SYNTAX:
-            matchResult.match.push({
-              type: item.type,
-              syntax: item.syntax
-            });
-            break;
-
-          default:
-            matchResult.match.push({
-              token: item.token.value,
-              node: item.token.node
-            });
-            break;
-        }
-
-        item = item.prev;
-      }
-    }
-
-    return matchResult;
-  }
-
-  function matchAsTree(tokens, matchGraph, syntaxes) {
-    var matchResult = internalMatch(tokens, matchGraph, syntaxes || {});
-
-    if (matchResult.match === null) {
-      return matchResult;
-    }
-
-    var item = matchResult.match;
-    var host = matchResult.match = {
-      syntax: matchGraph.syntax || null,
-      match: []
-    };
-    var hostStack = [host]; // revert a list and start with 2nd item since 1st is a stub item
-
-    item = reverseList(item).prev; // build a tree
-
-    while (item !== null) {
-      switch (item.type) {
-        case OPEN_SYNTAX:
-          host.match.push(host = {
-            syntax: item.syntax,
-            match: []
-          });
-          hostStack.push(host);
-          break;
-
-        case CLOSE_SYNTAX:
-          hostStack.pop();
-          host = hostStack[hostStack.length - 1];
-          break;
-
-        default:
-          host.match.push({
-            syntax: item.syntax || null,
-            token: item.token.value,
-            node: item.token.node
-          });
-      }
-
-      item = item.prev;
-    }
-
-    return matchResult;
-  }
-
-  var match = {
-    matchAsList: matchAsList,
-    matchAsTree: matchAsTree,
-    getTotalIterationCount: function () {
-      return totalIterationCount;
-    }
-  };
-
-  function getTrace(node) {
-    function shouldPutToTrace(syntax) {
-      if (syntax === null) {
-        return false;
-      }
-
-      return syntax.type === 'Type' || syntax.type === 'Property' || syntax.type === 'Keyword';
-    }
-
-    function hasMatch(matchNode) {
-      if (window.Array.isArray(matchNode.match)) {
-        // use for-loop for better perfomance
-        for (var i = 0; i < matchNode.match.length; i++) {
-          if (hasMatch(matchNode.match[i])) {
-            if (shouldPutToTrace(matchNode.syntax)) {
-              result.unshift(matchNode.syntax);
-            }
-
-            return true;
-          }
-        }
-      } else if (matchNode.node === node) {
-        result = shouldPutToTrace(matchNode.syntax) ? [matchNode.syntax] : [];
-        return true;
-      }
-
-      return false;
-    }
-
-    var result = null;
-
-    if (this.matched !== null) {
-      hasMatch(this.matched);
-    }
-
-    return result;
-  }
-
-  function testNode(match, node, fn) {
-    var trace = getTrace.call(match, node);
-
-    if (trace === null) {
-      return false;
-    }
-
-    return trace.some(fn);
-  }
-
-  function isType(node, type) {
-    return testNode(this, node, function (matchNode) {
-      return matchNode.type === 'Type' && matchNode.name === type;
-    });
-  }
-
-  function isProperty(node, property) {
-    return testNode(this, node, function (matchNode) {
-      return matchNode.type === 'Property' && matchNode.name === property;
-    });
-  }
-
-  function isKeyword(node) {
-    return testNode(this, node, function (matchNode) {
-      return matchNode.type === 'Keyword';
-    });
-  }
-
-  var trace = {
-    getTrace: getTrace,
-    isType: isType,
-    isProperty: isProperty,
-    isKeyword: isKeyword
-  };
-
-  function getFirstMatchNode(matchNode) {
-    if ('node' in matchNode) {
-      return matchNode.node;
-    }
-
-    return getFirstMatchNode(matchNode.match[0]);
-  }
-
-  function getLastMatchNode(matchNode) {
-    if ('node' in matchNode) {
-      return matchNode.node;
-    }
-
-    return getLastMatchNode(matchNode.match[matchNode.match.length - 1]);
-  }
-
-  function matchFragments(lexer, ast, match, type, name) {
-    function findFragments(matchNode) {
-      if (matchNode.syntax !== null && matchNode.syntax.type === type && matchNode.syntax.name === name) {
-        var start = getFirstMatchNode(matchNode);
-        var end = getLastMatchNode(matchNode);
-        lexer.syntax.walk(ast, function (node, item, list) {
-          if (node === start) {
-            var nodes = new List_1();
-
-            do {
-              nodes.appendData(item.data);
-
-              if (item.data === end) {
-                break;
-              }
-
-              item = item.next;
-            } while (item !== null);
-
-            fragments.push({
-              parent: list,
-              nodes: nodes
-            });
-          }
-        });
-      }
-
-      if (window.Array.isArray(matchNode.match)) {
-        matchNode.match.forEach(findFragments);
-      }
-    }
-
-    var fragments = [];
-
-    if (match.matched !== null) {
-      findFragments(match.matched);
-    }
-
-    return fragments;
-  }
-
-  var search = {
-    matchFragments: matchFragments
-  };
-
-  var hasOwnProperty$2 = window.Object.prototype.hasOwnProperty;
-
-  function isValidNumber(value) {
-    // Number.isInteger(value) && value >= 0
-    return typeof value === 'number' && isFinite(value) && Math.floor(value) === value && value >= 0;
-  }
-
-  function isValidLocation(loc) {
-    return Boolean(loc) && isValidNumber(loc.offset) && isValidNumber(loc.line) && isValidNumber(loc.column);
-  }
-
-  function createNodeStructureChecker(type, fields) {
-    return function checkNode(node, warn) {
-      if (!node || node.constructor !== window.Object) {
-        return warn(node, 'Type of node should be an window.Object');
-      }
-
-      for (var key in node) {
-        var valid = true;
-
-        if (hasOwnProperty$2.call(node, key) === false) {
-          continue;
-        }
-
-        if (key === 'type') {
-          if (node.type !== type) {
-            warn(node, 'Wrong node type `' + node.type + '`, expected `' + type + '`');
-          }
-        } else if (key === 'loc') {
-          if (node.loc === null) {
-            continue;
-          } else if (node.loc && node.loc.constructor === window.Object) {
-            if (typeof node.loc.source !== 'string') {
-              key += '.source';
-            } else if (!isValidLocation(node.loc.start)) {
-              key += '.start';
-            } else if (!isValidLocation(node.loc.end)) {
-              key += '.end';
-            } else {
-              continue;
-            }
-          }
-
-          valid = false;
-        } else if (fields.hasOwnProperty(key)) {
-          for (var i = 0, valid = false; !valid && i < fields[key].length; i++) {
-            var fieldType = fields[key][i];
-
-            switch (fieldType) {
-              case String:
-                valid = typeof node[key] === 'string';
-                break;
-
-              case Boolean:
-                valid = typeof node[key] === 'boolean';
-                break;
-
-              case null:
-                valid = node[key] === null;
-                break;
-
-              default:
-                if (typeof fieldType === 'string') {
-                  valid = node[key] && node[key].type === fieldType;
-                } else if (window.Array.isArray(fieldType)) {
-                  valid = node[key] instanceof List_1;
-                }
-
-            }
-          }
-        } else {
-          warn(node, 'Unknown field `' + key + '` for ' + type + ' node type');
-        }
-
-        if (!valid) {
-          warn(node, 'Bad value for `' + type + '.' + key + '`');
-        }
-      }
-
-      for (var key in fields) {
-        if (hasOwnProperty$2.call(fields, key) && hasOwnProperty$2.call(node, key) === false) {
-          warn(node, 'Field `' + type + '.' + key + '` is missed');
-        }
-      }
-    };
-  }
-
-  function processStructure(name, nodeType) {
-    var structure = nodeType.structure;
-    var fields = {
-      type: String,
-      loc: true
-    };
-    var docs = {
-      type: '"' + name + '"'
-    };
-
-    for (var key in structure) {
-      if (hasOwnProperty$2.call(structure, key) === false) {
-        continue;
-      }
-
-      var docsTypes = [];
-      var fieldTypes = fields[key] = window.Array.isArray(structure[key]) ? structure[key].slice() : [structure[key]];
-
-      for (var i = 0; i < fieldTypes.length; i++) {
-        var fieldType = fieldTypes[i];
-
-        if (fieldType === String || fieldType === Boolean) {
-          docsTypes.push(fieldType.name);
-        } else if (fieldType === null) {
-          docsTypes.push('null');
-        } else if (typeof fieldType === 'string') {
-          docsTypes.push('<' + fieldType + '>');
-        } else if (window.Array.isArray(fieldType)) {
-          docsTypes.push('List'); // TODO: use type enum
-        } else {
-          throw new Error('Wrong value `' + fieldType + '` in `' + name + '.' + key + '` structure definition');
-        }
-      }
-
-      docs[key] = docsTypes.join(' | ');
-    }
-
-    return {
-      docs: docs,
-      check: createNodeStructureChecker(name, fields)
-    };
-  }
-
-  var structure = {
-    getStructureFromConfig: function (config) {
-      var structure = {};
-
-      if (config.node) {
-        for (var name in config.node) {
-          if (hasOwnProperty$2.call(config.node, name)) {
-            var nodeType = config.node[name];
-
-            if (nodeType.structure) {
-              structure[name] = processStructure(name, nodeType);
-            } else {
-              throw new Error('Missed `structure` field in `' + name + '` node type definition');
-            }
-          }
-        }
-      }
-
-      return structure;
-    }
-  };
-
-  var SyntaxReferenceError$1 = error.SyntaxReferenceError;
-  var MatchError$1 = error.MatchError;
-  var buildMatchGraph$1 = matchGraph.buildMatchGraph;
-  var matchAsTree$1 = match.matchAsTree;
-  var getStructureFromConfig = structure.getStructureFromConfig;
-  var cssWideKeywords$1 = buildMatchGraph$1('inherit | initial | unset');
-  var cssWideKeywordsWithExpression = buildMatchGraph$1('inherit | initial | unset | <-ms-legacy-expression>');
-
-  function dumpMapSyntax(map, compact, syntaxAsAst) {
-    var result = {};
-
-    for (var name in map) {
-      if (map[name].syntax) {
-        result[name] = syntaxAsAst ? map[name].syntax : generate_1(map[name].syntax, {
-          compact: compact
-        });
-      }
-    }
-
-    return result;
-  }
-
-  function valueHasVar(tokens) {
-    for (var i = 0; i < tokens.length; i++) {
-      if (tokens[i].value.toLowerCase() === 'var(') {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  function buildMatchResult(match, error, iterations) {
-    return {
-      matched: match,
-      iterations: iterations,
-      error: error,
-      getTrace: trace.getTrace,
-      isType: trace.isType,
-      isProperty: trace.isProperty,
-      isKeyword: trace.isKeyword
-    };
-  }
-
-  function matchSyntax(lexer, syntax, value, useCommon) {
-    var tokens = prepareTokens_1(value, lexer.syntax);
-    var result;
-
-    if (valueHasVar(tokens)) {
-      return buildMatchResult(null, new Error('Matching for a tree with var() is not supported'));
-    }
-
-    if (useCommon) {
-      result = matchAsTree$1(tokens, lexer.valueCommonSyntax, lexer);
-    }
-
-    if (!useCommon || !result.match) {
-      result = matchAsTree$1(tokens, syntax.match, lexer);
-
-      if (!result.match) {
-        return buildMatchResult(null, new MatchError$1(result.reason, syntax.syntax, value, result), result.iterations);
-      }
-    }
-
-    return buildMatchResult(result.match, null, result.iterations);
-  }
-
-  var Lexer = function (config, syntax, structure) {
-    this.valueCommonSyntax = cssWideKeywords$1;
-    this.syntax = syntax;
-    this.generic = false;
-    this.atrules = {};
-    this.properties = {};
-    this.types = {};
-    this.structure = structure || getStructureFromConfig(config);
-
-    if (config) {
-      if (config.types) {
-        for (var name in config.types) {
-          this.addType_(name, config.types[name]);
-        }
-      }
-
-      if (config.generic) {
-        this.generic = true;
-
-        for (var name in generic) {
-          this.addType_(name, generic[name]);
-        }
-      }
-
-      if (config.atrules) {
-        for (var name in config.atrules) {
-          this.addAtrule_(name, config.atrules[name]);
-        }
-      }
-
-      if (config.properties) {
-        for (var name in config.properties) {
-          this.addProperty_(name, config.properties[name]);
-        }
-      }
-    }
-  };
-
-  Lexer.prototype = {
-    structure: {},
-    checkStructure: function (ast) {
-      function collectWarning(node, message) {
-        warns.push({
-          node: node,
-          message: message
-        });
-      }
-
-      var structure = this.structure;
-      var warns = [];
-      this.syntax.walk(ast, function (node) {
-        if (structure.hasOwnProperty(node.type)) {
-          structure[node.type].check(node, collectWarning);
-        } else {
-          collectWarning(node, 'Unknown node type `' + node.type + '`');
-        }
-      });
-      return warns.length ? warns : false;
-    },
-    createDescriptor: function (syntax, type, name) {
-      var ref = {
-        type: type,
-        name: name
-      };
-      var descriptor = {
-        type: type,
-        name: name,
-        syntax: null,
-        match: null
-      };
-
-      if (typeof syntax === 'function') {
-        descriptor.match = buildMatchGraph$1(syntax, ref);
-      } else {
-        if (typeof syntax === 'string') {
-          // lazy parsing on first access
-          window.Object.defineProperty(descriptor, 'syntax', {
-            get: function () {
-              window.Object.defineProperty(descriptor, 'syntax', {
-                value: parse_1(syntax)
-              });
-              return descriptor.syntax;
-            }
-          });
-        } else {
-          descriptor.syntax = syntax;
-        } // lazy graph build on first access
-
-
-        window.Object.defineProperty(descriptor, 'match', {
-          get: function () {
-            window.Object.defineProperty(descriptor, 'match', {
-              value: buildMatchGraph$1(descriptor.syntax, ref)
-            });
-            return descriptor.match;
-          }
-        });
-      }
-
-      return descriptor;
-    },
-    addAtrule_: function (name, syntax) {
-      this.atrules[name] = {
-        prelude: syntax.prelude ? this.createDescriptor(syntax.prelude, 'AtrulePrelude', name) : null,
-        descriptors: syntax.descriptors ? window.Object.keys(syntax.descriptors).reduce((res, name) => {
-          res[name] = this.createDescriptor(syntax.descriptors[name], 'AtruleDescriptor', name);
-          return res;
-        }, {}) : null
-      };
-    },
-    addProperty_: function (name, syntax) {
-      this.properties[name] = this.createDescriptor(syntax, 'Property', name);
-    },
-    addType_: function (name, syntax) {
-      this.types[name] = this.createDescriptor(syntax, 'Type', name);
-
-      if (syntax === generic['-ms-legacy-expression']) {
-        this.valueCommonSyntax = cssWideKeywordsWithExpression;
-      }
-    },
-    matchAtrulePrelude: function (atruleName, prelude) {
-      var atrule = names.keyword(atruleName);
-      var atrulePreludeSyntax = atrule.vendor ? this.getAtrulePrelude(atrule.name) || this.getAtrulePrelude(atrule.basename) : this.getAtrulePrelude(atrule.name);
-
-      if (!atrulePreludeSyntax) {
-        if (atrule.basename in this.atrules) {
-          return buildMatchResult(null, new Error('At-rule `' + atruleName + '` should not contain a prelude'));
-        }
-
-        return buildMatchResult(null, new SyntaxReferenceError$1('Unknown at-rule', atruleName));
-      }
-
-      return matchSyntax(this, atrulePreludeSyntax, prelude, true);
-    },
-    matchAtruleDescriptor: function (atruleName, descriptorName, value) {
-      var atrule = names.keyword(atruleName);
-      var descriptor = names.keyword(descriptorName);
-      var atruleEntry = atrule.vendor ? this.atrules[atrule.name] || this.atrules[atrule.basename] : this.atrules[atrule.name];
-
-      if (!atruleEntry) {
-        return buildMatchResult(null, new SyntaxReferenceError$1('Unknown at-rule', atruleName));
-      }
-
-      if (!atruleEntry.descriptors) {
-        return buildMatchResult(null, new Error('At-rule `' + atruleName + '` has no known descriptors'));
-      }
-
-      var atruleDescriptorSyntax = descriptor.vendor ? atruleEntry.descriptors[descriptor.name] || atruleEntry.descriptors[descriptor.basename] : atruleEntry.descriptors[descriptor.name];
-
-      if (!atruleDescriptorSyntax) {
-        return buildMatchResult(null, new SyntaxReferenceError$1('Unknown at-rule descriptor', descriptorName));
-      }
-
-      return matchSyntax(this, atruleDescriptorSyntax, value, true);
-    },
-    matchDeclaration: function (node) {
-      if (node.type !== 'Declaration') {
-        return buildMatchResult(null, new Error('Not a Declaration node'));
-      }
-
-      return this.matchProperty(node.property, node.value);
-    },
-    matchProperty: function (propertyName, value) {
-      var property = names.property(propertyName); // don't match syntax for a custom property
-
-      if (property.custom) {
-        return buildMatchResult(null, new Error('Lexer matching doesn\'t applicable for custom properties'));
-      }
-
-      var propertySyntax = property.vendor ? this.getProperty(property.name) || this.getProperty(property.basename) : this.getProperty(property.name);
-
-      if (!propertySyntax) {
-        return buildMatchResult(null, new SyntaxReferenceError$1('Unknown property', propertyName));
-      }
-
-      return matchSyntax(this, propertySyntax, value, true);
-    },
-    matchType: function (typeName, value) {
-      var typeSyntax = this.getType(typeName);
-
-      if (!typeSyntax) {
-        return buildMatchResult(null, new SyntaxReferenceError$1('Unknown type', typeName));
-      }
-
-      return matchSyntax(this, typeSyntax, value, false);
-    },
-    match: function (syntax, value) {
-      if (typeof syntax !== 'string' && (!syntax || !syntax.type)) {
-        return buildMatchResult(null, new SyntaxReferenceError$1('Bad syntax'));
-      }
-
-      if (typeof syntax === 'string' || !syntax.match) {
-        syntax = this.createDescriptor(syntax, 'Type', 'anonymous');
-      }
-
-      return matchSyntax(this, syntax, value, false);
-    },
-    findValueFragments: function (propertyName, value, type, name) {
-      return search.matchFragments(this, value, this.matchProperty(propertyName, value), type, name);
-    },
-    findDeclarationValueFragments: function (declaration, type, name) {
-      return search.matchFragments(this, declaration.value, this.matchDeclaration(declaration), type, name);
-    },
-    findAllFragments: function (ast, type, name) {
-      var result = [];
-      this.syntax.walk(ast, {
-        visit: 'Declaration',
-        enter: function (declaration) {
-          result.push.apply(result, this.findDeclarationValueFragments(declaration, type, name));
-        }.bind(this)
-      });
-      return result;
-    },
-    getAtrulePrelude: function (atruleName) {
-      return this.atrules.hasOwnProperty(atruleName) ? this.atrules[atruleName].prelude : null;
-    },
-    getAtruleDescriptor: function (atruleName, name) {
-      return this.atrules.hasOwnProperty(atruleName) && this.atrules.declarators ? this.atrules[atruleName].declarators[name] || null : null;
-    },
-    getProperty: function (name) {
-      return this.properties.hasOwnProperty(name) ? this.properties[name] : null;
-    },
-    getType: function (name) {
-      return this.types.hasOwnProperty(name) ? this.types[name] : null;
-    },
-    validate: function () {
-      function validate(syntax, name, broken, descriptor) {
-        if (broken.hasOwnProperty(name)) {
-          return broken[name];
-        }
-
-        broken[name] = false;
-
-        if (descriptor.syntax !== null) {
-          walk(descriptor.syntax, function (node) {
-            if (node.type !== 'Type' && node.type !== 'Property') {
-              return;
-            }
-
-            var map = node.type === 'Type' ? syntax.types : syntax.properties;
-            var brokenMap = node.type === 'Type' ? brokenTypes : brokenProperties;
-
-            if (!map.hasOwnProperty(node.name) || validate(syntax, node.name, brokenMap, map[node.name])) {
-              broken[name] = true;
-            }
-          }, this);
-        }
-      }
-
-      var brokenTypes = {};
-      var brokenProperties = {};
-
-      for (var key in this.types) {
-        validate(this, key, brokenTypes, this.types[key]);
-      }
-
-      for (var key in this.properties) {
-        validate(this, key, brokenProperties, this.properties[key]);
-      }
-
-      brokenTypes = window.Object.keys(brokenTypes).filter(function (name) {
-        return brokenTypes[name];
-      });
-      brokenProperties = window.Object.keys(brokenProperties).filter(function (name) {
-        return brokenProperties[name];
-      });
-
-      if (brokenTypes.length || brokenProperties.length) {
-        return {
-          types: brokenTypes,
-          properties: brokenProperties
-        };
-      }
-
-      return null;
-    },
-    dump: function (syntaxAsAst, pretty) {
-      return {
-        generic: this.generic,
-        types: dumpMapSyntax(this.types, !pretty, syntaxAsAst),
-        properties: dumpMapSyntax(this.properties, !pretty, syntaxAsAst)
-      };
-    },
-    toString: function () {
-      return JSON.stringify(this.dump());
-    }
-  };
-  var Lexer_1 = Lexer;
-
-  var definitionSyntax = {
-    SyntaxError: _SyntaxError$1,
-    parse: parse_1,
-    generate: generate_1,
-    walk: walk
-  };
-
-  var isBOM$2 = tokenizer.isBOM;
-  var N$3 = 10;
-  var F$2 = 12;
-  var R$2 = 13;
-
-  function computeLinesAndColumns(host, source) {
-    var sourceLength = source.length;
-    var lines = adoptBuffer(host.lines, sourceLength); // +1
-
-    var line = host.startLine;
-    var columns = adoptBuffer(host.columns, sourceLength);
-    var column = host.startColumn;
-    var startOffset = source.length > 0 ? isBOM$2(source.charCodeAt(0)) : 0;
-
-    for (var i = startOffset; i < sourceLength; i++) {
-      // -1
-      var code = source.charCodeAt(i);
-      lines[i] = line;
-      columns[i] = column++;
-
-      if (code === N$3 || code === R$2 || code === F$2) {
-        if (code === R$2 && i + 1 < sourceLength && source.charCodeAt(i + 1) === N$3) {
-          i++;
-          lines[i] = line;
-          columns[i] = column;
-        }
-
-        line++;
-        column = 1;
-      }
-    }
-
-    lines[i] = line;
-    columns[i] = column;
-    host.lines = lines;
-    host.columns = columns;
-  }
-
-  var OffsetToLocation = function () {
-    this.lines = null;
-    this.columns = null;
-    this.linesAndColumnsComputed = false;
-  };
-
-  OffsetToLocation.prototype = {
-    setSource: function (source, startOffset, startLine, startColumn) {
-      this.source = source;
-      this.startOffset = typeof startOffset === 'undefined' ? 0 : startOffset;
-      this.startLine = typeof startLine === 'undefined' ? 1 : startLine;
-      this.startColumn = typeof startColumn === 'undefined' ? 1 : startColumn;
-      this.linesAndColumnsComputed = false;
-    },
-    ensureLinesAndColumnsComputed: function () {
-      if (!this.linesAndColumnsComputed) {
-        computeLinesAndColumns(this, this.source);
-        this.linesAndColumnsComputed = true;
-      }
-    },
-    getLocation: function (offset, filename) {
-      this.ensureLinesAndColumnsComputed();
-      return {
-        source: filename,
-        offset: this.startOffset + offset,
-        line: this.lines[offset],
-        column: this.columns[offset]
-      };
-    },
-    getLocationRange: function (start, end, filename) {
-      this.ensureLinesAndColumnsComputed();
-      return {
-        source: filename,
-        start: {
-          offset: this.startOffset + start,
-          line: this.lines[start],
-          column: this.columns[start]
-        },
-        end: {
-          offset: this.startOffset + end,
-          line: this.lines[end],
-          column: this.columns[end]
-        }
-      };
-    }
-  };
-  var OffsetToLocation_1 = OffsetToLocation;
-
-  var TYPE$7 = tokenizer.TYPE;
-  var WHITESPACE$2 = TYPE$7.WhiteSpace;
-  var COMMENT$2 = TYPE$7.Comment;
-
-  var sequence = function readSequence(recognizer) {
-    var children = this.createList();
-    var child = null;
-    var context = {
-      recognizer: recognizer,
-      space: null,
-      ignoreWS: false,
-      ignoreWSAfter: false
-    };
-    this.scanner.skipSC();
-
-    while (!this.scanner.eof) {
-      switch (this.scanner.tokenType) {
-        case COMMENT$2:
-          this.scanner.next();
-          continue;
-
-        case WHITESPACE$2:
-          if (context.ignoreWS) {
-            this.scanner.next();
-          } else {
-            context.space = this.WhiteSpace();
-          }
-
-          continue;
-      }
-
-      child = recognizer.getNode.call(this, context);
-
-      if (child === undefined) {
-        break;
-      }
-
-      if (context.space !== null) {
-        children.push(context.space);
-        context.space = null;
-      }
-
-      children.push(child);
-
-      if (context.ignoreWSAfter) {
-        context.ignoreWSAfter = false;
-        context.ignoreWS = true;
-      } else {
-        context.ignoreWS = false;
-      }
-    }
-
-    return children;
-  };
-
-  var findWhiteSpaceStart$1 = utils.findWhiteSpaceStart;
-
-  var noop$2 = function () {};
-
-  var TYPE$8 = _const.TYPE;
-  var NAME$2 = _const.NAME;
-  var WHITESPACE$3 = TYPE$8.WhiteSpace;
-  var IDENT$2 = TYPE$8.Ident;
-  var FUNCTION = TYPE$8.Function;
-  var URL$1 = TYPE$8.Url;
-  var HASH = TYPE$8.Hash;
-  var PERCENTAGE = TYPE$8.Percentage;
-  var NUMBER$2 = TYPE$8.Number;
-  var NUMBERSIGN$1 = 0x0023; // U+0023 NUMBER SIGN (#)
-
-  var NULL = 0;
-
-  function createParseContext(name) {
-    return function () {
-      return this[name]();
-    };
-  }
-
-  function processConfig(config) {
-    var parserConfig = {
-      context: {},
-      scope: {},
-      atrule: {},
-      pseudo: {}
-    };
-
-    if (config.parseContext) {
-      for (var name in config.parseContext) {
-        switch (typeof config.parseContext[name]) {
-          case 'function':
-            parserConfig.context[name] = config.parseContext[name];
-            break;
-
-          case 'string':
-            parserConfig.context[name] = createParseContext(config.parseContext[name]);
-            break;
-        }
-      }
-    }
-
-    if (config.scope) {
-      for (var name in config.scope) {
-        parserConfig.scope[name] = config.scope[name];
-      }
-    }
-
-    if (config.atrule) {
-      for (var name in config.atrule) {
-        var atrule = config.atrule[name];
-
-        if (atrule.parse) {
-          parserConfig.atrule[name] = atrule.parse;
-        }
-      }
-    }
-
-    if (config.pseudo) {
-      for (var name in config.pseudo) {
-        var pseudo = config.pseudo[name];
-
-        if (pseudo.parse) {
-          parserConfig.pseudo[name] = pseudo.parse;
-        }
-      }
-    }
-
-    if (config.node) {
-      for (var name in config.node) {
-        parserConfig[name] = config.node[name].parse;
-      }
-    }
-
-    return parserConfig;
-  }
-
-  var create = function createParser(config) {
-    var parser = {
-      scanner: new TokenStream_1(),
-      locationMap: new OffsetToLocation_1(),
-      filename: '<unknown>',
-      needPositions: false,
-      onParseError: noop$2,
-      onParseErrorThrow: false,
-      parseAtrulePrelude: true,
-      parseRulePrelude: true,
-      parseValue: true,
-      parseCustomProperty: false,
-      readSequence: sequence,
-      createList: function () {
-        return new List_1();
-      },
-      createSingleNodeList: function (node) {
-        return new List_1().appendData(node);
-      },
-      getFirstListNode: function (list) {
-        return list && list.first();
-      },
-      getLastListNode: function (list) {
-        return list.last();
-      },
-      parseWithFallback: function (consumer, fallback) {
-        var startToken = this.scanner.tokenIndex;
-
-        try {
-          return consumer.call(this);
-        } catch (e) {
-          if (this.onParseErrorThrow) {
-            throw e;
-          }
-
-          var fallbackNode = fallback.call(this, startToken);
-          this.onParseErrorThrow = true;
-          this.onParseError(e, fallbackNode);
-          this.onParseErrorThrow = false;
-          return fallbackNode;
-        }
-      },
-      lookupNonWSType: function (offset) {
-        do {
-          var type = this.scanner.lookupType(offset++);
-
-          if (type !== WHITESPACE$3) {
-            return type;
-          }
-        } while (type !== NULL);
-
-        return NULL;
-      },
-      eat: function (tokenType) {
-        if (this.scanner.tokenType !== tokenType) {
-          var offset = this.scanner.tokenStart;
-          var message = NAME$2[tokenType] + ' is expected'; // tweak message and offset
-
-          switch (tokenType) {
-            case IDENT$2:
-              // when identifier is expected but there is a function or url
-              if (this.scanner.tokenType === FUNCTION || this.scanner.tokenType === URL$1) {
-                offset = this.scanner.tokenEnd - 1;
-                message = 'Identifier is expected but function found';
-              } else {
-                message = 'Identifier is expected';
-              }
-
-              break;
-
-            case HASH:
-              if (this.scanner.isDelim(NUMBERSIGN$1)) {
-                this.scanner.next();
-                offset++;
-                message = 'Name is expected';
-              }
-
-              break;
-
-            case PERCENTAGE:
-              if (this.scanner.tokenType === NUMBER$2) {
-                offset = this.scanner.tokenEnd;
-                message = 'Percent sign is expected';
-              }
-
-              break;
-
-            default:
-              // when test type is part of another token show error for current position + 1
-              // e.g. eat(HYPHENMINUS) will fail on "-foo", but pointing on "-" is odd
-              if (this.scanner.source.charCodeAt(this.scanner.tokenStart) === tokenType) {
-                offset = offset + 1;
-              }
-
-          }
-
-          this.error(message, offset);
-        }
-
-        this.scanner.next();
-      },
-      consume: function (tokenType) {
-        var value = this.scanner.getTokenValue();
-        this.eat(tokenType);
-        return value;
-      },
-      consumeFunctionName: function () {
-        var name = this.scanner.source.substring(this.scanner.tokenStart, this.scanner.tokenEnd - 1);
-        this.eat(FUNCTION);
-        return name;
-      },
-      getLocation: function (start, end) {
-        if (this.needPositions) {
-          return this.locationMap.getLocationRange(start, end, this.filename);
-        }
-
-        return null;
-      },
-      getLocationFromList: function (list) {
-        if (this.needPositions) {
-          var head = this.getFirstListNode(list);
-          var tail = this.getLastListNode(list);
-          return this.locationMap.getLocationRange(head !== null ? head.loc.start.offset - this.locationMap.startOffset : this.scanner.tokenStart, tail !== null ? tail.loc.end.offset - this.locationMap.startOffset : this.scanner.tokenStart, this.filename);
-        }
-
-        return null;
-      },
-      error: function (message, offset) {
-        var location = typeof offset !== 'undefined' && offset < this.scanner.source.length ? this.locationMap.getLocation(offset) : this.scanner.eof ? this.locationMap.getLocation(findWhiteSpaceStart$1(this.scanner.source, this.scanner.source.length - 1)) : this.locationMap.getLocation(this.scanner.tokenStart);
-        throw new _SyntaxError(message || 'Unexpected input', this.scanner.source, location.offset, location.line, location.column);
-      }
-    };
-    config = processConfig(config || {});
-
-    for (var key in config) {
-      parser[key] = config[key];
-    }
-
-    return function (source, options) {
-      options = options || {};
-      var context = options.context || 'default';
-      var ast;
-      tokenizer(source, parser.scanner);
-      parser.locationMap.setSource(source, options.offset, options.line, options.column);
-      parser.filename = options.filename || '<unknown>';
-      parser.needPositions = Boolean(options.positions);
-      parser.onParseError = typeof options.onParseError === 'function' ? options.onParseError : noop$2;
-      parser.onParseErrorThrow = false;
-      parser.parseAtrulePrelude = 'parseAtrulePrelude' in options ? Boolean(options.parseAtrulePrelude) : true;
-      parser.parseRulePrelude = 'parseRulePrelude' in options ? Boolean(options.parseRulePrelude) : true;
-      parser.parseValue = 'parseValue' in options ? Boolean(options.parseValue) : true;
-      parser.parseCustomProperty = 'parseCustomProperty' in options ? Boolean(options.parseCustomProperty) : false;
-
-      if (!parser.context.hasOwnProperty(context)) {
-        throw new Error('Unknown context `' + context + '`');
-      }
-
-      ast = parser.context[context].call(parser, options);
-
-      if (!parser.scanner.eof) {
-        parser.error();
-      }
-
-      return ast;
-    };
-  };
-
-  /* -*- Mode: js; js-indent-level: 2; -*- */
-
-  /*
-   * Copyright 2011 Mozilla Foundation and contributors
-   * Licensed under the New BSD license. See LICENSE or:
-   * http://opensource.org/licenses/BSD-3-Clause
-   */
-  var intToCharMap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.split('');
-  /**
-   * Encode an integer in the range of 0 to 63 to a single base 64 digit.
-   */
-
-  var encode = function (number) {
-    if (0 <= number && number < intToCharMap.length) {
-      return intToCharMap[number];
-    }
-
-    throw new TypeError("Must be between 0 and 63: " + number);
-  };
-  /**
-   * Decode a single base 64 character code digit to an integer. Returns -1 on
-   * failure.
-   */
-
-
-  var decode = function (charCode) {
-    var bigA = 65; // 'A'
-
-    var bigZ = 90; // 'Z'
-
-    var littleA = 97; // 'a'
-
-    var littleZ = 122; // 'z'
-
-    var zero = 48; // '0'
-
-    var nine = 57; // '9'
-
-    var plus = 43; // '+'
-
-    var slash = 47; // '/'
-
-    var littleOffset = 26;
-    var numberOffset = 52; // 0 - 25: ABCDEFGHIJKLMNOPQRSTUVWXYZ
-
-    if (bigA <= charCode && charCode <= bigZ) {
-      return charCode - bigA;
-    } // 26 - 51: abcdefghijklmnopqrstuvwxyz
-
-
-    if (littleA <= charCode && charCode <= littleZ) {
-      return charCode - littleA + littleOffset;
-    } // 52 - 61: 0123456789
-
-
-    if (zero <= charCode && charCode <= nine) {
-      return charCode - zero + numberOffset;
-    } // 62: +
-
-
-    if (charCode == plus) {
-      return 62;
-    } // 63: /
-
-
-    if (charCode == slash) {
-      return 63;
-    } // Invalid base64 digit.
-
-
-    return -1;
-  };
-
-  var base64 = {
-    encode: encode,
-    decode: decode
-  };
-
-  /* -*- Mode: js; js-indent-level: 2; -*- */
-
-  /*
-   * Copyright 2011 Mozilla Foundation and contributors
-   * Licensed under the New BSD license. See LICENSE or:
-   * http://opensource.org/licenses/BSD-3-Clause
-   *
-   * Based on the Base 64 VLQ implementation in Closure Compiler:
-   * https://code.google.com/p/closure-compiler/source/browse/trunk/src/com/google/debugging/sourcemap/Base64VLQ.java
-   *
-   * Copyright 2011 The Closure Compiler Authors. All rights reserved.
-   * Redistribution and use in source and binary forms, with or without
-   * modification, are permitted provided that the following conditions are
-   * met:
-   *
-   *  * Redistributions of source code must retain the above copyright
-   *    notice, this list of conditions and the following disclaimer.
-   *  * Redistributions in binary form must reproduce the above
-   *    copyright notice, this list of conditions and the following
-   *    disclaimer in the documentation and/or other materials provided
-   *    with the distribution.
-   *  * Neither the name of Google Inc. nor the names of its
-   *    contributors may be used to endorse or promote products derived
-   *    from this software without specific prior written permission.
-   *
-   * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-   */
-  // A single base 64 digit can contain 6 bits of data. For the base 64 variable
-  // length quantities we use in the source map spec, the first bit is the sign,
-  // the next four bits are the actual value, and the 6th bit is the
-  // continuation bit. The continuation bit tells us whether there are more
-  // digits in this value following this digit.
-  //
-  //   Continuation
-  //   |    Sign
-  //   |    |
-  //   V    V
-  //   101011
-
-  var VLQ_BASE_SHIFT = 5; // binary: 100000
-
-  var VLQ_BASE = 1 << VLQ_BASE_SHIFT; // binary: 011111
-
-  var VLQ_BASE_MASK = VLQ_BASE - 1; // binary: 100000
-
-  var VLQ_CONTINUATION_BIT = VLQ_BASE;
-  /**
-   * Converts from a two-complement value to a value where the sign bit is
-   * placed in the least significant bit.  For example, as decimals:
-   *   1 becomes 2 (10 binary), -1 becomes 3 (11 binary)
-   *   2 becomes 4 (100 binary), -2 becomes 5 (101 binary)
-   */
-
-  function toVLQSigned(aValue) {
-    return aValue < 0 ? (-aValue << 1) + 1 : (aValue << 1) + 0;
-  }
-  /**
-   * Converts to a two-complement value from a value where the sign bit is
-   * placed in the least significant bit.  For example, as decimals:
-   *   2 (10 binary) becomes 1, 3 (11 binary) becomes -1
-   *   4 (100 binary) becomes 2, 5 (101 binary) becomes -2
-   */
-
-
-  function fromVLQSigned(aValue) {
-    var isNegative = (aValue & 1) === 1;
-    var shifted = aValue >> 1;
-    return isNegative ? -shifted : shifted;
-  }
-  /**
-   * Returns the base 64 VLQ encoded value.
-   */
-
-
-  var encode$1 = function base64VLQ_encode(aValue) {
-    var encoded = "";
-    var digit;
-    var vlq = toVLQSigned(aValue);
-
-    do {
-      digit = vlq & VLQ_BASE_MASK;
-      vlq >>>= VLQ_BASE_SHIFT;
-
-      if (vlq > 0) {
-        // There are still more digits in this value, so we must make sure the
-        // continuation bit is marked.
-        digit |= VLQ_CONTINUATION_BIT;
-      }
-
-      encoded += base64.encode(digit);
-    } while (vlq > 0);
-
-    return encoded;
-  };
-  /**
-   * Decodes the next base 64 VLQ value from the given string and returns the
-   * value and the rest of the string via the out parameter.
-   */
-
-
-  var decode$1 = function base64VLQ_decode(aStr, aIndex, aOutParam) {
-    var strLen = aStr.length;
-    var result = 0;
-    var shift = 0;
-    var continuation, digit;
-
-    do {
-      if (aIndex >= strLen) {
-        throw new Error("Expected more digits in base 64 VLQ value.");
-      }
-
-      digit = base64.decode(aStr.charCodeAt(aIndex++));
-
-      if (digit === -1) {
-        throw new Error("Invalid base64 digit: " + aStr.charAt(aIndex - 1));
-      }
-
-      continuation = !!(digit & VLQ_CONTINUATION_BIT);
-      digit &= VLQ_BASE_MASK;
-      result = result + (digit << shift);
-      shift += VLQ_BASE_SHIFT;
-    } while (continuation);
-
-    aOutParam.value = fromVLQSigned(result);
-    aOutParam.rest = aIndex;
-  };
-
-  var base64Vlq = {
-    encode: encode$1,
-    decode: decode$1
-  };
-
-  function createCommonjsModule(fn, module) {
-  	return module = { exports: {} }, fn(module, module.exports), module.exports;
-  }
-
-  function getCjsExportFromNamespace (n) {
-  	return n && n['default'] || n;
-  }
-
-  var util = createCommonjsModule(function (module, exports) {
-    /* -*- Mode: js; js-indent-level: 2; -*- */
-
-    /*
-     * Copyright 2011 Mozilla Foundation and contributors
-     * Licensed under the New BSD license. See LICENSE or:
-     * http://opensource.org/licenses/BSD-3-Clause
-     */
-
-    /**
-     * This is a helper function for getting values from parameter/options
-     * objects.
-     *
-     * @param args The object we are extracting values from
-     * @param name The name of the property we are getting.
-     * @param defaultValue An optional value to return if the property is missing
-     * from the object. If this is not specified and the property is missing, an
-     * error will be thrown.
-     */
-    function getArg(aArgs, aName, aDefaultValue) {
-      if (aName in aArgs) {
-        return aArgs[aName];
-      } else if (arguments.length === 3) {
-        return aDefaultValue;
-      } else {
-        throw new Error('"' + aName + '" is a required argument.');
-      }
-    }
-
-    exports.getArg = getArg;
-    var urlRegexp = /^(?:([\w+\-.]+):)?\/\/(?:(\w+:\w+)@)?([\w.-]*)(?::(\d+))?(.*)$/;
-    var dataUrlRegexp = /^data:.+\,.+$/;
-
-    function urlParse(aUrl) {
-      var match = aUrl.match(urlRegexp);
-
-      if (!match) {
-        return null;
-      }
-
-      return {
-        scheme: match[1],
-        auth: match[2],
-        host: match[3],
-        port: match[4],
-        path: match[5]
-      };
-    }
-
-    exports.urlParse = urlParse;
-
-    function urlGenerate(aParsedUrl) {
-      var url = '';
-
-      if (aParsedUrl.scheme) {
-        url += aParsedUrl.scheme + ':';
-      }
-
-      url += '//';
-
-      if (aParsedUrl.auth) {
-        url += aParsedUrl.auth + '@';
-      }
-
-      if (aParsedUrl.host) {
-        url += aParsedUrl.host;
-      }
-
-      if (aParsedUrl.port) {
-        url += ":" + aParsedUrl.port;
-      }
-
-      if (aParsedUrl.path) {
-        url += aParsedUrl.path;
-      }
-
-      return url;
-    }
-
-    exports.urlGenerate = urlGenerate;
-    /**
-     * Normalizes a path, or the path portion of a URL:
-     *
-     * - Replaces consecutive slashes with one slash.
-     * - Removes unnecessary '.' parts.
-     * - Removes unnecessary '<dir>/..' parts.
-     *
-     * Based on code in the Node.js 'path' core module.
-     *
-     * @param aPath The path or url to normalize.
-     */
-
-    function normalize(aPath) {
-      var path = aPath;
-      var url = urlParse(aPath);
-
-      if (url) {
-        if (!url.path) {
-          return aPath;
-        }
-
-        path = url.path;
-      }
-
-      var isAbsolute = exports.isAbsolute(path);
-      var parts = path.split(/\/+/);
-
-      for (var part, up = 0, i = parts.length - 1; i >= 0; i--) {
-        part = parts[i];
-
-        if (part === '.') {
-          parts.splice(i, 1);
-        } else if (part === '..') {
-          up++;
-        } else if (up > 0) {
-          if (part === '') {
-            // The first part is blank if the path is absolute. Trying to go
-            // above the root is a no-op. Therefore we can remove all '..' parts
-            // directly after the root.
-            parts.splice(i + 1, up);
-            up = 0;
-          } else {
-            parts.splice(i, 2);
-            up--;
-          }
-        }
-      }
-
-      path = parts.join('/');
-
-      if (path === '') {
-        path = isAbsolute ? '/' : '.';
-      }
-
-      if (url) {
-        url.path = path;
-        return urlGenerate(url);
-      }
-
-      return path;
-    }
-
-    exports.normalize = normalize;
-    /**
-     * Joins two paths/URLs.
-     *
-     * @param aRoot The root path or URL.
-     * @param aPath The path or URL to be joined with the root.
-     *
-     * - If aPath is a URL or a data URI, aPath is returned, unless aPath is a
-     *   scheme-relative URL: Then the scheme of aRoot, if any, is prepended
-     *   first.
-     * - Otherwise aPath is a path. If aRoot is a URL, then its path portion
-     *   is updated with the result and aRoot is returned. Otherwise the result
-     *   is returned.
-     *   - If aPath is absolute, the result is aPath.
-     *   - Otherwise the two paths are joined with a slash.
-     * - Joining for example 'http://' and 'www.example.com' is also supported.
-     */
-
-    function join(aRoot, aPath) {
-      if (aRoot === "") {
-        aRoot = ".";
-      }
-
-      if (aPath === "") {
-        aPath = ".";
-      }
-
-      var aPathUrl = urlParse(aPath);
-      var aRootUrl = urlParse(aRoot);
-
-      if (aRootUrl) {
-        aRoot = aRootUrl.path || '/';
-      } // `join(foo, '//www.example.org')`
-
-
-      if (aPathUrl && !aPathUrl.scheme) {
-        if (aRootUrl) {
-          aPathUrl.scheme = aRootUrl.scheme;
-        }
-
-        return urlGenerate(aPathUrl);
-      }
-
-      if (aPathUrl || aPath.match(dataUrlRegexp)) {
-        return aPath;
-      } // `join('http://', 'www.example.com')`
-
-
-      if (aRootUrl && !aRootUrl.host && !aRootUrl.path) {
-        aRootUrl.host = aPath;
-        return urlGenerate(aRootUrl);
-      }
-
-      var joined = aPath.charAt(0) === '/' ? aPath : normalize(aRoot.replace(/\/+$/, '') + '/' + aPath);
-
-      if (aRootUrl) {
-        aRootUrl.path = joined;
-        return urlGenerate(aRootUrl);
-      }
-
-      return joined;
-    }
-
-    exports.join = join;
-
-    exports.isAbsolute = function (aPath) {
-      return aPath.charAt(0) === '/' || urlRegexp.test(aPath);
-    };
-    /**
-     * Make a path relative to a URL or another path.
-     *
-     * @param aRoot The root path or URL.
-     * @param aPath The path or URL to be made relative to aRoot.
-     */
-
-
-    function relative(aRoot, aPath) {
-      if (aRoot === "") {
-        aRoot = ".";
-      }
-
-      aRoot = aRoot.replace(/\/$/, ''); // It is possible for the path to be above the root. In this case, simply
-      // checking whether the root is a prefix of the path won't work. Instead, we
-      // need to remove components from the root one by one, until either we find
-      // a prefix that fits, or we run out of components to remove.
-
-      var level = 0;
-
-      while (aPath.indexOf(aRoot + '/') !== 0) {
-        var index = aRoot.lastIndexOf("/");
-
-        if (index < 0) {
-          return aPath;
-        } // If the only part of the root that is left is the scheme (i.e. http://,
-        // file:///, etc.), one or more slashes (/), or simply nothing at all, we
-        // have exhausted all components, so the path is not relative to the root.
-
-
-        aRoot = aRoot.slice(0, index);
-
-        if (aRoot.match(/^([^\/]+:\/)?\/*$/)) {
-          return aPath;
-        }
-
-        ++level;
-      } // Make sure we add a "../" for each component we removed from the root.
-
-
-      return window.Array(level + 1).join("../") + aPath.substr(aRoot.length + 1);
-    }
-
-    exports.relative = relative;
-
-    var supportsNullProto = function () {
-      var obj = window.Object.create(null);
-      return !('__proto__' in obj);
-    }();
-
-    function identity(s) {
-      return s;
-    }
-    /**
-     * Because behavior goes wacky when you set `__proto__` on objects, we
-     * have to prefix all the strings in our set with an arbitrary character.
-     *
-     * See https://github.com/mozilla/source-map/pull/31 and
-     * https://github.com/mozilla/source-map/issues/30
-     *
-     * @param String aStr
-     */
-
-
-    function toSetString(aStr) {
-      if (isProtoString(aStr)) {
-        return '$' + aStr;
-      }
-
-      return aStr;
-    }
-
-    exports.toSetString = supportsNullProto ? identity : toSetString;
-
-    function fromSetString(aStr) {
-      if (isProtoString(aStr)) {
-        return aStr.slice(1);
-      }
-
-      return aStr;
-    }
-
-    exports.fromSetString = supportsNullProto ? identity : fromSetString;
-
-    function isProtoString(s) {
-      if (!s) {
-        return false;
-      }
-
-      var length = s.length;
-
-      if (length < 9
-      /* "__proto__".length */
-      ) {
-          return false;
-        }
-
-      if (s.charCodeAt(length - 1) !== 95
-      /* '_' */
-      || s.charCodeAt(length - 2) !== 95
-      /* '_' */
-      || s.charCodeAt(length - 3) !== 111
-      /* 'o' */
-      || s.charCodeAt(length - 4) !== 116
-      /* 't' */
-      || s.charCodeAt(length - 5) !== 111
-      /* 'o' */
-      || s.charCodeAt(length - 6) !== 114
-      /* 'r' */
-      || s.charCodeAt(length - 7) !== 112
-      /* 'p' */
-      || s.charCodeAt(length - 8) !== 95
-      /* '_' */
-      || s.charCodeAt(length - 9) !== 95
-      /* '_' */
-      ) {
-          return false;
-        }
-
-      for (var i = length - 10; i >= 0; i--) {
-        if (s.charCodeAt(i) !== 36
-        /* '$' */
-        ) {
-            return false;
-          }
-      }
-
-      return true;
-    }
-    /**
-     * Comparator between two mappings where the original positions are compared.
-     *
-     * Optionally pass in `true` as `onlyCompareGenerated` to consider two
-     * mappings with the same original source/line/column, but different generated
-     * line and column the same. Useful when searching for a mapping with a
-     * stubbed out mapping.
-     */
-
-
-    function compareByOriginalPositions(mappingA, mappingB, onlyCompareOriginal) {
-      var cmp = strcmp(mappingA.source, mappingB.source);
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.originalLine - mappingB.originalLine;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.originalColumn - mappingB.originalColumn;
-
-      if (cmp !== 0 || onlyCompareOriginal) {
-        return cmp;
-      }
-
-      cmp = mappingA.generatedColumn - mappingB.generatedColumn;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.generatedLine - mappingB.generatedLine;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      return strcmp(mappingA.name, mappingB.name);
-    }
-
-    exports.compareByOriginalPositions = compareByOriginalPositions;
-    /**
-     * Comparator between two mappings with deflated source and name indices where
-     * the generated positions are compared.
-     *
-     * Optionally pass in `true` as `onlyCompareGenerated` to consider two
-     * mappings with the same generated line and column, but different
-     * source/name/original line and column the same. Useful when searching for a
-     * mapping with a stubbed out mapping.
-     */
-
-    function compareByGeneratedPositionsDeflated(mappingA, mappingB, onlyCompareGenerated) {
-      var cmp = mappingA.generatedLine - mappingB.generatedLine;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.generatedColumn - mappingB.generatedColumn;
-
-      if (cmp !== 0 || onlyCompareGenerated) {
-        return cmp;
-      }
-
-      cmp = strcmp(mappingA.source, mappingB.source);
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.originalLine - mappingB.originalLine;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.originalColumn - mappingB.originalColumn;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      return strcmp(mappingA.name, mappingB.name);
-    }
-
-    exports.compareByGeneratedPositionsDeflated = compareByGeneratedPositionsDeflated;
-
-    function strcmp(aStr1, aStr2) {
-      if (aStr1 === aStr2) {
-        return 0;
-      }
-
-      if (aStr1 === null) {
-        return 1; // aStr2 !== null
-      }
-
-      if (aStr2 === null) {
-        return -1; // aStr1 !== null
-      }
-
-      if (aStr1 > aStr2) {
-        return 1;
-      }
-
-      return -1;
-    }
-    /**
-     * Comparator between two mappings with inflated source and name strings where
-     * the generated positions are compared.
-     */
-
-
-    function compareByGeneratedPositionsInflated(mappingA, mappingB) {
-      var cmp = mappingA.generatedLine - mappingB.generatedLine;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.generatedColumn - mappingB.generatedColumn;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = strcmp(mappingA.source, mappingB.source);
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.originalLine - mappingB.originalLine;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      cmp = mappingA.originalColumn - mappingB.originalColumn;
-
-      if (cmp !== 0) {
-        return cmp;
-      }
-
-      return strcmp(mappingA.name, mappingB.name);
-    }
-
-    exports.compareByGeneratedPositionsInflated = compareByGeneratedPositionsInflated;
-    /**
-     * Strip any JSON XSSI avoidance prefix from the string (as documented
-     * in the source maps specification), and then parse the string as
-     * JSON.
-     */
-
-    function parseSourceMapInput(str) {
-      return JSON.parse(str.replace(/^\)]}'[^\n]*\n/, ''));
-    }
-
-    exports.parseSourceMapInput = parseSourceMapInput;
-    /**
-     * Compute the URL of a source given the the source root, the source's
-     * URL, and the source map's URL.
-     */
-
-    function computeSourceURL(sourceRoot, sourceURL, sourceMapURL) {
-      sourceURL = sourceURL || '';
-
-      if (sourceRoot) {
-        // This follows what Chrome does.
-        if (sourceRoot[sourceRoot.length - 1] !== '/' && sourceURL[0] !== '/') {
-          sourceRoot += '/';
-        } // The spec says:
-        //   Line 4: An optional source root, useful for relocating source
-        //   files on a server or removing repeated values in the
-        //   “sources” entry.  This value is prepended to the individual
-        //   entries in the “source” field.
-
-
-        sourceURL = sourceRoot + sourceURL;
-      } // Historically, SourceMapConsumer did not take the sourceMapURL as
-      // a parameter.  This mode is still somewhat supported, which is why
-      // this code block is conditional.  However, it's preferable to pass
-      // the source map URL to SourceMapConsumer, so that this function
-      // can implement the source URL resolution algorithm as outlined in
-      // the spec.  This block is basically the equivalent of:
-      //    new URL(sourceURL, sourceMapURL).toString()
-      // ... except it avoids using URL, which wasn't available in the
-      // older releases of node still supported by this library.
-      //
-      // The spec says:
-      //   If the sources are not absolute URLs after prepending of the
-      //   “sourceRoot”, the sources are resolved relative to the
-      //   SourceMap (like resolving script src in a html document).
-
-
-      if (sourceMapURL) {
-        var parsed = urlParse(sourceMapURL);
-
-        if (!parsed) {
-          throw new Error("sourceMapURL could not be parsed");
-        }
-
-        if (parsed.path) {
-          // Strip the last path component, but keep the "/".
-          var index = parsed.path.lastIndexOf('/');
-
-          if (index >= 0) {
-            parsed.path = parsed.path.substring(0, index + 1);
-          }
-        }
-
-        sourceURL = join(urlGenerate(parsed), sourceURL);
-      }
-
-      return normalize(sourceURL);
-    }
-
-    exports.computeSourceURL = computeSourceURL;
-  });
-  var util_1 = util.getArg;
-  var util_2 = util.urlParse;
-  var util_3 = util.urlGenerate;
-  var util_4 = util.normalize;
-  var util_5 = util.join;
-  var util_6 = util.isAbsolute;
-  var util_7 = util.relative;
-  var util_8 = util.toSetString;
-  var util_9 = util.fromSetString;
-  var util_10 = util.compareByOriginalPositions;
-  var util_11 = util.compareByGeneratedPositionsDeflated;
-  var util_12 = util.compareByGeneratedPositionsInflated;
-  var util_13 = util.parseSourceMapInput;
-  var util_14 = util.computeSourceURL;
-
-  /* -*- Mode: js; js-indent-level: 2; -*- */
-
-  /*
-   * Copyright 2011 Mozilla Foundation and contributors
-   * Licensed under the New BSD license. See LICENSE or:
-   * http://opensource.org/licenses/BSD-3-Clause
-   */
-
-  var has = window.Object.prototype.hasOwnProperty;
-  var hasNativeMap = typeof window.Map !== "undefined";
-  /**
-   * A data structure which is a combination of an array and a set. Adding a new
-   * member is O(1), testing for membership is O(1), and finding the index of an
-   * element is O(1). Removing elements from the set is not supported. Only
-   * strings are supported for membership.
-   */
-
-  function ArraySet() {
-    this._array = [];
-    this._set = hasNativeMap ? new window.Map() : window.Object.create(null);
-  }
-  /**
-   * Static method for creating ArraySet instances from an existing array.
-   */
-
-
-  ArraySet.fromArray = function ArraySet_fromArray(aArray, aAllowDuplicates) {
-    var set = new ArraySet();
-
-    for (var i = 0, len = aArray.length; i < len; i++) {
-      set.add(aArray[i], aAllowDuplicates);
-    }
-
-    return set;
-  };
-  /**
-   * Return how many unique items are in this ArraySet. If duplicates have been
-   * added, than those do not count towards the size.
-   *
-   * @returns Number
-   */
-
-
-  ArraySet.prototype.size = function ArraySet_size() {
-    return hasNativeMap ? this._set.size : window.Object.getOwnPropertyNames(this._set).length;
-  };
-  /**
-   * Add the given string to this set.
-   *
-   * @param String aStr
-   */
-
-
-  ArraySet.prototype.add = function ArraySet_add(aStr, aAllowDuplicates) {
-    var sStr = hasNativeMap ? aStr : util.toSetString(aStr);
-    var isDuplicate = hasNativeMap ? this.has(aStr) : has.call(this._set, sStr);
-    var idx = this._array.length;
-
-    if (!isDuplicate || aAllowDuplicates) {
-      this._array.push(aStr);
-    }
-
-    if (!isDuplicate) {
-      if (hasNativeMap) {
-        this._set.set(aStr, idx);
-      } else {
-        this._set[sStr] = idx;
-      }
-    }
-  };
-  /**
-   * Is the given string a member of this set?
-   *
-   * @param String aStr
-   */
-
-
-  ArraySet.prototype.has = function ArraySet_has(aStr) {
-    if (hasNativeMap) {
-      return this._set.has(aStr);
-    } else {
-      var sStr = util.toSetString(aStr);
-      return has.call(this._set, sStr);
-    }
-  };
-  /**
-   * What is the index of the given string in the array?
-   *
-   * @param String aStr
-   */
-
-
-  ArraySet.prototype.indexOf = function ArraySet_indexOf(aStr) {
-    if (hasNativeMap) {
-      var idx = this._set.get(aStr);
-
-      if (idx >= 0) {
-        return idx;
-      }
-    } else {
-      var sStr = util.toSetString(aStr);
-
-      if (has.call(this._set, sStr)) {
-        return this._set[sStr];
-      }
-    }
-
-    throw new Error('"' + aStr + '" is not in the set.');
-  };
-  /**
-   * What is the element at the given index?
-   *
-   * @param Number aIdx
-   */
-
-
-  ArraySet.prototype.at = function ArraySet_at(aIdx) {
-    if (aIdx >= 0 && aIdx < this._array.length) {
-      return this._array[aIdx];
-    }
-
-    throw new Error('No element indexed by ' + aIdx);
-  };
-  /**
-   * Returns the array representation of this set (which has the proper indices
-   * indicated by indexOf). Note that this is a copy of the internal array used
-   * for storing the members so that no one can mess with internal state.
-   */
-
-
-  ArraySet.prototype.toArray = function ArraySet_toArray() {
-    return this._array.slice();
-  };
-
-  var ArraySet_1 = ArraySet;
-  var arraySet = {
-    ArraySet: ArraySet_1
-  };
-
-  /* -*- Mode: js; js-indent-level: 2; -*- */
-
-  /*
-   * Copyright 2014 Mozilla Foundation and contributors
-   * Licensed under the New BSD license. See LICENSE or:
-   * http://opensource.org/licenses/BSD-3-Clause
-   */
-
-  /**
-   * Determine whether mappingB is after mappingA with respect to generated
-   * position.
-   */
-
-  function generatedPositionAfter(mappingA, mappingB) {
-    // Optimized for most common case
-    var lineA = mappingA.generatedLine;
-    var lineB = mappingB.generatedLine;
-    var columnA = mappingA.generatedColumn;
-    var columnB = mappingB.generatedColumn;
-    return lineB > lineA || lineB == lineA && columnB >= columnA || util.compareByGeneratedPositionsInflated(mappingA, mappingB) <= 0;
-  }
-  /**
-   * A data structure to provide a sorted view of accumulated mappings in a
-   * performance conscious manner. It trades a neglibable overhead in general
-   * case for a large speedup in case of mappings being added in order.
-   */
-
-
-  function MappingList() {
-    this._array = [];
-    this._sorted = true; // Serves as infimum
-
-    this._last = {
-      generatedLine: -1,
-      generatedColumn: 0
-    };
-  }
-  /**
-   * Iterate through internal items. This method takes the same arguments that
-   * `Array.prototype.forEach` takes.
-   *
-   * NOTE: The order of the mappings is NOT guaranteed.
-   */
-
-
-  MappingList.prototype.unsortedForEach = function MappingList_forEach(aCallback, aThisArg) {
-    this._array.forEach(aCallback, aThisArg);
-  };
-  /**
-   * Add the given source mapping.
-   *
-   * @param window.Object aMapping
-   */
-
-
-  MappingList.prototype.add = function MappingList_add(aMapping) {
-    if (generatedPositionAfter(this._last, aMapping)) {
-      this._last = aMapping;
-
-      this._array.push(aMapping);
-    } else {
-      this._sorted = false;
-
-      this._array.push(aMapping);
-    }
-  };
-  /**
-   * Returns the flat, sorted array of mappings. The mappings are sorted by
-   * generated position.
-   *
-   * WARNING: This method returns internal data without copying, for
-   * performance. The return value must NOT be mutated, and should be treated as
-   * an immutable borrow. If you want to take ownership, you must make your own
-   * copy.
-   */
-
-
-  MappingList.prototype.toArray = function MappingList_toArray() {
-    if (!this._sorted) {
-      this._array.sort(util.compareByGeneratedPositionsInflated);
-
-      this._sorted = true;
-    }
-
-    return this._array;
-  };
-
-  var MappingList_1 = MappingList;
-  var mappingList = {
-    MappingList: MappingList_1
-  };
-
-  /* -*- Mode: js; js-indent-level: 2; -*- */
-
-  /*
-   * Copyright 2011 Mozilla Foundation and contributors
-   * Licensed under the New BSD license. See LICENSE or:
-   * http://opensource.org/licenses/BSD-3-Clause
-   */
-
-  var ArraySet$1 = arraySet.ArraySet;
-  var MappingList$1 = mappingList.MappingList;
-  /**
-   * An instance of the SourceMapGenerator represents a source map which is
-   * being built incrementally. You may pass an object with the following
-   * properties:
-   *
-   *   - file: The filename of the generated source.
-   *   - sourceRoot: A root for all relative URLs in this source map.
-   */
-
-  function SourceMapGenerator(aArgs) {
-    if (!aArgs) {
-      aArgs = {};
-    }
-
-    this._file = util.getArg(aArgs, 'file', null);
-    this._sourceRoot = util.getArg(aArgs, 'sourceRoot', null);
-    this._skipValidation = util.getArg(aArgs, 'skipValidation', false);
-    this._sources = new ArraySet$1();
-    this._names = new ArraySet$1();
-    this._mappings = new MappingList$1();
-    this._sourcesContents = null;
-  }
-
-  SourceMapGenerator.prototype._version = 3;
-  /**
-   * Creates a new SourceMapGenerator based on a SourceMapConsumer
-   *
-   * @param aSourceMapConsumer The SourceMap.
-   */
-
-  SourceMapGenerator.fromSourceMap = function SourceMapGenerator_fromSourceMap(aSourceMapConsumer) {
-    var sourceRoot = aSourceMapConsumer.sourceRoot;
-    var generator = new SourceMapGenerator({
-      file: aSourceMapConsumer.file,
-      sourceRoot: sourceRoot
-    });
-    aSourceMapConsumer.eachMapping(function (mapping) {
-      var newMapping = {
-        generated: {
-          line: mapping.generatedLine,
-          column: mapping.generatedColumn
-        }
-      };
-
-      if (mapping.source != null) {
-        newMapping.source = mapping.source;
-
-        if (sourceRoot != null) {
-          newMapping.source = util.relative(sourceRoot, newMapping.source);
-        }
-
-        newMapping.original = {
-          line: mapping.originalLine,
-          column: mapping.originalColumn
-        };
-
-        if (mapping.name != null) {
-          newMapping.name = mapping.name;
-        }
-      }
-
-      generator.addMapping(newMapping);
-    });
-    aSourceMapConsumer.sources.forEach(function (sourceFile) {
-      var sourceRelative = sourceFile;
-
-      if (sourceRoot !== null) {
-        sourceRelative = util.relative(sourceRoot, sourceFile);
-      }
-
-      if (!generator._sources.has(sourceRelative)) {
-        generator._sources.add(sourceRelative);
-      }
-
-      var content = aSourceMapConsumer.sourceContentFor(sourceFile);
-
-      if (content != null) {
-        generator.setSourceContent(sourceFile, content);
-      }
-    });
-    return generator;
-  };
-  /**
-   * Add a single mapping from original source line and column to the generated
-   * source's line and column for this source map being created. The mapping
-   * object should have the following properties:
-   *
-   *   - generated: An object with the generated line and column positions.
-   *   - original: An object with the original line and column positions.
-   *   - source: The original source file (relative to the sourceRoot).
-   *   - name: An optional original token name for this mapping.
-   */
-
-
-  SourceMapGenerator.prototype.addMapping = function SourceMapGenerator_addMapping(aArgs) {
-    var generated = util.getArg(aArgs, 'generated');
-    var original = util.getArg(aArgs, 'original', null);
-    var source = util.getArg(aArgs, 'source', null);
-    var name = util.getArg(aArgs, 'name', null);
-
-    if (!this._skipValidation) {
-      this._validateMapping(generated, original, source, name);
-    }
-
-    if (source != null) {
-      source = String(source);
-
-      if (!this._sources.has(source)) {
-        this._sources.add(source);
-      }
-    }
-
-    if (name != null) {
-      name = String(name);
-
-      if (!this._names.has(name)) {
-        this._names.add(name);
-      }
-    }
-
-    this._mappings.add({
-      generatedLine: generated.line,
-      generatedColumn: generated.column,
-      originalLine: original != null && original.line,
-      originalColumn: original != null && original.column,
-      source: source,
-      name: name
-    });
-  };
-  /**
-   * window.Set the source content for a source file.
-   */
-
-
-  SourceMapGenerator.prototype.setSourceContent = function SourceMapGenerator_setSourceContent(aSourceFile, aSourceContent) {
-    var source = aSourceFile;
-
-    if (this._sourceRoot != null) {
-      source = util.relative(this._sourceRoot, source);
-    }
-
-    if (aSourceContent != null) {
-      // Add the source content to the _sourcesContents map.
-      // Create a new _sourcesContents map if the property is null.
-      if (!this._sourcesContents) {
-        this._sourcesContents = window.Object.create(null);
-      }
-
-      this._sourcesContents[util.toSetString(source)] = aSourceContent;
-    } else if (this._sourcesContents) {
-      // Remove the source file from the _sourcesContents map.
-      // If the _sourcesContents map is empty, set the property to null.
-      delete this._sourcesContents[util.toSetString(source)];
-
-      if (window.Object.keys(this._sourcesContents).length === 0) {
-        this._sourcesContents = null;
-      }
-    }
-  };
-  /**
-   * Applies the mappings of a sub-source-map for a specific source file to the
-   * source map being generated. Each mapping to the supplied source file is
-   * rewritten using the supplied source map. Note: The resolution for the
-   * resulting mappings is the minimium of this map and the supplied map.
-   *
-   * @param aSourceMapConsumer The source map to be applied.
-   * @param aSourceFile Optional. The filename of the source file.
-   *        If omitted, SourceMapConsumer's file property will be used.
-   * @param aSourceMapPath Optional. The dirname of the path to the source map
-   *        to be applied. If relative, it is relative to the SourceMapConsumer.
-   *        This parameter is needed when the two source maps aren't in the same
-   *        directory, and the source map to be applied contains relative source
-   *        paths. If so, those relative source paths need to be rewritten
-   *        relative to the SourceMapGenerator.
-   */
-
-
-  SourceMapGenerator.prototype.applySourceMap = function SourceMapGenerator_applySourceMap(aSourceMapConsumer, aSourceFile, aSourceMapPath) {
-    var sourceFile = aSourceFile; // If aSourceFile is omitted, we will use the file property of the SourceMap
-
-    if (aSourceFile == null) {
-      if (aSourceMapConsumer.file == null) {
-        throw new Error('SourceMapGenerator.prototype.applySourceMap requires either an explicit source file, ' + 'or the source map\'s "file" property. Both were omitted.');
-      }
-
-      sourceFile = aSourceMapConsumer.file;
-    }
-
-    var sourceRoot = this._sourceRoot; // Make "sourceFile" relative if an absolute Url is passed.
-
-    if (sourceRoot != null) {
-      sourceFile = util.relative(sourceRoot, sourceFile);
-    } // Applying the SourceMap can add and remove items from the sources and
-    // the names array.
-
-
-    var newSources = new ArraySet$1();
-    var newNames = new ArraySet$1(); // Find mappings for the "sourceFile"
-
-    this._mappings.unsortedForEach(function (mapping) {
-      if (mapping.source === sourceFile && mapping.originalLine != null) {
-        // Check if it can be mapped by the source map, then update the mapping.
-        var original = aSourceMapConsumer.originalPositionFor({
-          line: mapping.originalLine,
-          column: mapping.originalColumn
-        });
-
-        if (original.source != null) {
-          // Copy mapping
-          mapping.source = original.source;
-
-          if (aSourceMapPath != null) {
-            mapping.source = util.join(aSourceMapPath, mapping.source);
-          }
-
-          if (sourceRoot != null) {
-            mapping.source = util.relative(sourceRoot, mapping.source);
-          }
-
-          mapping.originalLine = original.line;
-          mapping.originalColumn = original.column;
-
-          if (original.name != null) {
-            mapping.name = original.name;
-          }
-        }
-      }
-
-      var source = mapping.source;
-
-      if (source != null && !newSources.has(source)) {
-        newSources.add(source);
-      }
-
-      var name = mapping.name;
-
-      if (name != null && !newNames.has(name)) {
-        newNames.add(name);
-      }
-    }, this);
-
-    this._sources = newSources;
-    this._names = newNames; // Copy sourcesContents of applied map.
-
-    aSourceMapConsumer.sources.forEach(function (sourceFile) {
-      var content = aSourceMapConsumer.sourceContentFor(sourceFile);
-
-      if (content != null) {
-        if (aSourceMapPath != null) {
-          sourceFile = util.join(aSourceMapPath, sourceFile);
-        }
-
-        if (sourceRoot != null) {
-          sourceFile = util.relative(sourceRoot, sourceFile);
-        }
-
-        this.setSourceContent(sourceFile, content);
-      }
-    }, this);
-  };
-  /**
-   * A mapping can have one of the three levels of data:
-   *
-   *   1. Just the generated position.
-   *   2. The Generated position, original position, and original source.
-   *   3. Generated and original position, original source, as well as a name
-   *      token.
-   *
-   * To maintain consistency, we validate that any new mapping being added falls
-   * in to one of these categories.
-   */
-
-
-  SourceMapGenerator.prototype._validateMapping = function SourceMapGenerator_validateMapping(aGenerated, aOriginal, aSource, aName) {
-    // When aOriginal is truthy but has empty values for .line and .column,
-    // it is most likely a programmer error. In this case we throw a very
-    // specific error message to try to guide them the right way.
-    // For example: https://github.com/Polymer/polymer-bundler/pull/519
-    if (aOriginal && typeof aOriginal.line !== 'number' && typeof aOriginal.column !== 'number') {
-      throw new Error('original.line and original.column are not numbers -- you probably meant to omit ' + 'the original mapping entirely and only map the generated position. If so, pass ' + 'null for the original mapping instead of an object with empty or null values.');
-    }
-
-    if (aGenerated && 'line' in aGenerated && 'column' in aGenerated && aGenerated.line > 0 && aGenerated.column >= 0 && !aOriginal && !aSource && !aName) {
-      // Case 1.
-      return;
-    } else if (aGenerated && 'line' in aGenerated && 'column' in aGenerated && aOriginal && 'line' in aOriginal && 'column' in aOriginal && aGenerated.line > 0 && aGenerated.column >= 0 && aOriginal.line > 0 && aOriginal.column >= 0 && aSource) {
-      // Cases 2 and 3.
-      return;
-    } else {
-      throw new Error('Invalid mapping: ' + JSON.stringify({
-        generated: aGenerated,
-        source: aSource,
-        original: aOriginal,
-        name: aName
-      }));
-    }
-  };
-  /**
-   * Serialize the accumulated mappings in to the stream of base 64 VLQs
-   * specified by the source map format.
-   */
-
-
-  SourceMapGenerator.prototype._serializeMappings = function SourceMapGenerator_serializeMappings() {
-    var previousGeneratedColumn = 0;
-    var previousGeneratedLine = 1;
-    var previousOriginalColumn = 0;
-    var previousOriginalLine = 0;
-    var previousName = 0;
-    var previousSource = 0;
-    var result = '';
-    var next;
-    var mapping;
-    var nameIdx;
-    var sourceIdx;
-
-    var mappings = this._mappings.toArray();
-
-    for (var i = 0, len = mappings.length; i < len; i++) {
-      mapping = mappings[i];
-      next = '';
-
-      if (mapping.generatedLine !== previousGeneratedLine) {
-        previousGeneratedColumn = 0;
-
-        while (mapping.generatedLine !== previousGeneratedLine) {
-          next += ';';
-          previousGeneratedLine++;
-        }
-      } else {
-        if (i > 0) {
-          if (!util.compareByGeneratedPositionsInflated(mapping, mappings[i - 1])) {
-            continue;
-          }
-
-          next += ',';
-        }
-      }
-
-      next += base64Vlq.encode(mapping.generatedColumn - previousGeneratedColumn);
-      previousGeneratedColumn = mapping.generatedColumn;
-
-      if (mapping.source != null) {
-        sourceIdx = this._sources.indexOf(mapping.source);
-        next += base64Vlq.encode(sourceIdx - previousSource);
-        previousSource = sourceIdx; // lines are stored 0-based in SourceMap spec version 3
-
-        next += base64Vlq.encode(mapping.originalLine - 1 - previousOriginalLine);
-        previousOriginalLine = mapping.originalLine - 1;
-        next += base64Vlq.encode(mapping.originalColumn - previousOriginalColumn);
-        previousOriginalColumn = mapping.originalColumn;
-
-        if (mapping.name != null) {
-          nameIdx = this._names.indexOf(mapping.name);
-          next += base64Vlq.encode(nameIdx - previousName);
-          previousName = nameIdx;
-        }
-      }
-
-      result += next;
-    }
-
-    return result;
-  };
-
-  SourceMapGenerator.prototype._generateSourcesContent = function SourceMapGenerator_generateSourcesContent(aSources, aSourceRoot) {
-    return aSources.map(function (source) {
-      if (!this._sourcesContents) {
-        return null;
-      }
-
-      if (aSourceRoot != null) {
-        source = util.relative(aSourceRoot, source);
-      }
-
-      var key = util.toSetString(source);
-      return window.Object.prototype.hasOwnProperty.call(this._sourcesContents, key) ? this._sourcesContents[key] : null;
-    }, this);
-  };
-  /**
-   * Externalize the source map.
-   */
-
-
-  SourceMapGenerator.prototype.toJSON = function SourceMapGenerator_toJSON() {
-    var map = {
-      version: this._version,
-      sources: this._sources.toArray(),
-      names: this._names.toArray(),
-      mappings: this._serializeMappings()
-    };
-
-    if (this._file != null) {
-      map.file = this._file;
-    }
-
-    if (this._sourceRoot != null) {
-      map.sourceRoot = this._sourceRoot;
-    }
-
-    if (this._sourcesContents) {
-      map.sourcesContent = this._generateSourcesContent(map.sources, map.sourceRoot);
-    }
-
-    return map;
-  };
-  /**
-   * Render the source map being generated to a string.
-   */
-
-
-  SourceMapGenerator.prototype.toString = function SourceMapGenerator_toString() {
-    return JSON.stringify(this.toJSON());
-  };
-
-  var SourceMapGenerator_1 = SourceMapGenerator;
-  var sourceMapGenerator = {
-    SourceMapGenerator: SourceMapGenerator_1
-  };
-
-  var SourceMapGenerator$1 = sourceMapGenerator.SourceMapGenerator;
-  var trackNodes = {
-    Atrule: true,
-    Selector: true,
-    Declaration: true
-  };
-
-  var sourceMap = function generateSourceMap(handlers) {
-    var map = new SourceMapGenerator$1();
-    var line = 1;
-    var column = 0;
-    var generated = {
-      line: 1,
-      column: 0
-    };
-    var original = {
-      line: 0,
-      // should be zero to add first mapping
-      column: 0
-    };
-    var sourceMappingActive = false;
-    var activatedGenerated = {
-      line: 1,
-      column: 0
-    };
-    var activatedMapping = {
-      generated: activatedGenerated
-    };
-    var handlersNode = handlers.node;
-
-    handlers.node = function (node) {
-      if (node.loc && node.loc.start && trackNodes.hasOwnProperty(node.type)) {
-        var nodeLine = node.loc.start.line;
-        var nodeColumn = node.loc.start.column - 1;
-
-        if (original.line !== nodeLine || original.column !== nodeColumn) {
-          original.line = nodeLine;
-          original.column = nodeColumn;
-          generated.line = line;
-          generated.column = column;
-
-          if (sourceMappingActive) {
-            sourceMappingActive = false;
-
-            if (generated.line !== activatedGenerated.line || generated.column !== activatedGenerated.column) {
-              map.addMapping(activatedMapping);
-            }
-          }
-
-          sourceMappingActive = true;
-          map.addMapping({
-            source: node.loc.source,
-            original: original,
-            generated: generated
-          });
-        }
-      }
-
-      handlersNode.call(this, node);
-
-      if (sourceMappingActive && trackNodes.hasOwnProperty(node.type)) {
-        activatedGenerated.line = line;
-        activatedGenerated.column = column;
-      }
-    };
-
-    var handlersChunk = handlers.chunk;
-
-    handlers.chunk = function (chunk) {
-      for (var i = 0; i < chunk.length; i++) {
-        if (chunk.charCodeAt(i) === 10) {
-          // \n
-          line++;
-          column = 0;
-        } else {
-          column++;
-        }
-      }
-
-      handlersChunk(chunk);
-    };
-
-    var handlersResult = handlers.result;
-
-    handlers.result = function () {
-      if (sourceMappingActive) {
-        map.addMapping(activatedMapping);
-      }
-
-      return {
-        css: handlersResult(),
-        map: map
-      };
-    };
-
-    return handlers;
-  };
-
-  var hasOwnProperty$3 = window.Object.prototype.hasOwnProperty;
-
-  function processChildren(node, delimeter) {
-    var list = node.children;
-    var prev = null;
-
-    if (typeof delimeter !== 'function') {
-      list.forEach(this.node, this);
-    } else {
-      list.forEach(function (node) {
-        if (prev !== null) {
-          delimeter.call(this, prev);
-        }
-
-        this.node(node);
-        prev = node;
-      }, this);
-    }
-  }
-
-  var create$1 = function createGenerator(config) {
-    function processNode(node) {
-      if (hasOwnProperty$3.call(types, node.type)) {
-        types[node.type].call(this, node);
-      } else {
-        throw new Error('Unknown node type: ' + node.type);
-      }
-    }
-
-    var types = {};
-
-    if (config.node) {
-      for (var name in config.node) {
-        types[name] = config.node[name].generate;
-      }
-    }
-
-    return function (node, options) {
-      var buffer = '';
-      var handlers = {
-        children: processChildren,
-        node: processNode,
-        chunk: function (chunk) {
-          buffer += chunk;
-        },
-        result: function () {
-          return buffer;
-        }
-      };
-
-      if (options) {
-        if (typeof options.decorator === 'function') {
-          handlers = options.decorator(handlers);
-        }
-
-        if (options.sourceMap) {
-          handlers = sourceMap(handlers);
-        }
-      }
-
-      handlers.node(node);
-      return handlers.result();
-    };
-  };
-
-  var create$2 = function createConvertors(walk) {
-    return {
-      fromPlainObject: function (ast) {
-        walk(ast, {
-          enter: function (node) {
-            if (node.children && node.children instanceof List_1 === false) {
-              node.children = new List_1().fromArray(node.children);
-            }
-          }
-        });
-        return ast;
-      },
-      toPlainObject: function (ast) {
-        walk(ast, {
-          leave: function (node) {
-            if (node.children && node.children instanceof List_1) {
-              node.children = node.children.toArray();
-            }
-          }
-        });
-        return ast;
-      }
-    };
-  };
-
-  var hasOwnProperty$4 = window.Object.prototype.hasOwnProperty;
-
-  var noop$3 = function () {};
-
-  function ensureFunction$1(value) {
-    return typeof value === 'function' ? value : noop$3;
-  }
-
-  function invokeForType(fn, type) {
-    return function (node, item, list) {
-      if (node.type === type) {
-        fn.call(this, node, item, list);
-      }
-    };
-  }
-
-  function getWalkersFromStructure(name, nodeType) {
-    var structure = nodeType.structure;
-    var walkers = [];
-
-    for (var key in structure) {
-      if (hasOwnProperty$4.call(structure, key) === false) {
-        continue;
-      }
-
-      var fieldTypes = structure[key];
-      var walker = {
-        name: key,
-        type: false,
-        nullable: false
-      };
-
-      if (!Array.isArray(structure[key])) {
-        fieldTypes = [structure[key]];
-      }
-
-      for (var i = 0; i < fieldTypes.length; i++) {
-        var fieldType = fieldTypes[i];
-
-        if (fieldType === null) {
-          walker.nullable = true;
-        } else if (typeof fieldType === 'string') {
-          walker.type = 'node';
-        } else if (window.Array.isArray(fieldType)) {
-          walker.type = 'list';
-        }
-      }
-
-      if (walker.type) {
-        walkers.push(walker);
-      }
-    }
-
-    if (walkers.length) {
-      return {
-        context: nodeType.walkContext,
-        fields: walkers
-      };
-    }
-
-    return null;
-  }
-
-  function getTypesFromConfig(config) {
-    var types = {};
-
-    for (var name in config.node) {
-      if (hasOwnProperty$4.call(config.node, name)) {
-        var nodeType = config.node[name];
-
-        if (!nodeType.structure) {
-          throw new Error('Missed `structure` field in `' + name + '` node type definition');
-        }
-
-        types[name] = getWalkersFromStructure(name, nodeType);
-      }
-    }
-
-    return types;
-  }
-
-  function createTypeIterator(config, reverse) {
-    var fields = config.fields.slice();
-    var contextName = config.context;
-    var useContext = typeof contextName === 'string';
-
-    if (reverse) {
-      fields.reverse();
-    }
-
-    return function (node, context, walk) {
-      var prevContextValue;
-
-      if (useContext) {
-        prevContextValue = context[contextName];
-        context[contextName] = node;
-      }
-
-      for (var i = 0; i < fields.length; i++) {
-        var field = fields[i];
-        var ref = node[field.name];
-
-        if (!field.nullable || ref) {
-          if (field.type === 'list') {
-            if (reverse) {
-              ref.forEachRight(walk);
-            } else {
-              ref.forEach(walk);
-            }
-          } else {
-            walk(ref);
-          }
-        }
-      }
-
-      if (useContext) {
-        context[contextName] = prevContextValue;
-      }
-    };
-  }
-
-  function createFastTraveralMap(iterators) {
-    return {
-      Atrule: {
-        StyleSheet: iterators.StyleSheet,
-        Atrule: iterators.Atrule,
-        Rule: iterators.Rule,
-        Block: iterators.Block
-      },
-      Rule: {
-        StyleSheet: iterators.StyleSheet,
-        Atrule: iterators.Atrule,
-        Rule: iterators.Rule,
-        Block: iterators.Block
-      },
-      Declaration: {
-        StyleSheet: iterators.StyleSheet,
-        Atrule: iterators.Atrule,
-        Rule: iterators.Rule,
-        Block: iterators.Block,
-        DeclarationList: iterators.DeclarationList
-      }
-    };
-  }
-
-  var create$3 = function createWalker(config) {
-    var types = getTypesFromConfig(config);
-    var iteratorsNatural = {};
-    var iteratorsReverse = {};
-
-    for (var name in types) {
-      if (hasOwnProperty$4.call(types, name) && types[name] !== null) {
-        iteratorsNatural[name] = createTypeIterator(types[name], false);
-        iteratorsReverse[name] = createTypeIterator(types[name], true);
-      }
-    }
-
-    var fastTraversalIteratorsNatural = createFastTraveralMap(iteratorsNatural);
-    var fastTraversalIteratorsReverse = createFastTraveralMap(iteratorsReverse);
-
-    var walk = function (root, options) {
-      function walkNode(node, item, list) {
-        enter.call(context, node, item, list);
-
-        if (iterators.hasOwnProperty(node.type)) {
-          iterators[node.type](node, context, walkNode);
-        }
-
-        leave.call(context, node, item, list);
-      }
-
-      var enter = noop$3;
-      var leave = noop$3;
-      var iterators = iteratorsNatural;
-      var context = {
-        root: root,
-        stylesheet: null,
-        atrule: null,
-        atrulePrelude: null,
-        rule: null,
-        selector: null,
-        block: null,
-        declaration: null,
-        function: null
-      };
-
-      if (typeof options === 'function') {
-        enter = options;
-      } else if (options) {
-        enter = ensureFunction$1(options.enter);
-        leave = ensureFunction$1(options.leave);
-
-        if (options.reverse) {
-          iterators = iteratorsReverse;
-        }
-
-        if (options.visit) {
-          if (fastTraversalIteratorsNatural.hasOwnProperty(options.visit)) {
-            iterators = options.reverse ? fastTraversalIteratorsReverse[options.visit] : fastTraversalIteratorsNatural[options.visit];
-          } else if (!types.hasOwnProperty(options.visit)) {
-            throw new Error('Bad value `' + options.visit + '` for `visit` option (should be: ' + window.Object.keys(types).join(', ') + ')');
-          }
-
-          enter = invokeForType(enter, options.visit);
-          leave = invokeForType(leave, options.visit);
-        }
-      }
-
-      if (enter === noop$3 && leave === noop$3) {
-        throw new Error('Neither `enter` nor `leave` walker handler is set or both aren\'t a function');
-      } // swap handlers in reverse mode to invert visit order
-
-
-      if (options.reverse) {
-        var tmp = enter;
-        enter = leave;
-        leave = tmp;
-      }
-
-      walkNode(root);
-    };
-
-    walk.find = function (ast, fn) {
-      var found = null;
-      walk(ast, function (node, item, list) {
-        if (found === null && fn.call(this, node, item, list)) {
-          found = node;
-        }
-      });
-      return found;
-    };
-
-    walk.findLast = function (ast, fn) {
-      var found = null;
-      walk(ast, {
-        reverse: true,
-        enter: function (node, item, list) {
-          if (found === null && fn.call(this, node, item, list)) {
-            found = node;
-          }
-        }
-      });
-      return found;
-    };
-
-    walk.findAll = function (ast, fn) {
-      var found = [];
-      walk(ast, function (node, item, list) {
-        if (fn.call(this, node, item, list)) {
-          found.push(node);
-        }
-      });
-      return found;
-    };
-
-    return walk;
-  };
-
-  var clone = function clone(node) {
-    var result = {};
-
-    for (var key in node) {
-      var value = node[key];
-
-      if (value) {
-        if (window.Array.isArray(value) || value instanceof List_1) {
-          value = value.map(clone);
-        } else if (value.constructor === window.Object) {
-          value = clone(value);
-        }
-      }
-
-      result[key] = value;
-    }
-
-    return result;
-  };
-
-  var hasOwnProperty$5 = window.Object.prototype.hasOwnProperty;
-  var shape = {
-    generic: true,
-    types: {},
-    atrules: {},
-    properties: {},
-    parseContext: {},
-    scope: {},
-    atrule: ['parse'],
-    pseudo: ['parse'],
-    node: ['name', 'structure', 'parse', 'generate', 'walkContext']
-  };
-
-  function isObject(value) {
-    return value && value.constructor === window.Object;
-  }
-
-  function copy(value) {
-    if (isObject(value)) {
-      return window.Object.assign({}, value);
-    } else {
-      return value;
-    }
-  }
-
-  function extend(dest, src) {
-    for (var key in src) {
-      if (hasOwnProperty$5.call(src, key)) {
-        if (isObject(dest[key])) {
-          extend(dest[key], copy(src[key]));
-        } else {
-          dest[key] = copy(src[key]);
-        }
-      }
-    }
-  }
-
-  function mix(dest, src, shape) {
-    for (var key in shape) {
-      if (hasOwnProperty$5.call(shape, key) === false) {
-        continue;
-      }
-
-      if (shape[key] === true) {
-        if (key in src) {
-          if (hasOwnProperty$5.call(src, key)) {
-            dest[key] = copy(src[key]);
-          }
-        }
-      } else if (shape[key]) {
-        if (isObject(shape[key])) {
-          var res = {};
-          extend(res, dest[key]);
-          extend(res, src[key]);
-          dest[key] = res;
-        } else if (window.Array.isArray(shape[key])) {
-          var res = {};
-          var innerShape = shape[key].reduce(function (s, k) {
-            s[k] = true;
-            return s;
-          }, {});
-
-          for (var name in dest[key]) {
-            if (hasOwnProperty$5.call(dest[key], name)) {
-              res[name] = {};
-
-              if (dest[key] && dest[key][name]) {
-                mix(res[name], dest[key][name], innerShape);
-              }
-            }
-          }
-
-          for (var name in src[key]) {
-            if (hasOwnProperty$5.call(src[key], name)) {
-              if (!res[name]) {
-                res[name] = {};
-              }
-
-              if (src[key] && src[key][name]) {
-                mix(res[name], src[key][name], innerShape);
-              }
-            }
-          }
-
-          dest[key] = res;
-        }
-      }
-    }
-
-    return dest;
-  }
-
-  var mix_1 = function (dest, src) {
-    return mix(dest, src, shape);
-  };
-
-  function createSyntax(config) {
-    var parse = create(config);
-    var walk = create$3(config);
-    var generate = create$1(config);
-    var convert = create$2(walk);
-    var syntax = {
-      List: List_1,
-      SyntaxError: _SyntaxError,
-      TokenStream: TokenStream_1,
-      Lexer: Lexer_1,
-      vendorPrefix: names.vendorPrefix,
-      keyword: names.keyword,
-      property: names.property,
-      isCustomProperty: names.isCustomProperty,
-      definitionSyntax: definitionSyntax,
-      lexer: null,
-      createLexer: function (config) {
-        return new Lexer_1(config, syntax, syntax.lexer.structure);
-      },
-      tokenize: tokenizer,
-      parse: parse,
-      walk: walk,
-      generate: generate,
-      find: walk.find,
-      findLast: walk.findLast,
-      findAll: walk.findAll,
-      clone: clone,
-      fromPlainObject: convert.fromPlainObject,
-      toPlainObject: convert.toPlainObject,
-      createSyntax: function (config) {
-        return createSyntax(mix_1({}, config));
-      },
-      fork: function (extension) {
-        var base = mix_1({}, config); // copy of config
-
-        return createSyntax(typeof extension === 'function' ? extension(base, window.Object.assign) : mix_1(base, extension));
-      }
-    };
-    syntax.lexer = new Lexer_1({
-      generic: true,
-      types: config.types,
-      atrules: config.atrules,
-      properties: config.properties,
-      node: config.node
-    }, syntax);
-    return syntax;
-  }
-
-  var create_1 = function (config) {
-    return createSyntax(mix_1({}, config));
-  };
-
-  var create$4 = {
-    create: create_1
-  };
-
-  var atRules = {
-  	"@charset": {
-  	syntax: "@charset \"<charset>\";",
-  	groups: [
-  		"CSS Charsets"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@charset"
-  },
-  	"@counter-style": {
-  	syntax: "@counter-style <counter-style-name> {\n  [ system: <counter-system>; ] ||\n  [ symbols: <counter-symbols>; ] ||\n  [ additive-symbols: <additive-symbols>; ] ||\n  [ negative: <negative-symbol>; ] ||\n  [ prefix: <prefix>; ] ||\n  [ suffix: <suffix>; ] ||\n  [ range: <range>; ] ||\n  [ pad: <padding>; ] ||\n  [ speak-as: <speak-as>; ] ||\n  [ fallback: <counter-style-name>; ]\n}",
-  	interfaces: [
-  		"CSSCounterStyleRule"
-  	],
-  	groups: [
-  		"CSS Counter Styles"
-  	],
-  	descriptors: {
-  		"additive-symbols": {
-  			syntax: "[ <integer> && <symbol> ]#",
-  			media: "all",
-  			initial: "N/A",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		fallback: {
-  			syntax: "<counter-style-name>",
-  			media: "all",
-  			initial: "decimal",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		negative: {
-  			syntax: "<symbol> <symbol>?",
-  			media: "all",
-  			initial: "\"-\" hyphen-minus",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		pad: {
-  			syntax: "<integer> && <symbol>",
-  			media: "all",
-  			initial: "0 \"\"",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		prefix: {
-  			syntax: "<symbol>",
-  			media: "all",
-  			initial: "\"\"",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		range: {
-  			syntax: "[ [ <integer> | infinite ]{2} ]# | auto",
-  			media: "all",
-  			initial: "auto",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		"speak-as": {
-  			syntax: "auto | bullets | numbers | words | spell-out | <counter-style-name>",
-  			media: "all",
-  			initial: "auto",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		suffix: {
-  			syntax: "<symbol>",
-  			media: "all",
-  			initial: "\". \"",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		symbols: {
-  			syntax: "<symbol>+",
-  			media: "all",
-  			initial: "N/A",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		system: {
-  			syntax: "cyclic | numeric | alphabetic | symbolic | additive | [ fixed <integer>? ] | [ extends <counter-style-name> ]",
-  			media: "all",
-  			initial: "symbolic",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		}
-  	},
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@counter-style"
-  },
-  	"@document": {
-  	syntax: "@document [ <url> | url-prefix(<string>) | domain(<string>) | media-document(<string>) | regexp(<string>) ]# {\n  <group-rule-body>\n}",
-  	interfaces: [
-  		"CSSGroupingRule",
-  		"CSSConditionRule"
-  	],
-  	groups: [
-  		"CSS Conditional Rules"
-  	],
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@document"
-  },
-  	"@font-face": {
-  	syntax: "@font-face {\n  [ font-family: <family-name>; ] ||\n  [ src: <src>; ] ||\n  [ unicode-range: <unicode-range>; ] ||\n  [ font-variant: <font-variant>; ] ||\n  [ font-feature-settings: <font-feature-settings>; ] ||\n  [ font-variation-settings: <font-variation-settings>; ] ||\n  [ font-stretch: <font-stretch>; ] ||\n  [ font-weight: <font-weight>; ] ||\n  [ font-style: <font-style>; ]\n}",
-  	interfaces: [
-  		"CSSFontFaceRule"
-  	],
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	descriptors: {
-  		"font-display": {
-  			syntax: "[ auto | block | swap | fallback | optional ]",
-  			media: "visual",
-  			percentages: "no",
-  			initial: "auto",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "experimental"
-  		},
-  		"font-family": {
-  			syntax: "<family-name>",
-  			media: "all",
-  			initial: "n/a (required)",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"font-feature-settings": {
-  			syntax: "normal | <feature-tag-value>#",
-  			media: "all",
-  			initial: "normal",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		"font-variation-settings": {
-  			syntax: "normal | [ <string> <number> ]#",
-  			media: "all",
-  			initial: "normal",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		"font-stretch": {
-  			syntax: "<font-stretch-absolute>{1,2}",
-  			media: "all",
-  			initial: "normal",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"font-style": {
-  			syntax: "normal | italic | oblique <angle>{0,2}",
-  			media: "all",
-  			initial: "normal",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"font-weight": {
-  			syntax: "<font-weight-absolute>{1,2}",
-  			media: "all",
-  			initial: "normal",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"font-variant": {
-  			syntax: "normal | none | [ <common-lig-values> || <discretionary-lig-values> || <historical-lig-values> || <contextual-alt-values> || stylistic(<feature-value-name>) || historical-forms || styleset(<feature-value-name>#) || character-variant(<feature-value-name>#) || swash(<feature-value-name>) || ornaments(<feature-value-name>) || annotation(<feature-value-name>) || [ small-caps | all-small-caps | petite-caps | all-petite-caps | unicase | titling-caps ] || <numeric-figure-values> || <numeric-spacing-values> || <numeric-fraction-values> || ordinal || slashed-zero || <east-asian-variant-values> || <east-asian-width-values> || ruby ]",
-  			media: "all",
-  			initial: "normal",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		src: {
-  			syntax: "[ <url> [ format( <string># ) ]? | local( <family-name> ) ]#",
-  			media: "all",
-  			initial: "n/a (required)",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		"unicode-range": {
-  			syntax: "<unicode-range>#",
-  			media: "all",
-  			initial: "U+0-10FFFF",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		}
-  	},
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@font-face"
-  },
-  	"@font-feature-values": {
-  	syntax: "@font-feature-values <family-name># {\n  <feature-value-block-list>\n}",
-  	interfaces: [
-  		"CSSFontFeatureValuesRule"
-  	],
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@font-feature-values"
-  },
-  	"@import": {
-  	syntax: "@import [ <string> | <url> ] [ <media-query-list> ]?;",
-  	groups: [
-  		"Media Queries"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@import"
-  },
-  	"@keyframes": {
-  	syntax: "@keyframes <keyframes-name> {\n  <keyframe-block-list>\n}",
-  	interfaces: [
-  		"CSSKeyframeRule",
-  		"CSSKeyframesRule"
-  	],
-  	groups: [
-  		"CSS Animations"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@keyframes"
-  },
-  	"@media": {
-  	syntax: "@media <media-query-list> {\n  <group-rule-body>\n}",
-  	interfaces: [
-  		"CSSGroupingRule",
-  		"CSSConditionRule",
-  		"CSSMediaRule",
-  		"CSSCustomMediaRule"
-  	],
-  	groups: [
-  		"CSS Conditional Rules",
-  		"Media Queries"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@media"
-  },
-  	"@namespace": {
-  	syntax: "@namespace <namespace-prefix>? [ <string> | <url> ];",
-  	groups: [
-  		"CSS Namespaces"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@namespace"
-  },
-  	"@page": {
-  	syntax: "@page <page-selector-list> {\n  <page-body>\n}",
-  	interfaces: [
-  		"CSSPageRule"
-  	],
-  	groups: [
-  		"CSS Pages"
-  	],
-  	descriptors: {
-  		bleed: {
-  			syntax: "auto | <length>",
-  			media: [
-  				"visual",
-  				"paged"
-  			],
-  			initial: "auto",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "experimental"
-  		},
-  		marks: {
-  			syntax: "none | [ crop || cross ]",
-  			media: [
-  				"visual",
-  				"paged"
-  			],
-  			initial: "none",
-  			percentages: "no",
-  			computed: "asSpecified",
-  			order: "orderOfAppearance",
-  			status: "experimental"
-  		}
-  	},
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@page"
-  },
-  	"@supports": {
-  	syntax: "@supports <supports-condition> {\n  <group-rule-body>\n}",
-  	interfaces: [
-  		"CSSGroupingRule",
-  		"CSSConditionRule",
-  		"CSSSupportsRule"
-  	],
-  	groups: [
-  		"CSS Conditional Rules"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@supports"
-  },
-  	"@viewport": {
-  	syntax: "@viewport {\n  <group-rule-body>\n}",
-  	interfaces: [
-  		"CSSViewportRule"
-  	],
-  	groups: [
-  		"CSS Device Adaptation"
-  	],
-  	descriptors: {
-  		height: {
-  			syntax: "<viewport-length>{1,2}",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: [
-  				"min-height",
-  				"max-height"
-  			],
-  			percentages: [
-  				"min-height",
-  				"max-height"
-  			],
-  			computed: [
-  				"min-height",
-  				"max-height"
-  			],
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		"max-height": {
-  			syntax: "<viewport-length>",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "auto",
-  			percentages: "referToHeightOfInitialViewport",
-  			computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"max-width": {
-  			syntax: "<viewport-length>",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "auto",
-  			percentages: "referToWidthOfInitialViewport",
-  			computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"max-zoom": {
-  			syntax: "auto | <number> | <percentage>",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "auto",
-  			percentages: "the zoom factor itself",
-  			computed: "autoNonNegativeOrPercentage",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"min-height": {
-  			syntax: "<viewport-length>",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "auto",
-  			percentages: "referToHeightOfInitialViewport",
-  			computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"min-width": {
-  			syntax: "<viewport-length>",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "auto",
-  			percentages: "referToWidthOfInitialViewport",
-  			computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"min-zoom": {
-  			syntax: "auto | <number> | <percentage>",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "auto",
-  			percentages: "the zoom factor itself",
-  			computed: "autoNonNegativeOrPercentage",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		orientation: {
-  			syntax: "auto | portrait | landscape",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "auto",
-  			percentages: "referToSizeOfBoundingBox",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		"user-zoom": {
-  			syntax: "zoom | fixed",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "zoom",
-  			percentages: "referToSizeOfBoundingBox",
-  			computed: "asSpecified",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		},
-  		width: {
-  			syntax: "<viewport-length>{1,2}",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: [
-  				"min-width",
-  				"max-width"
-  			],
-  			percentages: [
-  				"min-width",
-  				"max-width"
-  			],
-  			computed: [
-  				"min-width",
-  				"max-width"
-  			],
-  			order: "orderOfAppearance",
-  			status: "standard"
-  		},
-  		zoom: {
-  			syntax: "auto | <number> | <percentage>",
-  			media: [
-  				"visual",
-  				"continuous"
-  			],
-  			initial: "auto",
-  			percentages: "the zoom factor itself",
-  			computed: "autoNonNegativeOrPercentage",
-  			order: "uniqueOrder",
-  			status: "standard"
-  		}
-  	},
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/@viewport"
-  }
-  };
-
-  var atRules$1 = /*#__PURE__*/window.Object.freeze({
-    __proto__: null,
-    'default': atRules
-  });
-
-  var all = {
-  	syntax: "initial | inherit | unset | revert",
-  	media: "noPracticalMedia",
-  	inherited: false,
-  	animationType: "eachOfShorthandPropertiesExceptUnicodeBiDiAndDirection",
-  	percentages: "no",
-  	groups: [
-  		"CSS Miscellaneous"
-  	],
-  	initial: "noPracticalInitialValue",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedAppliesToEachProperty",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/all"
-  };
-  var animation = {
-  	syntax: "<single-animation>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: [
-  		"animation-name",
-  		"animation-duration",
-  		"animation-timing-function",
-  		"animation-delay",
-  		"animation-iteration-count",
-  		"animation-direction",
-  		"animation-fill-mode",
-  		"animation-play-state"
-  	],
-  	appliesto: "allElementsAndPseudos",
-  	computed: [
-  		"animation-name",
-  		"animation-duration",
-  		"animation-timing-function",
-  		"animation-delay",
-  		"animation-direction",
-  		"animation-iteration-count",
-  		"animation-fill-mode",
-  		"animation-play-state"
-  	],
-  	order: "orderOfAppearance",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation"
-  };
-  var appearance = {
-  	syntax: "none | auto | button | textfield | <compat>",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-appearance"
-  };
-  var azimuth = {
-  	syntax: "<angle> | [ [ left-side | far-left | left | center-left | center | center-right | right | far-right | right-side ] || behind ] | leftwards | rightwards",
-  	media: "aural",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Speech"
-  	],
-  	initial: "center",
-  	appliesto: "allElements",
-  	computed: "normalizedAngle",
-  	order: "orderOfAppearance",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/azimuth"
-  };
-  var background = {
-  	syntax: "[ <bg-layer> , ]* <final-bg-layer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"background-color",
-  		"background-image",
-  		"background-clip",
-  		"background-position",
-  		"background-size",
-  		"background-repeat",
-  		"background-attachment"
-  	],
-  	percentages: [
-  		"background-position",
-  		"background-size"
-  	],
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"background-image",
-  		"background-position",
-  		"background-size",
-  		"background-repeat",
-  		"background-origin",
-  		"background-clip",
-  		"background-attachment",
-  		"background-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"background-image",
-  		"background-position",
-  		"background-size",
-  		"background-repeat",
-  		"background-origin",
-  		"background-clip",
-  		"background-attachment",
-  		"background-color"
-  	],
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background"
-  };
-  var border = {
-  	syntax: "<line-width> || <line-style> || <color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"border-color",
-  		"border-style",
-  		"border-width"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-width",
-  		"border-style",
-  		"border-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-width",
-  		"border-style",
-  		"border-color"
-  	],
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border"
-  };
-  var bottom = {
-  	syntax: "<length> | <percentage> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToContainingBlockHeight",
-  	groups: [
-  		"CSS Positioning"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/bottom"
-  };
-  var clear = {
-  	syntax: "none | left | right | both | inline-start | inline-end",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Positioning"
-  	],
-  	initial: "none",
-  	appliesto: "blockLevelElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/clear"
-  };
-  var clip = {
-  	syntax: "<shape> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "rectangle",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "auto",
-  	appliesto: "absolutelyPositionedElements",
-  	computed: "autoOrRectangle",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/clip"
-  };
-  var color = {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Color"
-  	],
-  	initial: "variesFromBrowserToBrowser",
-  	appliesto: "allElements",
-  	computed: "translucentValuesRGBAOtherwiseRGB",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/color"
-  };
-  var columns = {
-  	syntax: "<'column-width'> || <'column-count'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"column-width",
-  		"column-count"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: [
-  		"column-width",
-  		"column-count"
-  	],
-  	appliesto: "blockContainersExceptTableWrappers",
-  	computed: [
-  		"column-width",
-  		"column-count"
-  	],
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/columns"
-  };
-  var contain = {
-  	syntax: "none | strict | content | [ size || layout || style || paint ]",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Containment"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/contain"
-  };
-  var content = {
-  	syntax: "normal | none | [ <content-replacement> | <content-list> ] [/ <string> ]?",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Generated Content"
-  	],
-  	initial: "normal",
-  	appliesto: "beforeAndAfterPseudos",
-  	computed: "normalOnElementsForPseudosNoneAbsoluteURIStringOrAsSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/content"
-  };
-  var cursor = {
-  	syntax: "[ [ <url> [ <x> <y> ]? , ]* [ auto | default | none | context-menu | help | pointer | progress | wait | cell | crosshair | text | vertical-text | alias | copy | move | no-drop | not-allowed | e-resize | n-resize | ne-resize | nw-resize | s-resize | se-resize | sw-resize | w-resize | ew-resize | ns-resize | nesw-resize | nwse-resize | col-resize | row-resize | all-scroll | zoom-in | zoom-out | grab | grabbing ] ]",
-  	media: [
-  		"visual",
-  		"interactive"
-  	],
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedURLsAbsolute",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/cursor"
-  };
-  var direction = {
-  	syntax: "ltr | rtl",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Writing Modes"
-  	],
-  	initial: "ltr",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/direction"
-  };
-  var display = {
-  	syntax: "[ <display-outside> || <display-inside> ] | <display-listitem> | <display-internal> | <display-box> | <display-legacy>",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Display"
-  	],
-  	initial: "inline",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedExceptPositionedFloatingAndRootElementsKeywordMaybeDifferent",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/display"
-  };
-  var filter = {
-  	syntax: "none | <filter-function-list>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "filterList",
-  	percentages: "no",
-  	groups: [
-  		"Filter Effects"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/filter"
-  };
-  var flex = {
-  	syntax: "none | [ <'flex-grow'> <'flex-shrink'>? || <'flex-basis'> ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"flex-grow",
-  		"flex-shrink",
-  		"flex-basis"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Flexible Box Layout"
-  	],
-  	initial: [
-  		"flex-grow",
-  		"flex-shrink",
-  		"flex-basis"
-  	],
-  	appliesto: "flexItemsAndInFlowPseudos",
-  	computed: [
-  		"flex-grow",
-  		"flex-shrink",
-  		"flex-basis"
-  	],
-  	order: "orderOfAppearance",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/flex"
-  };
-  var float = {
-  	syntax: "left | right | none | inline-start | inline-end",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Positioning"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsNoEffectIfDisplayNone",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/float"
-  };
-  var font = {
-  	syntax: "[ [ <'font-style'> || <font-variant-css21> || <'font-weight'> || <'font-stretch'> ]? <'font-size'> [ / <'line-height'> ]? <'font-family'> ] | caption | icon | menu | message-box | small-caption | status-bar",
-  	media: "visual",
-  	inherited: true,
-  	animationType: [
-  		"font-style",
-  		"font-variant",
-  		"font-weight",
-  		"font-stretch",
-  		"font-size",
-  		"line-height",
-  		"font-family"
-  	],
-  	percentages: [
-  		"font-size",
-  		"line-height"
-  	],
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: [
-  		"font-style",
-  		"font-variant",
-  		"font-weight",
-  		"font-stretch",
-  		"font-size",
-  		"line-height",
-  		"font-family"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"font-style",
-  		"font-variant",
-  		"font-weight",
-  		"font-stretch",
-  		"font-size",
-  		"line-height",
-  		"font-family"
-  	],
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font"
-  };
-  var gap = {
-  	syntax: "<'row-gap'> <'column-gap'>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"row-gap",
-  		"column-gap"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: [
-  		"row-gap",
-  		"column-gap"
-  	],
-  	appliesto: "gridContainers",
-  	computed: [
-  		"row-gap",
-  		"column-gap"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/gap"
-  };
-  var grid = {
-  	syntax: "<'grid-template'> | <'grid-template-rows'> / [ auto-flow && dense? ] <'grid-auto-columns'>? | [ auto-flow && dense? ] <'grid-auto-rows'>? / <'grid-template-columns'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: [
-  		"grid-template-rows",
-  		"grid-template-columns",
-  		"grid-auto-rows",
-  		"grid-auto-columns"
-  	],
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: [
-  		"grid-template-rows",
-  		"grid-template-columns",
-  		"grid-template-areas",
-  		"grid-auto-rows",
-  		"grid-auto-columns",
-  		"grid-auto-flow",
-  		"grid-column-gap",
-  		"grid-row-gap",
-  		"column-gap",
-  		"row-gap"
-  	],
-  	appliesto: "gridContainers",
-  	computed: [
-  		"grid-template-rows",
-  		"grid-template-columns",
-  		"grid-template-areas",
-  		"grid-auto-rows",
-  		"grid-auto-columns",
-  		"grid-auto-flow",
-  		"grid-column-gap",
-  		"grid-row-gap",
-  		"column-gap",
-  		"row-gap"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid"
-  };
-  var height = {
-  	syntax: "[ <length> | <percentage> ] && [ border-box | content-box ]? | available | min-content | max-content | fit-content | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "regardingHeightOfGeneratedBoxContainingBlockPercentagesRelativeToContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsButNonReplacedAndTableColumns",
-  	computed: "percentageAutoOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/height"
-  };
-  var hyphens = {
-  	syntax: "none | manual | auto",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "manual",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/hyphens"
-  };
-  var inset = {
-  	syntax: "<'top'>{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "logicalHeightOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "sameAsBoxOffsets",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/inset"
-  };
-  var isolation = {
-  	syntax: "auto | isolate",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Compositing and Blending"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsSVGContainerGraphicsAndGraphicsReferencingElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/isolation"
-  };
-  var left = {
-  	syntax: "<length> | <percentage> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Positioning"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/left"
-  };
-  var margin = {
-  	syntax: "[ <length> | <percentage> | auto ]{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: [
-  		"margin-bottom",
-  		"margin-left",
-  		"margin-right",
-  		"margin-top"
-  	],
-  	appliesto: "allElementsExceptTableDisplayTypes",
-  	computed: [
-  		"margin-bottom",
-  		"margin-left",
-  		"margin-right",
-  		"margin-top"
-  	],
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin"
-  };
-  var mask = {
-  	syntax: "<mask-layer>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"mask-image",
-  		"mask-mode",
-  		"mask-repeat",
-  		"mask-position",
-  		"mask-clip",
-  		"mask-origin",
-  		"mask-size",
-  		"mask-composite"
-  	],
-  	percentages: [
-  		"mask-position"
-  	],
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: [
-  		"mask-image",
-  		"mask-mode",
-  		"mask-repeat",
-  		"mask-position",
-  		"mask-clip",
-  		"mask-origin",
-  		"mask-size",
-  		"mask-composite"
-  	],
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: [
-  		"mask-image",
-  		"mask-mode",
-  		"mask-repeat",
-  		"mask-position",
-  		"mask-clip",
-  		"mask-origin",
-  		"mask-size",
-  		"mask-composite"
-  	],
-  	order: "perGrammar",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask"
-  };
-  var offset = {
-  	syntax: "[ <'offset-position'>? [ <'offset-path'> [ <'offset-distance'> || <'offset-rotate'> ]? ]? ]! [ / <'offset-anchor'> ]?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"offset-position",
-  		"offset-path",
-  		"offset-distance",
-  		"offset-anchor",
-  		"offset-rotate"
-  	],
-  	percentages: [
-  		"offset-position",
-  		"offset-distance",
-  		"offset-anchor"
-  	],
-  	groups: [
-  		"CSS Motion Path"
-  	],
-  	initial: [
-  		"offset-position",
-  		"offset-path",
-  		"offset-distance",
-  		"offset-anchor",
-  		"offset-rotate"
-  	],
-  	appliesto: "transformableElements",
-  	computed: [
-  		"offset-position",
-  		"offset-path",
-  		"offset-distance",
-  		"offset-anchor",
-  		"offset-rotate"
-  	],
-  	order: "perGrammar",
-  	stacking: true,
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/offset"
-  };
-  var opacity = {
-  	syntax: "<alpha-value>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "number",
-  	percentages: "no",
-  	groups: [
-  		"CSS Color"
-  	],
-  	initial: "1.0",
-  	appliesto: "allElements",
-  	computed: "specifiedValueClipped0To1",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/opacity"
-  };
-  var order = {
-  	syntax: "<integer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "integer",
-  	percentages: "no",
-  	groups: [
-  		"CSS Flexible Box Layout"
-  	],
-  	initial: "0",
-  	appliesto: "flexItemsAndAbsolutelyPositionedFlexContainerChildren",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/order"
-  };
-  var orphans = {
-  	syntax: "<integer>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fragmentation"
-  	],
-  	initial: "2",
-  	appliesto: "blockContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/orphans"
-  };
-  var outline = {
-  	syntax: "[ <'outline-color'> || <'outline-style'> || <'outline-width'> ]",
-  	media: [
-  		"visual",
-  		"interactive"
-  	],
-  	inherited: false,
-  	animationType: [
-  		"outline-color",
-  		"outline-width",
-  		"outline-style"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: [
-  		"outline-color",
-  		"outline-style",
-  		"outline-width"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"outline-color",
-  		"outline-width",
-  		"outline-style"
-  	],
-  	order: "orderOfAppearance",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/outline"
-  };
-  var overflow = {
-  	syntax: "[ visible | hidden | clip | scroll | auto ]{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Overflow"
-  	],
-  	initial: "visible",
-  	appliesto: "blockContainersFlexContainersGridContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/overflow"
-  };
-  var padding = {
-  	syntax: "[ <length> | <percentage> ]{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: [
-  		"padding-bottom",
-  		"padding-left",
-  		"padding-right",
-  		"padding-top"
-  	],
-  	appliesto: "allElementsExceptInternalTableDisplayTypes",
-  	computed: [
-  		"padding-bottom",
-  		"padding-left",
-  		"padding-right",
-  		"padding-top"
-  	],
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding"
-  };
-  var perspective = {
-  	syntax: "none | <length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "none",
-  	appliesto: "transformableElements",
-  	computed: "absoluteLengthOrNone",
-  	order: "uniqueOrder",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/perspective"
-  };
-  var position = {
-  	syntax: "static | relative | absolute | sticky | fixed",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Positioning"
-  	],
-  	initial: "static",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/position"
-  };
-  var quotes = {
-  	syntax: "none | auto | [ <string> <string> ]+",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Generated Content"
-  	],
-  	initial: "dependsOnUserAgent",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/quotes"
-  };
-  var resize = {
-  	syntax: "none | both | horizontal | vertical | block | inline",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "none",
-  	appliesto: "elementsWithOverflowNotVisibleAndReplacedElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/resize"
-  };
-  var right = {
-  	syntax: "<length> | <percentage> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Positioning"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/right"
-  };
-  var rotate = {
-  	syntax: "none | <angle> | [ x | y | z | <number>{3} ] && <angle>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "transform",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "none",
-  	appliesto: "transformableElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/rotate"
-  };
-  var scale = {
-  	syntax: "none | <number>{1,3}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "transform",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "none",
-  	appliesto: "transformableElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scale"
-  };
-  var top = {
-  	syntax: "<length> | <percentage> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToContainingBlockHeight",
-  	groups: [
-  		"CSS Positioning"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/top"
-  };
-  var transform = {
-  	syntax: "none | <transform-list>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "transform",
-  	percentages: "referToSizeOfBoundingBox",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "none",
-  	appliesto: "transformableElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transform"
-  };
-  var transition = {
-  	syntax: "<single-transition>#",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transitions"
-  	],
-  	initial: [
-  		"transition-delay",
-  		"transition-duration",
-  		"transition-property",
-  		"transition-timing-function"
-  	],
-  	appliesto: "allElementsAndPseudos",
-  	computed: [
-  		"transition-delay",
-  		"transition-duration",
-  		"transition-property",
-  		"transition-timing-function"
-  	],
-  	order: "orderOfAppearance",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transition"
-  };
-  var translate = {
-  	syntax: "none | <length-percentage> [ <length-percentage> <length>? ]?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "transform",
-  	percentages: "referToSizeOfBoundingBox",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "none",
-  	appliesto: "transformableElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "perGrammar",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/translate"
-  };
-  var visibility = {
-  	syntax: "visible | hidden | collapse",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "visibility",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "visible",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/visibility"
-  };
-  var widows = {
-  	syntax: "<integer>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fragmentation"
-  	],
-  	initial: "2",
-  	appliesto: "blockContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/widows"
-  };
-  var width = {
-  	syntax: "[ <length> | <percentage> ] && [ border-box | content-box ]? | available | min-content | max-content | fit-content | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsButNonReplacedAndTableRows",
-  	computed: "percentageAutoOrAbsoluteLength",
-  	order: "lengthOrPercentageBeforeKeywordIfBothPresent",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/width"
-  };
-  var zoom = {
-  	syntax: "normal | reset | <number> | <percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "integer",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/zoom"
-  };
-  var properties$1 = {
-  	"--*": {
-  	syntax: "<declaration-value>",
-  	media: "all",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Variables"
-  	],
-  	initial: "seeProse",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedWithVarsSubstituted",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/--*"
-  },
-  	"-ms-accelerator": {
-  	syntax: "false | true",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "false",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-accelerator"
-  },
-  	"-ms-block-progression": {
-  	syntax: "tb | rl | bt | lr",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "tb",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-block-progression"
-  },
-  	"-ms-content-zoom-chaining": {
-  	syntax: "none | chained",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-content-zoom-chaining"
-  },
-  	"-ms-content-zooming": {
-  	syntax: "none | zoom",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "zoomForTheTopLevelNoneForTheRest",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-content-zooming"
-  },
-  	"-ms-content-zoom-limit": {
-  	syntax: "<'-ms-content-zoom-limit-min'> <'-ms-content-zoom-limit-max'>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: [
-  		"-ms-content-zoom-limit-max",
-  		"-ms-content-zoom-limit-min"
-  	],
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: [
-  		"-ms-content-zoom-limit-max",
-  		"-ms-content-zoom-limit-min"
-  	],
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: [
-  		"-ms-content-zoom-limit-max",
-  		"-ms-content-zoom-limit-min"
-  	],
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-content-zoom-limit"
-  },
-  	"-ms-content-zoom-limit-max": {
-  	syntax: "<percentage>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "maxZoomFactor",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "400%",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-content-zoom-limit-max"
-  },
-  	"-ms-content-zoom-limit-min": {
-  	syntax: "<percentage>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "minZoomFactor",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "100%",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-content-zoom-limit-min"
-  },
-  	"-ms-content-zoom-snap": {
-  	syntax: "<'-ms-content-zoom-snap-type'> || <'-ms-content-zoom-snap-points'>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: [
-  		"-ms-content-zoom-snap-type",
-  		"-ms-content-zoom-snap-points"
-  	],
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: [
-  		"-ms-content-zoom-snap-type",
-  		"-ms-content-zoom-snap-points"
-  	],
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-content-zoom-snap"
-  },
-  	"-ms-content-zoom-snap-points": {
-  	syntax: "snapInterval( <percentage>, <percentage> ) | snapList( <percentage># )",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "snapInterval(0%, 100%)",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-content-zoom-snap-points"
-  },
-  	"-ms-content-zoom-snap-type": {
-  	syntax: "none | proximity | mandatory",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-content-zoom-snap-type"
-  },
-  	"-ms-filter": {
-  	syntax: "<string>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "\"\"",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-filter"
-  },
-  	"-ms-flow-from": {
-  	syntax: "[ none | <custom-ident> ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "nonReplacedElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-flow-from"
-  },
-  	"-ms-flow-into": {
-  	syntax: "[ none | <custom-ident> ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "iframeElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-flow-into"
-  },
-  	"-ms-high-contrast-adjust": {
-  	syntax: "auto | none",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-high-contrast-adjust"
-  },
-  	"-ms-hyphenate-limit-chars": {
-  	syntax: "auto | <integer>{1,3}",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-hyphenate-limit-chars"
-  },
-  	"-ms-hyphenate-limit-lines": {
-  	syntax: "no-limit | <integer>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "no-limit",
-  	appliesto: "blockContainerElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-hyphenate-limit-lines"
-  },
-  	"-ms-hyphenate-limit-zone": {
-  	syntax: "<percentage> | <length>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "referToLineBoxWidth",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "blockContainerElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-hyphenate-limit-zone"
-  },
-  	"-ms-ime-align": {
-  	syntax: "auto | after",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-ime-align"
-  },
-  	"-ms-overflow-style": {
-  	syntax: "auto | none | scrollbar | -ms-autohiding-scrollbar",
-  	media: "interactive",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-overflow-style"
-  },
-  	"-ms-scrollbar-3dlight-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "dependsOnUserAgent",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scrollbar-3dlight-color"
-  },
-  	"-ms-scrollbar-arrow-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "ButtonText",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scrollbar-arrow-color"
-  },
-  	"-ms-scrollbar-base-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "dependsOnUserAgent",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scrollbar-base-color"
-  },
-  	"-ms-scrollbar-darkshadow-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "ThreeDDarkShadow",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scrollbar-darkshadow-color"
-  },
-  	"-ms-scrollbar-face-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "ThreeDFace",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scrollbar-face-color"
-  },
-  	"-ms-scrollbar-highlight-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "ThreeDHighlight",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scrollbar-highlight-color"
-  },
-  	"-ms-scrollbar-shadow-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "ThreeDDarkShadow",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scrollbar-shadow-color"
-  },
-  	"-ms-scrollbar-track-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "Scrollbar",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scrollbar-track-color"
-  },
-  	"-ms-scroll-chaining": {
-  	syntax: "chained | none",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "chained",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-chaining"
-  },
-  	"-ms-scroll-limit": {
-  	syntax: "<'-ms-scroll-limit-x-min'> <'-ms-scroll-limit-y-min'> <'-ms-scroll-limit-x-max'> <'-ms-scroll-limit-y-max'>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: [
-  		"-ms-scroll-limit-x-min",
-  		"-ms-scroll-limit-y-min",
-  		"-ms-scroll-limit-x-max",
-  		"-ms-scroll-limit-y-max"
-  	],
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: [
-  		"-ms-scroll-limit-x-min",
-  		"-ms-scroll-limit-y-min",
-  		"-ms-scroll-limit-x-max",
-  		"-ms-scroll-limit-y-max"
-  	],
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-limit"
-  },
-  	"-ms-scroll-limit-x-max": {
-  	syntax: "auto | <length>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-limit-x-max"
-  },
-  	"-ms-scroll-limit-x-min": {
-  	syntax: "<length>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-limit-x-min"
-  },
-  	"-ms-scroll-limit-y-max": {
-  	syntax: "auto | <length>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-limit-y-max"
-  },
-  	"-ms-scroll-limit-y-min": {
-  	syntax: "<length>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-limit-y-min"
-  },
-  	"-ms-scroll-rails": {
-  	syntax: "none | railed",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "railed",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-rails"
-  },
-  	"-ms-scroll-snap-points-x": {
-  	syntax: "snapInterval( <length-percentage>, <length-percentage> ) | snapList( <length-percentage># )",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "snapInterval(0px, 100%)",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-snap-points-x"
-  },
-  	"-ms-scroll-snap-points-y": {
-  	syntax: "snapInterval( <length-percentage>, <length-percentage> ) | snapList( <length-percentage># )",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "snapInterval(0px, 100%)",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-snap-points-y"
-  },
-  	"-ms-scroll-snap-type": {
-  	syntax: "none | proximity | mandatory",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-snap-type"
-  },
-  	"-ms-scroll-snap-x": {
-  	syntax: "<'-ms-scroll-snap-type'> <'-ms-scroll-snap-points-x'>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: [
-  		"-ms-scroll-snap-type",
-  		"-ms-scroll-snap-points-x"
-  	],
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: [
-  		"-ms-scroll-snap-type",
-  		"-ms-scroll-snap-points-x"
-  	],
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-snap-x"
-  },
-  	"-ms-scroll-snap-y": {
-  	syntax: "<'-ms-scroll-snap-type'> <'-ms-scroll-snap-points-y'>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: [
-  		"-ms-scroll-snap-type",
-  		"-ms-scroll-snap-points-y"
-  	],
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: [
-  		"-ms-scroll-snap-type",
-  		"-ms-scroll-snap-points-y"
-  	],
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-snap-y"
-  },
-  	"-ms-scroll-translation": {
-  	syntax: "none | vertical-to-horizontal",
-  	media: "interactive",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-scroll-translation"
-  },
-  	"-ms-text-autospace": {
-  	syntax: "none | ideograph-alpha | ideograph-numeric | ideograph-parenthesis | ideograph-space",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-text-autospace"
-  },
-  	"-ms-touch-select": {
-  	syntax: "grippers | none",
-  	media: "interactive",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "grippers",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-touch-select"
-  },
-  	"-ms-user-select": {
-  	syntax: "none | element | text",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "text",
-  	appliesto: "nonReplacedElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-user-select"
-  },
-  	"-ms-wrap-flow": {
-  	syntax: "auto | both | start | end | maximum | clear",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "blockLevelElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-wrap-flow"
-  },
-  	"-ms-wrap-margin": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "exclusionElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-wrap-margin"
-  },
-  	"-ms-wrap-through": {
-  	syntax: "wrap | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Microsoft Extensions"
-  	],
-  	initial: "wrap",
-  	appliesto: "blockLevelElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-ms-wrap-through"
-  },
-  	"-moz-appearance": {
-  	syntax: "none | button | button-arrow-down | button-arrow-next | button-arrow-previous | button-arrow-up | button-bevel | button-focus | caret | checkbox | checkbox-container | checkbox-label | checkmenuitem | dualbutton | groupbox | listbox | listitem | menuarrow | menubar | menucheckbox | menuimage | menuitem | menuitemtext | menulist | menulist-button | menulist-text | menulist-textfield | menupopup | menuradio | menuseparator | meterbar | meterchunk | progressbar | progressbar-vertical | progresschunk | progresschunk-vertical | radio | radio-container | radio-label | radiomenuitem | range | range-thumb | resizer | resizerpanel | scale-horizontal | scalethumbend | scalethumb-horizontal | scalethumbstart | scalethumbtick | scalethumb-vertical | scale-vertical | scrollbarbutton-down | scrollbarbutton-left | scrollbarbutton-right | scrollbarbutton-up | scrollbarthumb-horizontal | scrollbarthumb-vertical | scrollbartrack-horizontal | scrollbartrack-vertical | searchfield | separator | sheet | spinner | spinner-downbutton | spinner-textfield | spinner-upbutton | splitter | statusbar | statusbarpanel | tab | tabpanel | tabpanels | tab-scroll-arrow-back | tab-scroll-arrow-forward | textfield | textfield-multiline | toolbar | toolbarbutton | toolbarbutton-dropdown | toolbargripper | toolbox | tooltip | treeheader | treeheadercell | treeheadersortarrow | treeitem | treeline | treetwisty | treetwistyopen | treeview | -moz-mac-unified-toolbar | -moz-win-borderless-glass | -moz-win-browsertabbar-toolbox | -moz-win-communicationstext | -moz-win-communications-toolbox | -moz-win-exclude-glass | -moz-win-glass | -moz-win-mediatext | -moz-win-media-toolbox | -moz-window-button-box | -moz-window-button-box-maximized | -moz-window-button-close | -moz-window-button-maximize | -moz-window-button-minimize | -moz-window-button-restore | -moz-window-frame-bottom | -moz-window-frame-left | -moz-window-frame-right | -moz-window-titlebar | -moz-window-titlebar-maximized",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "noneButOverriddenInUserAgentCSS",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-appearance"
-  },
-  	"-moz-binding": {
-  	syntax: "<url> | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsExceptGeneratedContentOrPseudoElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-binding"
-  },
-  	"-moz-border-bottom-colors": {
-  	syntax: "<color>+ | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-border-bottom-colors"
-  },
-  	"-moz-border-left-colors": {
-  	syntax: "<color>+ | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-border-left-colors"
-  },
-  	"-moz-border-right-colors": {
-  	syntax: "<color>+ | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-border-right-colors"
-  },
-  	"-moz-border-top-colors": {
-  	syntax: "<color>+ | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-border-top-colors"
-  },
-  	"-moz-context-properties": {
-  	syntax: "none | [ fill | fill-opacity | stroke | stroke-opacity ]#",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsThatCanReferenceImages",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-context-properties"
-  },
-  	"-moz-float-edge": {
-  	syntax: "border-box | content-box | margin-box | padding-box",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "content-box",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-float-edge"
-  },
-  	"-moz-force-broken-image-icon": {
-  	syntax: "<integer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "images",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-force-broken-image-icon"
-  },
-  	"-moz-image-region": {
-  	syntax: "<shape> | auto",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "xulImageElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-image-region"
-  },
-  	"-moz-orient": {
-  	syntax: "inline | block | horizontal | vertical",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "inline",
-  	appliesto: "anyElementEffectOnProgressAndMeter",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-orient"
-  },
-  	"-moz-outline-radius": {
-  	syntax: "<outline-radius>{1,4} [ / <outline-radius>{1,4} ]?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"-moz-outline-radius-topleft",
-  		"-moz-outline-radius-topright",
-  		"-moz-outline-radius-bottomright",
-  		"-moz-outline-radius-bottomleft"
-  	],
-  	percentages: [
-  		"-moz-outline-radius-topleft",
-  		"-moz-outline-radius-topright",
-  		"-moz-outline-radius-bottomright",
-  		"-moz-outline-radius-bottomleft"
-  	],
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: [
-  		"-moz-outline-radius-topleft",
-  		"-moz-outline-radius-topright",
-  		"-moz-outline-radius-bottomright",
-  		"-moz-outline-radius-bottomleft"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"-moz-outline-radius-topleft",
-  		"-moz-outline-radius-topright",
-  		"-moz-outline-radius-bottomright",
-  		"-moz-outline-radius-bottomleft"
-  	],
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-outline-radius"
-  },
-  	"-moz-outline-radius-bottomleft": {
-  	syntax: "<outline-radius>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-outline-radius-bottomleft"
-  },
-  	"-moz-outline-radius-bottomright": {
-  	syntax: "<outline-radius>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-outline-radius-bottomright"
-  },
-  	"-moz-outline-radius-topleft": {
-  	syntax: "<outline-radius>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-outline-radius-topleft"
-  },
-  	"-moz-outline-radius-topright": {
-  	syntax: "<outline-radius>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-outline-radius-topright"
-  },
-  	"-moz-stack-sizing": {
-  	syntax: "ignore | stretch-to-fit",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "stretch-to-fit",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-stack-sizing"
-  },
-  	"-moz-text-blink": {
-  	syntax: "none | blink",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-text-blink"
-  },
-  	"-moz-user-focus": {
-  	syntax: "ignore | normal | select-after | select-before | select-menu | select-same | select-all | none",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-user-focus"
-  },
-  	"-moz-user-input": {
-  	syntax: "auto | none | enabled | disabled",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-user-input"
-  },
-  	"-moz-user-modify": {
-  	syntax: "read-only | read-write | write-only",
-  	media: "interactive",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "read-only",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-user-modify"
-  },
-  	"-moz-window-dragging": {
-  	syntax: "drag | no-drag",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "drag",
-  	appliesto: "allElementsCreatingNativeWindows",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-window-dragging"
-  },
-  	"-moz-window-shadow": {
-  	syntax: "default | menu | tooltip | sheet | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "default",
-  	appliesto: "allElementsCreatingNativeWindows",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-window-shadow"
-  },
-  	"-webkit-appearance": {
-  	syntax: "none | button | button-bevel | caret | checkbox | default-button | inner-spin-button | listbox | listitem | media-controls-background | media-controls-fullscreen-background | media-current-time-display | media-enter-fullscreen-button | media-exit-fullscreen-button | media-fullscreen-button | media-mute-button | media-overlay-play-button | media-play-button | media-seek-back-button | media-seek-forward-button | media-slider | media-sliderthumb | media-time-remaining-display | media-toggle-closed-captions-button | media-volume-slider | media-volume-slider-container | media-volume-sliderthumb | menulist | menulist-button | menulist-text | menulist-textfield | meter | progress-bar | progress-bar-value | push-button | radio | searchfield | searchfield-cancel-button | searchfield-decoration | searchfield-results-button | searchfield-results-decoration | slider-horizontal | slider-vertical | sliderthumb-horizontal | sliderthumb-vertical | square-button | textarea | textfield",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "noneButOverriddenInUserAgentCSS",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-moz-appearance"
-  },
-  	"-webkit-border-before": {
-  	syntax: "<'border-width'> || <'border-style'> || <'color'>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: [
-  		"-webkit-border-before-width"
-  	],
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: [
-  		"border-width",
-  		"border-style",
-  		"color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-width",
-  		"border-style",
-  		"color"
-  	],
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-border-before"
-  },
-  	"-webkit-border-before-color": {
-  	syntax: "<'color'>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "nonstandard"
-  },
-  	"-webkit-border-before-style": {
-  	syntax: "<'border-style'>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard"
-  },
-  	"-webkit-border-before-width": {
-  	syntax: "<'border-width'>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthZeroIfBorderStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	status: "nonstandard"
-  },
-  	"-webkit-box-reflect": {
-  	syntax: "[ above | below | right | left ]? <length>? <image>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-box-reflect"
-  },
-  	"-webkit-line-clamp": {
-  	syntax: "none | <integer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions",
-  		"CSS Overflow"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-line-clamp"
-  },
-  	"-webkit-mask": {
-  	syntax: "[ <mask-reference> || <position> [ / <bg-size> ]? || <repeat-style> || [ <box> | border | padding | content | text ] || [ <box> | border | padding | content ] ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: [
-  		"-webkit-mask-image",
-  		"-webkit-mask-repeat",
-  		"-webkit-mask-attachment",
-  		"-webkit-mask-position",
-  		"-webkit-mask-origin",
-  		"-webkit-mask-clip"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"-webkit-mask-image",
-  		"-webkit-mask-repeat",
-  		"-webkit-mask-attachment",
-  		"-webkit-mask-position",
-  		"-webkit-mask-origin",
-  		"-webkit-mask-clip"
-  	],
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask"
-  },
-  	"-webkit-mask-attachment": {
-  	syntax: "<attachment>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "scroll",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-mask-attachment"
-  },
-  	"-webkit-mask-clip": {
-  	syntax: "[ <box> | border | padding | content | text ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "border",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-clip"
-  },
-  	"-webkit-mask-composite": {
-  	syntax: "<composite-style>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "source-over",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-mask-composite"
-  },
-  	"-webkit-mask-image": {
-  	syntax: "<mask-reference>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "absoluteURIOrNone",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-image"
-  },
-  	"-webkit-mask-origin": {
-  	syntax: "[ <box> | border | padding | content ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "padding",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-origin"
-  },
-  	"-webkit-mask-position": {
-  	syntax: "<position>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "referToSizeOfElement",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "0% 0%",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOrPercentage",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-position"
-  },
-  	"-webkit-mask-position-x": {
-  	syntax: "[ <length-percentage> | left | center | right ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "referToSizeOfElement",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "0%",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOrPercentage",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-mask-position-x"
-  },
-  	"-webkit-mask-position-y": {
-  	syntax: "[ <length-percentage> | top | center | bottom ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "referToSizeOfElement",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "0%",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOrPercentage",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-mask-position-y"
-  },
-  	"-webkit-mask-repeat": {
-  	syntax: "<repeat-style>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "repeat",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-repeat"
-  },
-  	"-webkit-mask-repeat-x": {
-  	syntax: "repeat | no-repeat | space | round",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "repeat",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-mask-repeat-x"
-  },
-  	"-webkit-mask-repeat-y": {
-  	syntax: "repeat | no-repeat | space | round",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "repeat",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOrPercentage",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-mask-repeat-y"
-  },
-  	"-webkit-mask-size": {
-  	syntax: "<bg-size>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "relativeToBackgroundPositioningArea",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "auto auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-size"
-  },
-  	"-webkit-overflow-scrolling": {
-  	syntax: "auto | touch",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollingBoxes",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-overflow-scrolling"
-  },
-  	"-webkit-tap-highlight-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "black",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-tap-highlight-color"
-  },
-  	"-webkit-text-fill-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-text-fill-color"
-  },
-  	"-webkit-text-stroke": {
-  	syntax: "<length> || <color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: [
-  		"-webkit-text-stroke-width",
-  		"-webkit-text-stroke-color"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: [
-  		"-webkit-text-stroke-width",
-  		"-webkit-text-stroke-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"-webkit-text-stroke-width",
-  		"-webkit-text-stroke-color"
-  	],
-  	order: "canonicalOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-text-stroke"
-  },
-  	"-webkit-text-stroke-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-text-stroke-color"
-  },
-  	"-webkit-text-stroke-width": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "absoluteLength",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-text-stroke-width"
-  },
-  	"-webkit-touch-callout": {
-  	syntax: "default | none",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "default",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/-webkit-touch-callout"
-  },
-  	"-webkit-user-modify": {
-  	syntax: "read-only | read-write | read-write-plaintext-only",
-  	media: "interactive",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"WebKit Extensions"
-  	],
-  	initial: "read-only",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard"
-  },
-  	"align-content": {
-  	syntax: "normal | <baseline-position> | <content-distribution> | <overflow-position>? <content-position>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "normal",
-  	appliesto: "multilineFlexContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/align-content"
-  },
-  	"align-items": {
-  	syntax: "normal | stretch | <baseline-position> | [ <overflow-position>? <self-position> ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/align-items"
-  },
-  	"align-self": {
-  	syntax: "auto | normal | stretch | <baseline-position> | <overflow-position>? <self-position>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "auto",
-  	appliesto: "flexItemsGridItemsAndAbsolutelyPositionedBoxes",
-  	computed: "autoOnAbsolutelyPositionedElementsValueOfAlignItemsOnParent",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/align-self"
-  },
-  	all: all,
-  	animation: animation,
-  	"animation-delay": {
-  	syntax: "<time>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: "0s",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation-delay"
-  },
-  	"animation-direction": {
-  	syntax: "<single-animation-direction>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: "normal",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation-direction"
-  },
-  	"animation-duration": {
-  	syntax: "<time>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: "0s",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation-duration"
-  },
-  	"animation-fill-mode": {
-  	syntax: "<single-animation-fill-mode>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation-fill-mode"
-  },
-  	"animation-iteration-count": {
-  	syntax: "<single-animation-iteration-count>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: "1",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation-iteration-count"
-  },
-  	"animation-name": {
-  	syntax: "[ none | <keyframes-name> ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation-name"
-  },
-  	"animation-play-state": {
-  	syntax: "<single-animation-play-state>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: "running",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation-play-state"
-  },
-  	"animation-timing-function": {
-  	syntax: "<timing-function>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Animations"
-  	],
-  	initial: "ease",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/animation-timing-function"
-  },
-  	appearance: appearance,
-  	"aspect-ratio": {
-  	syntax: "auto | <ratio>",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsExceptInlineBoxesAndInternalRubyOrTableBoxes",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/aspect-ratio"
-  },
-  	azimuth: azimuth,
-  	"backdrop-filter": {
-  	syntax: "none | <filter-function-list>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "filterList",
-  	percentages: "no",
-  	groups: [
-  		"Filter Effects"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/backdrop-filter"
-  },
-  	"backface-visibility": {
-  	syntax: "visible | hidden",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "visible",
-  	appliesto: "transformableElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/backface-visibility"
-  },
-  	background: background,
-  	"background-attachment": {
-  	syntax: "<attachment>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "scroll",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-attachment"
-  },
-  	"background-blend-mode": {
-  	syntax: "<blend-mode>#",
-  	media: "none",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Compositing and Blending"
-  	],
-  	initial: "normal",
-  	appliesto: "allElementsSVGContainerGraphicsAndGraphicsReferencingElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-blend-mode"
-  },
-  	"background-clip": {
-  	syntax: "<box>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "border-box",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-clip"
-  },
-  	"background-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "transparent",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-color"
-  },
-  	"background-image": {
-  	syntax: "<bg-image>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedURLsAbsolute",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-image"
-  },
-  	"background-origin": {
-  	syntax: "<box>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "padding-box",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-origin"
-  },
-  	"background-position": {
-  	syntax: "<bg-position>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "repeatableListOfSimpleListOfLpc",
-  	percentages: "referToSizeOfBackgroundPositioningAreaMinusBackgroundImageSize",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "0% 0%",
-  	appliesto: "allElements",
-  	computed: "listEachItemTwoKeywordsOriginOffsets",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-position"
-  },
-  	"background-position-x": {
-  	syntax: "[ center | [ left | right | x-start | x-end ]? <length-percentage>? ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "referToWidthOfBackgroundPositioningAreaMinusBackgroundImageHeight",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "left",
-  	appliesto: "allElements",
-  	computed: "listEachItemConsistingOfAbsoluteLengthPercentageAndOrigin",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-position-x"
-  },
-  	"background-position-y": {
-  	syntax: "[ center | [ top | bottom | y-start | y-end ]? <length-percentage>? ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "referToHeightOfBackgroundPositioningAreaMinusBackgroundImageHeight",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "top",
-  	appliesto: "allElements",
-  	computed: "listEachItemConsistingOfAbsoluteLengthPercentageAndOrigin",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-position-y"
-  },
-  	"background-repeat": {
-  	syntax: "<repeat-style>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "repeat",
-  	appliesto: "allElements",
-  	computed: "listEachItemHasTwoKeywordsOnePerDimension",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-repeat"
-  },
-  	"background-size": {
-  	syntax: "<bg-size>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "repeatableListOfSimpleListOfLpc",
-  	percentages: "relativeToBackgroundPositioningArea",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "auto auto",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/background-size"
-  },
-  	"block-overflow": {
-  	syntax: "clip | ellipsis | <string>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Overflow"
-  	],
-  	initial: "clip",
-  	appliesto: "blockContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental"
-  },
-  	"block-size": {
-  	syntax: "<'width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "blockSizeOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "sameAsWidthAndHeight",
-  	computed: "sameAsWidthAndHeight",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/block-size"
-  },
-  	border: border,
-  	"border-block": {
-  	syntax: "<'border-top-width'> || <'border-top-style'> || <'color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: [
-  		"border-top-width",
-  		"border-top-style",
-  		"border-top-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-top-width",
-  		"border-top-style",
-  		"border-top-color"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block"
-  },
-  	"border-block-color": {
-  	syntax: "<'border-top-color'>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-color"
-  },
-  	"border-block-style": {
-  	syntax: "<'border-top-style'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-style"
-  },
-  	"border-block-width": {
-  	syntax: "<'border-top-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthZeroIfBorderStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-width"
-  },
-  	"border-block-end": {
-  	syntax: "<'border-top-width'> || <'border-top-style'> || <'color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: [
-  		"border-top-width",
-  		"border-top-style",
-  		"border-top-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-top-width",
-  		"border-top-style",
-  		"border-top-color"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-end"
-  },
-  	"border-block-end-color": {
-  	syntax: "<'border-top-color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-end-color"
-  },
-  	"border-block-end-style": {
-  	syntax: "<'border-top-style'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-end-style"
-  },
-  	"border-block-end-width": {
-  	syntax: "<'border-top-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthZeroIfBorderStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-end-width"
-  },
-  	"border-block-start": {
-  	syntax: "<'border-top-width'> || <'border-top-style'> || <'color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: [
-  		"border-width",
-  		"border-style",
-  		"color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-width",
-  		"border-style",
-  		"border-block-start-color"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-start"
-  },
-  	"border-block-start-color": {
-  	syntax: "<'border-top-color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-start-color"
-  },
-  	"border-block-start-style": {
-  	syntax: "<'border-top-style'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-start-style"
-  },
-  	"border-block-start-width": {
-  	syntax: "<'border-top-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthZeroIfBorderStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-block-start-width"
-  },
-  	"border-bottom": {
-  	syntax: "<line-width> || <line-style> || <color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"border-bottom-color",
-  		"border-bottom-style",
-  		"border-bottom-width"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-bottom-width",
-  		"border-bottom-style",
-  		"border-bottom-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-bottom-width",
-  		"border-bottom-style",
-  		"border-bottom-color"
-  	],
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-bottom"
-  },
-  	"border-bottom-color": {
-  	syntax: "<'border-top-color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-bottom-color"
-  },
-  	"border-bottom-left-radius": {
-  	syntax: "<length-percentage>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: "twoAbsoluteLengthOrPercentages",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-bottom-left-radius"
-  },
-  	"border-bottom-right-radius": {
-  	syntax: "<length-percentage>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: "twoAbsoluteLengthOrPercentages",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-bottom-right-radius"
-  },
-  	"border-bottom-style": {
-  	syntax: "<line-style>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-bottom-style"
-  },
-  	"border-bottom-width": {
-  	syntax: "<line-width>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOr0IfBorderBottomStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-bottom-width"
-  },
-  	"border-collapse": {
-  	syntax: "collapse | separate",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Table"
-  	],
-  	initial: "separate",
-  	appliesto: "tableElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-collapse"
-  },
-  	"border-color": {
-  	syntax: "<color>{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"border-bottom-color",
-  		"border-left-color",
-  		"border-right-color",
-  		"border-top-color"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-top-color",
-  		"border-right-color",
-  		"border-bottom-color",
-  		"border-left-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-bottom-color",
-  		"border-left-color",
-  		"border-right-color",
-  		"border-top-color"
-  	],
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-color"
-  },
-  	"border-end-end-radius": {
-  	syntax: "<length-percentage>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: "twoAbsoluteLengthOrPercentages",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-end-end-radius"
-  },
-  	"border-end-start-radius": {
-  	syntax: "<length-percentage>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: "twoAbsoluteLengthOrPercentages",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-end-start-radius"
-  },
-  	"border-image": {
-  	syntax: "<'border-image-source'> || <'border-image-slice'> [ / <'border-image-width'> | / <'border-image-width'>? / <'border-image-outset'> ]? || <'border-image-repeat'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: [
-  		"border-image-slice",
-  		"border-image-width"
-  	],
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-image-source",
-  		"border-image-slice",
-  		"border-image-width",
-  		"border-image-outset",
-  		"border-image-repeat"
-  	],
-  	appliesto: "allElementsExceptTableElementsWhenCollapse",
-  	computed: [
-  		"border-image-outset",
-  		"border-image-repeat",
-  		"border-image-slice",
-  		"border-image-source",
-  		"border-image-width"
-  	],
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-image"
-  },
-  	"border-image-outset": {
-  	syntax: "[ <length> | <number> ]{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptTableElementsWhenCollapse",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-image-outset"
-  },
-  	"border-image-repeat": {
-  	syntax: "[ stretch | repeat | round | space ]{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "stretch",
-  	appliesto: "allElementsExceptTableElementsWhenCollapse",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-image-repeat"
-  },
-  	"border-image-slice": {
-  	syntax: "<number-percentage>{1,4} && fill?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "referToSizeOfBorderImage",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "100%",
-  	appliesto: "allElementsExceptTableElementsWhenCollapse",
-  	computed: "oneToFourPercentagesOrAbsoluteLengthsPlusFill",
-  	order: "percentagesOrLengthsFollowedByFill",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-image-slice"
-  },
-  	"border-image-source": {
-  	syntax: "none | <image>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsExceptTableElementsWhenCollapse",
-  	computed: "noneOrImageWithAbsoluteURI",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-image-source"
-  },
-  	"border-image-width": {
-  	syntax: "[ <length-percentage> | <number> | auto ]{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "referToWidthOrHeightOfBorderImageArea",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "1",
-  	appliesto: "allElementsExceptTableElementsWhenCollapse",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-image-width"
-  },
-  	"border-inline": {
-  	syntax: "<'border-top-width'> || <'border-top-style'> || <'color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: [
-  		"border-top-width",
-  		"border-top-style",
-  		"border-top-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-top-width",
-  		"border-top-style",
-  		"border-top-color"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline"
-  },
-  	"border-inline-end": {
-  	syntax: "<'border-top-width'> || <'border-top-style'> || <'color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: [
-  		"border-width",
-  		"border-style",
-  		"color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-width",
-  		"border-style",
-  		"border-inline-end-color"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-end"
-  },
-  	"border-inline-color": {
-  	syntax: "<'border-top-color'>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-color"
-  },
-  	"border-inline-style": {
-  	syntax: "<'border-top-style'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-style"
-  },
-  	"border-inline-width": {
-  	syntax: "<'border-top-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthZeroIfBorderStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-width"
-  },
-  	"border-inline-end-color": {
-  	syntax: "<'border-top-color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-end-color"
-  },
-  	"border-inline-end-style": {
-  	syntax: "<'border-top-style'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-end-style"
-  },
-  	"border-inline-end-width": {
-  	syntax: "<'border-top-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthZeroIfBorderStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-end-width"
-  },
-  	"border-inline-start": {
-  	syntax: "<'border-top-width'> || <'border-top-style'> || <'color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: [
-  		"border-width",
-  		"border-style",
-  		"color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-width",
-  		"border-style",
-  		"border-inline-start-color"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-start"
-  },
-  	"border-inline-start-color": {
-  	syntax: "<'border-top-color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-start-color"
-  },
-  	"border-inline-start-style": {
-  	syntax: "<'border-top-style'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-start-style"
-  },
-  	"border-inline-start-width": {
-  	syntax: "<'border-top-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthZeroIfBorderStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-inline-start-width"
-  },
-  	"border-left": {
-  	syntax: "<line-width> || <line-style> || <color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"border-left-color",
-  		"border-left-style",
-  		"border-left-width"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-left-width",
-  		"border-left-style",
-  		"border-left-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-left-width",
-  		"border-left-style",
-  		"border-left-color"
-  	],
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-left"
-  },
-  	"border-left-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-left-color"
-  },
-  	"border-left-style": {
-  	syntax: "<line-style>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-left-style"
-  },
-  	"border-left-width": {
-  	syntax: "<line-width>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOr0IfBorderLeftStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-left-width"
-  },
-  	"border-radius": {
-  	syntax: "<length-percentage>{1,4} [ / <length-percentage>{1,4} ]?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"border-top-left-radius",
-  		"border-top-right-radius",
-  		"border-bottom-right-radius",
-  		"border-bottom-left-radius"
-  	],
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-top-left-radius",
-  		"border-top-right-radius",
-  		"border-bottom-right-radius",
-  		"border-bottom-left-radius"
-  	],
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: [
-  		"border-bottom-left-radius",
-  		"border-bottom-right-radius",
-  		"border-top-left-radius",
-  		"border-top-right-radius"
-  	],
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-radius"
-  },
-  	"border-right": {
-  	syntax: "<line-width> || <line-style> || <color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"border-right-color",
-  		"border-right-style",
-  		"border-right-width"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-right-width",
-  		"border-right-style",
-  		"border-right-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-right-width",
-  		"border-right-style",
-  		"border-right-color"
-  	],
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-right"
-  },
-  	"border-right-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-right-color"
-  },
-  	"border-right-style": {
-  	syntax: "<line-style>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-right-style"
-  },
-  	"border-right-width": {
-  	syntax: "<line-width>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOr0IfBorderRightStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-right-width"
-  },
-  	"border-spacing": {
-  	syntax: "<length> <length>?",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Table"
-  	],
-  	initial: "0",
-  	appliesto: "tableElements",
-  	computed: "twoAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-spacing"
-  },
-  	"border-start-end-radius": {
-  	syntax: "<length-percentage>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: "twoAbsoluteLengthOrPercentages",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-start-end-radius"
-  },
-  	"border-start-start-radius": {
-  	syntax: "<length-percentage>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: "twoAbsoluteLengthOrPercentages",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-start-start-radius"
-  },
-  	"border-style": {
-  	syntax: "<line-style>{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-top-style",
-  		"border-right-style",
-  		"border-bottom-style",
-  		"border-left-style"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-bottom-style",
-  		"border-left-style",
-  		"border-right-style",
-  		"border-top-style"
-  	],
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-style"
-  },
-  	"border-top": {
-  	syntax: "<line-width> || <line-style> || <color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"border-top-color",
-  		"border-top-style",
-  		"border-top-width"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-top-width",
-  		"border-top-style",
-  		"border-top-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-top-width",
-  		"border-top-style",
-  		"border-top-color"
-  	],
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-top"
-  },
-  	"border-top-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-top-color"
-  },
-  	"border-top-left-radius": {
-  	syntax: "<length-percentage>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: "twoAbsoluteLengthOrPercentages",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-top-left-radius"
-  },
-  	"border-top-right-radius": {
-  	syntax: "<length-percentage>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfBorderBox",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsUAsNotRequiredWhenCollapse",
-  	computed: "twoAbsoluteLengthOrPercentages",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-top-right-radius"
-  },
-  	"border-top-style": {
-  	syntax: "<line-style>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-top-style"
-  },
-  	"border-top-width": {
-  	syntax: "<line-width>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOr0IfBorderTopStyleNoneOrHidden",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-top-width"
-  },
-  	"border-width": {
-  	syntax: "<line-width>{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"border-bottom-width",
-  		"border-left-width",
-  		"border-right-width",
-  		"border-top-width"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: [
-  		"border-top-width",
-  		"border-right-width",
-  		"border-bottom-width",
-  		"border-left-width"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"border-bottom-width",
-  		"border-left-width",
-  		"border-right-width",
-  		"border-top-width"
-  	],
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/border-width"
-  },
-  	bottom: bottom,
-  	"box-align": {
-  	syntax: "start | center | end | baseline | stretch",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "stretch",
-  	appliesto: "elementsWithDisplayBoxOrInlineBox",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-align"
-  },
-  	"box-decoration-break": {
-  	syntax: "slice | clone",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fragmentation"
-  	],
-  	initial: "slice",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-decoration-break"
-  },
-  	"box-direction": {
-  	syntax: "normal | reverse | inherit",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "normal",
-  	appliesto: "elementsWithDisplayBoxOrInlineBox",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-direction"
-  },
-  	"box-flex": {
-  	syntax: "<number>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "0",
-  	appliesto: "directChildrenOfElementsWithDisplayMozBoxMozInlineBox",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-flex"
-  },
-  	"box-flex-group": {
-  	syntax: "<integer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "1",
-  	appliesto: "inFlowChildrenOfBoxElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-flex-group"
-  },
-  	"box-lines": {
-  	syntax: "single | multiple",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "single",
-  	appliesto: "boxElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-lines"
-  },
-  	"box-ordinal-group": {
-  	syntax: "<integer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "1",
-  	appliesto: "childrenOfBoxElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-ordinal-group"
-  },
-  	"box-orient": {
-  	syntax: "horizontal | vertical | inline-axis | block-axis | inherit",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "inlineAxisHorizontalInXUL",
-  	appliesto: "elementsWithDisplayBoxOrInlineBox",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-orient"
-  },
-  	"box-pack": {
-  	syntax: "start | center | end | justify",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions",
-  		"WebKit Extensions"
-  	],
-  	initial: "start",
-  	appliesto: "elementsWithDisplayMozBoxMozInlineBox",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-pack"
-  },
-  	"box-shadow": {
-  	syntax: "none | <shadow>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "shadowList",
-  	percentages: "no",
-  	groups: [
-  		"CSS Backgrounds and Borders"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthsSpecifiedColorAsSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-shadow"
-  },
-  	"box-sizing": {
-  	syntax: "content-box | border-box",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "content-box",
-  	appliesto: "allElementsAcceptingWidthOrHeight",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/box-sizing"
-  },
-  	"break-after": {
-  	syntax: "auto | avoid | always | all | avoid-page | page | left | right | recto | verso | avoid-column | column | avoid-region | region",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fragmentation"
-  	],
-  	initial: "auto",
-  	appliesto: "blockLevelElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/break-after"
-  },
-  	"break-before": {
-  	syntax: "auto | avoid | always | all | avoid-page | page | left | right | recto | verso | avoid-column | column | avoid-region | region",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fragmentation"
-  	],
-  	initial: "auto",
-  	appliesto: "blockLevelElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/break-before"
-  },
-  	"break-inside": {
-  	syntax: "auto | avoid | avoid-page | avoid-column | avoid-region",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fragmentation"
-  	],
-  	initial: "auto",
-  	appliesto: "blockLevelElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/break-inside"
-  },
-  	"caption-side": {
-  	syntax: "top | bottom | block-start | block-end | inline-start | inline-end",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Table"
-  	],
-  	initial: "top",
-  	appliesto: "tableCaptionElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/caption-side"
-  },
-  	"caret-color": {
-  	syntax: "auto | <color>",
-  	media: "interactive",
-  	inherited: true,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asAutoOrColor",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/caret-color"
-  },
-  	clear: clear,
-  	clip: clip,
-  	"clip-path": {
-  	syntax: "<clip-source> | [ <basic-shape> || <geometry-box> ] | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "basicShapeOtherwiseNo",
-  	percentages: "referToReferenceBoxWhenSpecifiedOtherwiseBorderBox",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecifiedURLsAbsolute",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/clip-path"
-  },
-  	color: color,
-  	"color-adjust": {
-  	syntax: "economy | exact",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Color"
-  	],
-  	initial: "economy",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/color-adjust"
-  },
-  	"column-count": {
-  	syntax: "<integer> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "integer",
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: "auto",
-  	appliesto: "blockContainersExceptTableWrappers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-count"
-  },
-  	"column-fill": {
-  	syntax: "auto | balance | balance-all",
-  	media: "visualInContinuousMediaNoEffectInOverflowColumns",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: "balance",
-  	appliesto: "multicolElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-fill"
-  },
-  	"column-gap": {
-  	syntax: "normal | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfContentArea",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "normal",
-  	appliesto: "multiColumnElementsFlexContainersGridContainers",
-  	computed: "asSpecifiedWithLengthsAbsoluteAndNormalComputingToZeroExceptMultiColumn",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-gap"
-  },
-  	"column-rule": {
-  	syntax: "<'column-rule-width'> || <'column-rule-style'> || <'column-rule-color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"column-rule-color",
-  		"column-rule-style",
-  		"column-rule-width"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: [
-  		"column-rule-width",
-  		"column-rule-style",
-  		"column-rule-color"
-  	],
-  	appliesto: "multicolElements",
-  	computed: [
-  		"column-rule-color",
-  		"column-rule-style",
-  		"column-rule-width"
-  	],
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-rule"
-  },
-  	"column-rule-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "multicolElements",
-  	computed: "computedColor",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-rule-color"
-  },
-  	"column-rule-style": {
-  	syntax: "<'border-style'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: "none",
-  	appliesto: "multicolElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-rule-style"
-  },
-  	"column-rule-width": {
-  	syntax: "<'border-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: "medium",
-  	appliesto: "multicolElements",
-  	computed: "absoluteLength0IfColumnRuleStyleNoneOrHidden",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-rule-width"
-  },
-  	"column-span": {
-  	syntax: "none | all",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: "none",
-  	appliesto: "inFlowBlockLevelElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-span"
-  },
-  	"column-width": {
-  	syntax: "<length> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Columns"
-  	],
-  	initial: "auto",
-  	appliesto: "blockContainersExceptTableWrappers",
-  	computed: "absoluteLengthZeroOrLarger",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-width"
-  },
-  	columns: columns,
-  	contain: contain,
-  	content: content,
-  	"counter-increment": {
-  	syntax: "[ <custom-ident> <integer>? ]+ | none",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Counter Styles"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/counter-increment"
-  },
-  	"counter-reset": {
-  	syntax: "[ <custom-ident> <integer>? ]+ | none",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Counter Styles"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/counter-reset"
-  },
-  	"counter-set": {
-  	syntax: "[ <custom-ident> <integer>? ]+ | none",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Counter Styles"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/counter-set"
-  },
-  	cursor: cursor,
-  	direction: direction,
-  	display: display,
-  	"empty-cells": {
-  	syntax: "show | hide",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Table"
-  	],
-  	initial: "show",
-  	appliesto: "tableCellElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/empty-cells"
-  },
-  	filter: filter,
-  	flex: flex,
-  	"flex-basis": {
-  	syntax: "content | <'width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToFlexContainersInnerMainSize",
-  	groups: [
-  		"CSS Flexible Box Layout"
-  	],
-  	initial: "auto",
-  	appliesto: "flexItemsAndInFlowPseudos",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "lengthOrPercentageBeforeKeywordIfBothPresent",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/flex-basis"
-  },
-  	"flex-direction": {
-  	syntax: "row | row-reverse | column | column-reverse",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Flexible Box Layout"
-  	],
-  	initial: "row",
-  	appliesto: "flexContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/flex-direction"
-  },
-  	"flex-flow": {
-  	syntax: "<'flex-direction'> || <'flex-wrap'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Flexible Box Layout"
-  	],
-  	initial: [
-  		"flex-direction",
-  		"flex-wrap"
-  	],
-  	appliesto: "flexContainers",
-  	computed: [
-  		"flex-direction",
-  		"flex-wrap"
-  	],
-  	order: "orderOfAppearance",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/flex-flow"
-  },
-  	"flex-grow": {
-  	syntax: "<number>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "number",
-  	percentages: "no",
-  	groups: [
-  		"CSS Flexible Box Layout"
-  	],
-  	initial: "0",
-  	appliesto: "flexItemsAndInFlowPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/flex-grow"
-  },
-  	"flex-shrink": {
-  	syntax: "<number>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "number",
-  	percentages: "no",
-  	groups: [
-  		"CSS Flexible Box Layout"
-  	],
-  	initial: "1",
-  	appliesto: "flexItemsAndInFlowPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/flex-shrink"
-  },
-  	"flex-wrap": {
-  	syntax: "nowrap | wrap | wrap-reverse",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Flexible Box Layout"
-  	],
-  	initial: "nowrap",
-  	appliesto: "flexContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/flex-wrap"
-  },
-  	float: float,
-  	font: font,
-  	"font-family": {
-  	syntax: "[ <family-name> | <generic-family> ]#",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "dependsOnUserAgent",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-family"
-  },
-  	"font-feature-settings": {
-  	syntax: "normal | <feature-tag-value>#",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-feature-settings"
-  },
-  	"font-kerning": {
-  	syntax: "auto | normal | none",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-kerning"
-  },
-  	"font-language-override": {
-  	syntax: "normal | <string>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-language-override"
-  },
-  	"font-optical-sizing": {
-  	syntax: "auto | none",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-optical-sizing"
-  },
-  	"font-variation-settings": {
-  	syntax: "normal | [ <string> <number> ]#",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "transform",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-variation-settings"
-  },
-  	"font-size": {
-  	syntax: "<absolute-size> | <relative-size> | <length-percentage>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "length",
-  	percentages: "referToParentElementsFontSize",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-size"
-  },
-  	"font-size-adjust": {
-  	syntax: "none | <number>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "number",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-size-adjust"
-  },
-  	"font-stretch": {
-  	syntax: "<font-stretch-absolute>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "fontStretch",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-stretch"
-  },
-  	"font-style": {
-  	syntax: "normal | italic | oblique <angle>?",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-style"
-  },
-  	"font-synthesis": {
-  	syntax: "none | [ weight || style ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "weight style",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-synthesis"
-  },
-  	"font-variant": {
-  	syntax: "normal | none | [ <common-lig-values> || <discretionary-lig-values> || <historical-lig-values> || <contextual-alt-values> || stylistic( <feature-value-name> ) || historical-forms || styleset( <feature-value-name># ) || character-variant( <feature-value-name># ) || swash( <feature-value-name> ) || ornaments( <feature-value-name> ) || annotation( <feature-value-name> ) || [ small-caps | all-small-caps | petite-caps | all-petite-caps | unicase | titling-caps ] || <numeric-figure-values> || <numeric-spacing-values> || <numeric-fraction-values> || ordinal || slashed-zero || <east-asian-variant-values> || <east-asian-width-values> || ruby ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-variant"
-  },
-  	"font-variant-alternates": {
-  	syntax: "normal | [ stylistic( <feature-value-name> ) || historical-forms || styleset( <feature-value-name># ) || character-variant( <feature-value-name># ) || swash( <feature-value-name> ) || ornaments( <feature-value-name> ) || annotation( <feature-value-name> ) ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-variant-alternates"
-  },
-  	"font-variant-caps": {
-  	syntax: "normal | small-caps | all-small-caps | petite-caps | all-petite-caps | unicase | titling-caps",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-variant-caps"
-  },
-  	"font-variant-east-asian": {
-  	syntax: "normal | [ <east-asian-variant-values> || <east-asian-width-values> || ruby ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-variant-east-asian"
-  },
-  	"font-variant-ligatures": {
-  	syntax: "normal | none | [ <common-lig-values> || <discretionary-lig-values> || <historical-lig-values> || <contextual-alt-values> ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-variant-ligatures"
-  },
-  	"font-variant-numeric": {
-  	syntax: "normal | [ <numeric-figure-values> || <numeric-spacing-values> || <numeric-fraction-values> || ordinal || slashed-zero ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-variant-numeric"
-  },
-  	"font-variant-position": {
-  	syntax: "normal | sub | super",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-variant-position"
-  },
-  	"font-weight": {
-  	syntax: "<font-weight-absolute> | bolder | lighter",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "fontWeight",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "keywordOrNumericalValueBolderLighterTransformedToRealValue",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/font-weight"
-  },
-  	gap: gap,
-  	grid: grid,
-  	"grid-area": {
-  	syntax: "<grid-line> [ / <grid-line> ]{0,3}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: [
-  		"grid-row-start",
-  		"grid-column-start",
-  		"grid-row-end",
-  		"grid-column-end"
-  	],
-  	appliesto: "gridItemsAndBoxesWithinGridContainer",
-  	computed: [
-  		"grid-row-start",
-  		"grid-column-start",
-  		"grid-row-end",
-  		"grid-column-end"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-area"
-  },
-  	"grid-auto-columns": {
-  	syntax: "<track-size>+",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "referToDimensionOfContentArea",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "auto",
-  	appliesto: "gridContainers",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-auto-columns"
-  },
-  	"grid-auto-flow": {
-  	syntax: "[ row | column ] || dense",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "row",
-  	appliesto: "gridContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-auto-flow"
-  },
-  	"grid-auto-rows": {
-  	syntax: "<track-size>+",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "referToDimensionOfContentArea",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "auto",
-  	appliesto: "gridContainers",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-auto-rows"
-  },
-  	"grid-column": {
-  	syntax: "<grid-line> [ / <grid-line> ]?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: [
-  		"grid-column-start",
-  		"grid-column-end"
-  	],
-  	appliesto: "gridItemsAndBoxesWithinGridContainer",
-  	computed: [
-  		"grid-column-start",
-  		"grid-column-end"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-column"
-  },
-  	"grid-column-end": {
-  	syntax: "<grid-line>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "auto",
-  	appliesto: "gridItemsAndBoxesWithinGridContainer",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-column-end"
-  },
-  	"grid-column-gap": {
-  	syntax: "<length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToDimensionOfContentArea",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "0",
-  	appliesto: "gridContainers",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/column-gap"
-  },
-  	"grid-column-start": {
-  	syntax: "<grid-line>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "auto",
-  	appliesto: "gridItemsAndBoxesWithinGridContainer",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-column-start"
-  },
-  	"grid-gap": {
-  	syntax: "<'grid-row-gap'> <'grid-column-gap'>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"grid-row-gap",
-  		"grid-column-gap"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: [
-  		"grid-row-gap",
-  		"grid-column-gap"
-  	],
-  	appliesto: "gridContainers",
-  	computed: [
-  		"grid-row-gap",
-  		"grid-column-gap"
-  	],
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/gap"
-  },
-  	"grid-row": {
-  	syntax: "<grid-line> [ / <grid-line> ]?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: [
-  		"grid-row-start",
-  		"grid-row-end"
-  	],
-  	appliesto: "gridItemsAndBoxesWithinGridContainer",
-  	computed: [
-  		"grid-row-start",
-  		"grid-row-end"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-row"
-  },
-  	"grid-row-end": {
-  	syntax: "<grid-line>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "auto",
-  	appliesto: "gridItemsAndBoxesWithinGridContainer",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-row-end"
-  },
-  	"grid-row-gap": {
-  	syntax: "<length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToDimensionOfContentArea",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "0",
-  	appliesto: "gridContainers",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/row-gap"
-  },
-  	"grid-row-start": {
-  	syntax: "<grid-line>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "auto",
-  	appliesto: "gridItemsAndBoxesWithinGridContainer",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-row-start"
-  },
-  	"grid-template": {
-  	syntax: "none | [ <'grid-template-rows'> / <'grid-template-columns'> ] | [ <line-names>? <string> <track-size>? <line-names>? ]+ [ / <explicit-track-list> ]?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: [
-  		"grid-template-columns",
-  		"grid-template-rows"
-  	],
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: [
-  		"grid-template-columns",
-  		"grid-template-rows",
-  		"grid-template-areas"
-  	],
-  	appliesto: "gridContainers",
-  	computed: [
-  		"grid-template-columns",
-  		"grid-template-rows",
-  		"grid-template-areas"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-template"
-  },
-  	"grid-template-areas": {
-  	syntax: "none | <string>+",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "none",
-  	appliesto: "gridContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-template-areas"
-  },
-  	"grid-template-columns": {
-  	syntax: "none | <track-list> | <auto-track-list> | subgrid <line-name-list>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "simpleListOfLpcDifferenceLpc",
-  	percentages: "referToDimensionOfContentArea",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "none",
-  	appliesto: "gridContainers",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-template-columns"
-  },
-  	"grid-template-rows": {
-  	syntax: "none | <track-list> | <auto-track-list> | subgrid <line-name-list>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "simpleListOfLpcDifferenceLpc",
-  	percentages: "referToDimensionOfContentArea",
-  	groups: [
-  		"CSS Grid Layout"
-  	],
-  	initial: "none",
-  	appliesto: "gridContainers",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/grid-template-rows"
-  },
-  	"hanging-punctuation": {
-  	syntax: "none | [ first || [ force-end | allow-end ] || last ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/hanging-punctuation"
-  },
-  	height: height,
-  	hyphens: hyphens,
-  	"image-orientation": {
-  	syntax: "from-image | <angle> | [ <angle>? flip ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Images"
-  	],
-  	initial: "0deg",
-  	appliesto: "allElements",
-  	computed: "angleRoundedToNextQuarter",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/image-orientation"
-  },
-  	"image-rendering": {
-  	syntax: "auto | crisp-edges | pixelated",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Images"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/image-rendering"
-  },
-  	"image-resolution": {
-  	syntax: "[ from-image || <resolution> ] && snap?",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Images"
-  	],
-  	initial: "1dppx",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedWithExceptionOfResolution",
-  	order: "uniqueOrder",
-  	status: "experimental"
-  },
-  	"ime-mode": {
-  	syntax: "auto | normal | active | inactive | disabled",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "auto",
-  	appliesto: "textFields",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/ime-mode"
-  },
-  	"initial-letter": {
-  	syntax: "normal | [ <number> <integer>? ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Inline"
-  	],
-  	initial: "normal",
-  	appliesto: "firstLetterPseudoElementsAndInlineLevelFirstChildren",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/initial-letter"
-  },
-  	"initial-letter-align": {
-  	syntax: "[ auto | alphabetic | hanging | ideographic ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Inline"
-  	],
-  	initial: "auto",
-  	appliesto: "firstLetterPseudoElementsAndInlineLevelFirstChildren",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/initial-letter-align"
-  },
-  	"inline-size": {
-  	syntax: "<'width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "inlineSizeOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "sameAsWidthAndHeight",
-  	computed: "sameAsWidthAndHeight",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/inline-size"
-  },
-  	inset: inset,
-  	"inset-block": {
-  	syntax: "<'top'>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "logicalHeightOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "sameAsBoxOffsets",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/inset-block"
-  },
-  	"inset-block-end": {
-  	syntax: "<'top'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "logicalHeightOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "sameAsBoxOffsets",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/inset-block-end"
-  },
-  	"inset-block-start": {
-  	syntax: "<'top'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "logicalHeightOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "sameAsBoxOffsets",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/inset-block-start"
-  },
-  	"inset-inline": {
-  	syntax: "<'top'>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "sameAsBoxOffsets",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/inset-inline"
-  },
-  	"inset-inline-end": {
-  	syntax: "<'top'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "sameAsBoxOffsets",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/inset-inline-end"
-  },
-  	"inset-inline-start": {
-  	syntax: "<'top'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "sameAsBoxOffsets",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/inset-inline-start"
-  },
-  	isolation: isolation,
-  	"justify-content": {
-  	syntax: "normal | <content-distribution> | <overflow-position>? [ <content-position> | left | right ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "normal",
-  	appliesto: "flexContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/justify-content"
-  },
-  	"justify-items": {
-  	syntax: "normal | stretch | <baseline-position> | <overflow-position>? [ <self-position> | left | right ] | legacy | legacy && [ left | right | center ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "legacy",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/justify-items"
-  },
-  	"justify-self": {
-  	syntax: "auto | normal | stretch | <baseline-position> | <overflow-position>? [ <self-position> | left | right ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "auto",
-  	appliesto: "blockLevelBoxesAndAbsolutelyPositionedBoxesAndGridItems",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/justify-self"
-  },
-  	left: left,
-  	"letter-spacing": {
-  	syntax: "normal | <length>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "optimumValueOfAbsoluteLengthOrNormal",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/letter-spacing"
-  },
-  	"line-break": {
-  	syntax: "auto | loose | normal | strict | anywhere",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/line-break"
-  },
-  	"line-clamp": {
-  	syntax: "none | <integer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "integer",
-  	percentages: "no",
-  	groups: [
-  		"CSS Overflow"
-  	],
-  	initial: "none",
-  	appliesto: "blockContainersExceptMultiColumnContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental"
-  },
-  	"line-height": {
-  	syntax: "normal | <number> | <length> | <percentage>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "numberOrLength",
-  	percentages: "referToElementFontSize",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "absoluteLengthOrAsSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/line-height"
-  },
-  	"line-height-step": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Fonts"
-  	],
-  	initial: "0",
-  	appliesto: "blockContainers",
-  	computed: "absoluteLength",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/line-height-step"
-  },
-  	"list-style": {
-  	syntax: "<'list-style-type'> || <'list-style-position'> || <'list-style-image'>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Lists and Counters"
-  	],
-  	initial: [
-  		"list-style-type",
-  		"list-style-position",
-  		"list-style-image"
-  	],
-  	appliesto: "listItems",
-  	computed: [
-  		"list-style-image",
-  		"list-style-position",
-  		"list-style-type"
-  	],
-  	order: "orderOfAppearance",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/list-style"
-  },
-  	"list-style-image": {
-  	syntax: "<url> | none",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Lists and Counters"
-  	],
-  	initial: "none",
-  	appliesto: "listItems",
-  	computed: "noneOrImageWithAbsoluteURI",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/list-style-image"
-  },
-  	"list-style-position": {
-  	syntax: "inside | outside",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Lists and Counters"
-  	],
-  	initial: "outside",
-  	appliesto: "listItems",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/list-style-position"
-  },
-  	"list-style-type": {
-  	syntax: "<counter-style> | <string> | none",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Lists and Counters"
-  	],
-  	initial: "disc",
-  	appliesto: "listItems",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/list-style-type"
-  },
-  	margin: margin,
-  	"margin-block": {
-  	syntax: "<'margin-left'>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "dependsOnLayoutModel",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsMargin",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-block"
-  },
-  	"margin-block-end": {
-  	syntax: "<'margin-left'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "dependsOnLayoutModel",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsMargin",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-block-end"
-  },
-  	"margin-block-start": {
-  	syntax: "<'margin-left'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "dependsOnLayoutModel",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsMargin",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-block-start"
-  },
-  	"margin-bottom": {
-  	syntax: "<length> | <percentage> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptTableDisplayTypes",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-bottom"
-  },
-  	"margin-inline": {
-  	syntax: "<'margin-left'>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "dependsOnLayoutModel",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsMargin",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-inline"
-  },
-  	"margin-inline-end": {
-  	syntax: "<'margin-left'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "dependsOnLayoutModel",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsMargin",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-inline-end"
-  },
-  	"margin-inline-start": {
-  	syntax: "<'margin-left'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "dependsOnLayoutModel",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsMargin",
-  	computed: "lengthAbsolutePercentageAsSpecifiedOtherwiseAuto",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-inline-start"
-  },
-  	"margin-left": {
-  	syntax: "<length> | <percentage> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptTableDisplayTypes",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-left"
-  },
-  	"margin-right": {
-  	syntax: "<length> | <percentage> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptTableDisplayTypes",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-right"
-  },
-  	"margin-top": {
-  	syntax: "<length> | <percentage> | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptTableDisplayTypes",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/margin-top"
-  },
-  	mask: mask,
-  	"mask-border": {
-  	syntax: "<'mask-border-source'> || <'mask-border-slice'> [ / <'mask-border-width'>? [ / <'mask-border-outset'> ]? ]? || <'mask-border-repeat'> || <'mask-border-mode'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"mask-border-mode",
-  		"mask-border-outset",
-  		"mask-border-repeat",
-  		"mask-border-slice",
-  		"mask-border-source",
-  		"mask-border-width"
-  	],
-  	percentages: [
-  		"mask-border-slice",
-  		"mask-border-width"
-  	],
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: [
-  		"mask-border-mode",
-  		"mask-border-outset",
-  		"mask-border-repeat",
-  		"mask-border-slice",
-  		"mask-border-source",
-  		"mask-border-width"
-  	],
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: [
-  		"mask-border-mode",
-  		"mask-border-outset",
-  		"mask-border-repeat",
-  		"mask-border-slice",
-  		"mask-border-source",
-  		"mask-border-width"
-  	],
-  	order: "perGrammar",
-  	stacking: true,
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-border"
-  },
-  	"mask-border-mode": {
-  	syntax: "luminance | alpha",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "alpha",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-border-mode"
-  },
-  	"mask-border-outset": {
-  	syntax: "[ <length> | <number> ]{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-border-outset"
-  },
-  	"mask-border-repeat": {
-  	syntax: "[ stretch | repeat | round | space ]{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "stretch",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-border-repeat"
-  },
-  	"mask-border-slice": {
-  	syntax: "<number-percentage>{1,4} fill?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "referToSizeOfMaskBorderImage",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-border-slice"
-  },
-  	"mask-border-source": {
-  	syntax: "none | <image>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecifiedURLsAbsolute",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-border-source"
-  },
-  	"mask-border-width": {
-  	syntax: "[ <length-percentage> | <number> | auto ]{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "relativeToMaskBorderImageArea",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-border-width"
-  },
-  	"mask-clip": {
-  	syntax: "[ <geometry-box> | no-clip ]#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "border-box",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-clip"
-  },
-  	"mask-composite": {
-  	syntax: "<compositing-operator>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "add",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-composite"
-  },
-  	"mask-image": {
-  	syntax: "<mask-reference>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecifiedURLsAbsolute",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-image"
-  },
-  	"mask-mode": {
-  	syntax: "<masking-mode>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "match-source",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-mode"
-  },
-  	"mask-origin": {
-  	syntax: "<geometry-box>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "border-box",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-origin"
-  },
-  	"mask-position": {
-  	syntax: "<position>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "repeatableListOfSimpleListOfLpc",
-  	percentages: "referToSizeOfMaskPaintingArea",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "center",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "consistsOfTwoKeywordsForOriginAndOffsets",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-position"
-  },
-  	"mask-repeat": {
-  	syntax: "<repeat-style>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "no-repeat",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "consistsOfTwoDimensionKeywords",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-repeat"
-  },
-  	"mask-size": {
-  	syntax: "<bg-size>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "repeatableListOfSimpleListOfLpc",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsSVGContainerElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-size"
-  },
-  	"mask-type": {
-  	syntax: "luminance | alpha",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Masking"
-  	],
-  	initial: "luminance",
-  	appliesto: "maskElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mask-type"
-  },
-  	"max-block-size": {
-  	syntax: "<'max-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "blockSizeOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsWidthAndHeight",
-  	computed: "sameAsMaxWidthAndMaxHeight",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/max-block-size"
-  },
-  	"max-height": {
-  	syntax: "<length> | <percentage> | none | max-content | min-content | fit-content | fill-available",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "regardingHeightOfGeneratedBoxContainingBlockPercentagesNone",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsButNonReplacedAndTableColumns",
-  	computed: "percentageAsSpecifiedAbsoluteLengthOrNone",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/max-height"
-  },
-  	"max-inline-size": {
-  	syntax: "<'max-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "inlineSizeOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsWidthAndHeight",
-  	computed: "sameAsMaxWidthAndMaxHeight",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/max-inline-size"
-  },
-  	"max-lines": {
-  	syntax: "none | <integer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "integer",
-  	percentages: "no",
-  	groups: [
-  		"CSS Overflow"
-  	],
-  	initial: "none",
-  	appliesto: "blockContainersExceptMultiColumnContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental"
-  },
-  	"max-width": {
-  	syntax: "<length> | <percentage> | none | max-content | min-content | fit-content | fill-available",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "none",
-  	appliesto: "allElementsButNonReplacedAndTableRows",
-  	computed: "percentageAsSpecifiedAbsoluteLengthOrNone",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/max-width"
-  },
-  	"min-block-size": {
-  	syntax: "<'min-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "blockSizeOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsWidthAndHeight",
-  	computed: "sameAsMinWidthAndMinHeight",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/min-block-size"
-  },
-  	"min-height": {
-  	syntax: "<length> | <percentage> | auto | max-content | min-content | fit-content | fill-available",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "regardingHeightOfGeneratedBoxContainingBlockPercentages0",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsButNonReplacedAndTableColumns",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/min-height"
-  },
-  	"min-inline-size": {
-  	syntax: "<'min-width'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "inlineSizeOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "sameAsWidthAndHeight",
-  	computed: "sameAsMinWidthAndMinHeight",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/min-inline-size"
-  },
-  	"min-width": {
-  	syntax: "<length> | <percentage> | auto | max-content | min-content | fit-content | fill-available",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsButNonReplacedAndTableRows",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/min-width"
-  },
-  	"mix-blend-mode": {
-  	syntax: "<blend-mode>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Compositing and Blending"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/mix-blend-mode"
-  },
-  	"object-fit": {
-  	syntax: "fill | contain | cover | none | scale-down",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Images"
-  	],
-  	initial: "fill",
-  	appliesto: "replacedElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/object-fit"
-  },
-  	"object-position": {
-  	syntax: "<position>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "repeatableListOfSimpleListOfLpc",
-  	percentages: "referToWidthAndHeightOfElement",
-  	groups: [
-  		"CSS Images"
-  	],
-  	initial: "50% 50%",
-  	appliesto: "replacedElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/object-position"
-  },
-  	offset: offset,
-  	"offset-anchor": {
-  	syntax: "auto | <position>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "position",
-  	percentages: "relativeToWidthAndHeight",
-  	groups: [
-  		"CSS Motion Path"
-  	],
-  	initial: "auto",
-  	appliesto: "transformableElements",
-  	computed: "forLengthAbsoluteValueOtherwisePercentage",
-  	order: "perGrammar",
-  	status: "experimental"
-  },
-  	"offset-distance": {
-  	syntax: "<length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToTotalPathLength",
-  	groups: [
-  		"CSS Motion Path"
-  	],
-  	initial: "0",
-  	appliesto: "transformableElements",
-  	computed: "forLengthAbsoluteValueOtherwisePercentage",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/offset-distance"
-  },
-  	"offset-path": {
-  	syntax: "none | ray( [ <angle> && <size>? && contain? ] ) | <path()> | <url> | [ <basic-shape> || <geometry-box> ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "angleOrBasicShapeOrPath",
-  	percentages: "no",
-  	groups: [
-  		"CSS Motion Path"
-  	],
-  	initial: "none",
-  	appliesto: "transformableElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	stacking: true,
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/offset-path"
-  },
-  	"offset-position": {
-  	syntax: "auto | <position>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "position",
-  	percentages: "referToSizeOfContainingBlock",
-  	groups: [
-  		"CSS Motion Path"
-  	],
-  	initial: "auto",
-  	appliesto: "transformableElements",
-  	computed: "forLengthAbsoluteValueOtherwisePercentage",
-  	order: "perGrammar",
-  	status: "experimental"
-  },
-  	"offset-rotate": {
-  	syntax: "[ auto | reverse ] || <angle>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "angleOrBasicShapeOrPath",
-  	percentages: "no",
-  	groups: [
-  		"CSS Motion Path"
-  	],
-  	initial: "auto",
-  	appliesto: "transformableElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/offset-rotate"
-  },
-  	opacity: opacity,
-  	order: order,
-  	orphans: orphans,
-  	outline: outline,
-  	"outline-color": {
-  	syntax: "<color> | invert",
-  	media: [
-  		"visual",
-  		"interactive"
-  	],
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "invertOrCurrentColor",
-  	appliesto: "allElements",
-  	computed: "invertForTranslucentColorRGBAOtherwiseRGB",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/outline-color"
-  },
-  	"outline-offset": {
-  	syntax: "<length>",
-  	media: [
-  		"visual",
-  		"interactive"
-  	],
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/outline-offset"
-  },
-  	"outline-style": {
-  	syntax: "auto | <'border-style'>",
-  	media: [
-  		"visual",
-  		"interactive"
-  	],
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/outline-style"
-  },
-  	"outline-width": {
-  	syntax: "<line-width>",
-  	media: [
-  		"visual",
-  		"interactive"
-  	],
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "medium",
-  	appliesto: "allElements",
-  	computed: "absoluteLength0ForNone",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/outline-width"
-  },
-  	overflow: overflow,
-  	"overflow-anchor": {
-  	syntax: "auto | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Anchoring"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental"
-  },
-  	"overflow-block": {
-  	syntax: "visible | hidden | clip | scroll | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Overflow"
-  	],
-  	initial: "auto",
-  	appliesto: "blockContainersFlexContainersGridContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental"
-  },
-  	"overflow-clip-box": {
-  	syntax: "padding-box | content-box",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Mozilla Extensions"
-  	],
-  	initial: "padding-box",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Mozilla/CSS/overflow-clip-box"
-  },
-  	"overflow-inline": {
-  	syntax: "visible | hidden | clip | scroll | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Overflow"
-  	],
-  	initial: "auto",
-  	appliesto: "blockContainersFlexContainersGridContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "experimental"
-  },
-  	"overflow-wrap": {
-  	syntax: "normal | break-word | anywhere",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "normal",
-  	appliesto: "nonReplacedInlineElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/overflow-wrap"
-  },
-  	"overflow-x": {
-  	syntax: "visible | hidden | clip | scroll | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Overflow"
-  	],
-  	initial: "visible",
-  	appliesto: "blockContainersFlexContainersGridContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/overflow-x"
-  },
-  	"overflow-y": {
-  	syntax: "visible | hidden | clip | scroll | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Overflow"
-  	],
-  	initial: "visible",
-  	appliesto: "blockContainersFlexContainersGridContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/overflow-y"
-  },
-  	"overscroll-behavior": {
-  	syntax: "[ contain | none | auto ]{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "auto",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior"
-  },
-  	"overscroll-behavior-x": {
-  	syntax: "contain | none | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "auto",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-x"
-  },
-  	"overscroll-behavior-y": {
-  	syntax: "contain | none | auto",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "auto",
-  	appliesto: "nonReplacedBlockAndInlineBlockElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-y"
-  },
-  	padding: padding,
-  	"padding-block": {
-  	syntax: "<'padding-left'>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-block"
-  },
-  	"padding-block-end": {
-  	syntax: "<'padding-left'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-block-end"
-  },
-  	"padding-block-start": {
-  	syntax: "<'padding-left'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-block-start"
-  },
-  	"padding-bottom": {
-  	syntax: "<length> | <percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptInternalTableDisplayTypes",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-bottom"
-  },
-  	"padding-inline": {
-  	syntax: "<'padding-left'>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-inline"
-  },
-  	"padding-inline-end": {
-  	syntax: "<'padding-left'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-inline-end"
-  },
-  	"padding-inline-start": {
-  	syntax: "<'padding-left'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "logicalWidthOfContainingBlock",
-  	groups: [
-  		"CSS Logical Properties"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-inline-start"
-  },
-  	"padding-left": {
-  	syntax: "<length> | <percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptInternalTableDisplayTypes",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-left"
-  },
-  	"padding-right": {
-  	syntax: "<length> | <percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptInternalTableDisplayTypes",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-right"
-  },
-  	"padding-top": {
-  	syntax: "<length> | <percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Box Model"
-  	],
-  	initial: "0",
-  	appliesto: "allElementsExceptInternalTableDisplayTypes",
-  	computed: "percentageAsSpecifiedOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/padding-top"
-  },
-  	"page-break-after": {
-  	syntax: "auto | always | avoid | left | right | recto | verso",
-  	media: [
-  		"visual",
-  		"paged"
-  	],
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Pages"
-  	],
-  	initial: "auto",
-  	appliesto: "blockElementsInNormalFlow",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/page-break-after"
-  },
-  	"page-break-before": {
-  	syntax: "auto | always | avoid | left | right | recto | verso",
-  	media: [
-  		"visual",
-  		"paged"
-  	],
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Pages"
-  	],
-  	initial: "auto",
-  	appliesto: "blockElementsInNormalFlow",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/page-break-before"
-  },
-  	"page-break-inside": {
-  	syntax: "auto | avoid",
-  	media: [
-  		"visual",
-  		"paged"
-  	],
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Pages"
-  	],
-  	initial: "auto",
-  	appliesto: "blockElementsInNormalFlow",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/page-break-inside"
-  },
-  	"paint-order": {
-  	syntax: "normal | [ fill || stroke || markers ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "normal",
-  	appliesto: "textElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/paint-order"
-  },
-  	perspective: perspective,
-  	"perspective-origin": {
-  	syntax: "<position>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "simpleListOfLpc",
-  	percentages: "referToSizeOfBoundingBox",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "50% 50%",
-  	appliesto: "transformableElements",
-  	computed: "forLengthAbsoluteValueOtherwisePercentage",
-  	order: "oneOrTwoValuesLengthAbsoluteKeywordsPercentages",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/perspective-origin"
-  },
-  	"place-content": {
-  	syntax: "<'align-content'> <'justify-content'>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "normal",
-  	appliesto: "multilineFlexContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/place-content"
-  },
-  	"place-items": {
-  	syntax: "<'align-items'> <'justify-items'>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: [
-  		"align-items",
-  		"justify-items"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"align-items",
-  		"justify-items"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/place-items"
-  },
-  	"place-self": {
-  	syntax: "<'align-self'> <'justify-self'>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: [
-  		"align-self",
-  		"justify-self"
-  	],
-  	appliesto: "blockLevelBoxesAndAbsolutelyPositionedBoxesAndGridItems",
-  	computed: [
-  		"align-self",
-  		"justify-self"
-  	],
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/place-self"
-  },
-  	"pointer-events": {
-  	syntax: "auto | none | visiblePainted | visibleFill | visibleStroke | visible | painted | fill | stroke | all | inherit",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Pointer Events"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/pointer-events"
-  },
-  	position: position,
-  	quotes: quotes,
-  	resize: resize,
-  	right: right,
-  	rotate: rotate,
-  	"row-gap": {
-  	syntax: "normal | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToDimensionOfContentArea",
-  	groups: [
-  		"CSS Box Alignment"
-  	],
-  	initial: "normal",
-  	appliesto: "multiColumnElementsFlexContainersGridContainers",
-  	computed: "asSpecifiedWithLengthsAbsoluteAndNormalComputingToZeroExceptMultiColumn",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/row-gap"
-  },
-  	"ruby-align": {
-  	syntax: "start | center | space-between | space-around",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Ruby"
-  	],
-  	initial: "space-around",
-  	appliesto: "rubyBasesAnnotationsBaseAnnotationContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/ruby-align"
-  },
-  	"ruby-merge": {
-  	syntax: "separate | collapse | auto",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Ruby"
-  	],
-  	initial: "separate",
-  	appliesto: "rubyAnnotationsContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "experimental"
-  },
-  	"ruby-position": {
-  	syntax: "over | under | inter-character",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Ruby"
-  	],
-  	initial: "over",
-  	appliesto: "rubyAnnotationsContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/ruby-position"
-  },
-  	scale: scale,
-  	"scrollbar-color": {
-  	syntax: "auto | dark | light | <color>{2}",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scrollbars"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollingBoxes",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scrollbar-color"
-  },
-  	"scrollbar-width": {
-  	syntax: "auto | thin | none",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scrollbars"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollingBoxes",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scrollbar-width"
-  },
-  	"scroll-behavior": {
-  	syntax: "auto | smooth",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSSOM View"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollingBoxes",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-behavior"
-  },
-  	"scroll-margin": {
-  	syntax: "<length>{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin"
-  },
-  	"scroll-margin-block": {
-  	syntax: "<length>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-block"
-  },
-  	"scroll-margin-block-start": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-block-start"
-  },
-  	"scroll-margin-block-end": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-block-end"
-  },
-  	"scroll-margin-bottom": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-bottom"
-  },
-  	"scroll-margin-inline": {
-  	syntax: "<length>{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-inline"
-  },
-  	"scroll-margin-inline-start": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-inline-start"
-  },
-  	"scroll-margin-inline-end": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-inline-end"
-  },
-  	"scroll-margin-left": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-left"
-  },
-  	"scroll-margin-right": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-right"
-  },
-  	"scroll-margin-top": {
-  	syntax: "<length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-top"
-  },
-  	"scroll-padding": {
-  	syntax: "[ auto | <length-percentage> ]{1,4}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding"
-  },
-  	"scroll-padding-block": {
-  	syntax: "[ auto | <length-percentage> ]{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-block"
-  },
-  	"scroll-padding-block-start": {
-  	syntax: "auto | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-block-start"
-  },
-  	"scroll-padding-block-end": {
-  	syntax: "auto | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-block-end"
-  },
-  	"scroll-padding-bottom": {
-  	syntax: "auto | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-bottom"
-  },
-  	"scroll-padding-inline": {
-  	syntax: "[ auto | <length-percentage> ]{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-inline"
-  },
-  	"scroll-padding-inline-start": {
-  	syntax: "auto | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-inline-start"
-  },
-  	"scroll-padding-inline-end": {
-  	syntax: "auto | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-inline-end"
-  },
-  	"scroll-padding-left": {
-  	syntax: "auto | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-left"
-  },
-  	"scroll-padding-right": {
-  	syntax: "auto | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-right"
-  },
-  	"scroll-padding-top": {
-  	syntax: "auto | <length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "relativeToTheScrollContainersScrollport",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "auto",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-top"
-  },
-  	"scroll-snap-align": {
-  	syntax: "[ none | start | end | center ]{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-align"
-  },
-  	"scroll-snap-coordinate": {
-  	syntax: "none | <position>#",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "position",
-  	percentages: "referToBorderBox",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-coordinate"
-  },
-  	"scroll-snap-destination": {
-  	syntax: "<position>",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "position",
-  	percentages: "relativeToScrollContainerPaddingBoxAxis",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "0px 0px",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-destination"
-  },
-  	"scroll-snap-points-x": {
-  	syntax: "none | repeat( <length-percentage> )",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "relativeToScrollContainerPaddingBoxAxis",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "none",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-points-x"
-  },
-  	"scroll-snap-points-y": {
-  	syntax: "none | repeat( <length-percentage> )",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "relativeToScrollContainerPaddingBoxAxis",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "none",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-points-y"
-  },
-  	"scroll-snap-stop": {
-  	syntax: "normal | always",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "perGrammar",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-stop"
-  },
-  	"scroll-snap-type": {
-  	syntax: "none | [ x | y | block | inline | both ] [ mandatory | proximity ]?",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-type"
-  },
-  	"scroll-snap-type-x": {
-  	syntax: "none | mandatory | proximity",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "none",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-type-x"
-  },
-  	"scroll-snap-type-y": {
-  	syntax: "none | mandatory | proximity",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Scroll Snap"
-  	],
-  	initial: "none",
-  	appliesto: "scrollContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "obsolete",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-type-y"
-  },
-  	"shape-image-threshold": {
-  	syntax: "<alpha-value>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "number",
-  	percentages: "no",
-  	groups: [
-  		"CSS Shapes"
-  	],
-  	initial: "0.0",
-  	appliesto: "floats",
-  	computed: "specifiedValueNumberClipped0To1",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/shape-image-threshold"
-  },
-  	"shape-margin": {
-  	syntax: "<length-percentage>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "lpc",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Shapes"
-  	],
-  	initial: "0",
-  	appliesto: "floats",
-  	computed: "asSpecifiedRelativeToAbsoluteLengths",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/shape-margin"
-  },
-  	"shape-outside": {
-  	syntax: "none | <shape-box> || <basic-shape> | <image>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "basicShapeOtherwiseNo",
-  	percentages: "no",
-  	groups: [
-  		"CSS Shapes"
-  	],
-  	initial: "none",
-  	appliesto: "floats",
-  	computed: "asDefinedForBasicShapeWithAbsoluteURIOtherwiseAsSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/shape-outside"
-  },
-  	"tab-size": {
-  	syntax: "<integer> | <length>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "length",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "8",
-  	appliesto: "blockContainers",
-  	computed: "specifiedIntegerOrAbsoluteLength",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/tab-size"
-  },
-  	"table-layout": {
-  	syntax: "auto | fixed",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Table"
-  	],
-  	initial: "auto",
-  	appliesto: "tableElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/table-layout"
-  },
-  	"text-align": {
-  	syntax: "start | end | left | right | center | justify | match-parent",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "startOrNamelessValueIfLTRRightIfRTL",
-  	appliesto: "blockContainers",
-  	computed: "asSpecifiedExceptMatchParent",
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-align"
-  },
-  	"text-align-last": {
-  	syntax: "auto | start | end | left | right | center | justify",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "auto",
-  	appliesto: "blockContainers",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-align-last"
-  },
-  	"text-combine-upright": {
-  	syntax: "none | all | [ digits <integer>? ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Writing Modes"
-  	],
-  	initial: "none",
-  	appliesto: "nonReplacedInlineElements",
-  	computed: "keywordPlusIntegerIfDigits",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-combine-upright"
-  },
-  	"text-decoration": {
-  	syntax: "<'text-decoration-line'> || <'text-decoration-style'> || <'text-decoration-color'> || <'text-decoration-thickness'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"text-decoration-color",
-  		"text-decoration-style",
-  		"text-decoration-line",
-  		"text-decoration-thickness"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: [
-  		"text-decoration-color",
-  		"text-decoration-style",
-  		"text-decoration-line"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"text-decoration-line",
-  		"text-decoration-style",
-  		"text-decoration-color",
-  		"text-decoration-thickness"
-  	],
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-decoration"
-  },
-  	"text-decoration-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-color"
-  },
-  	"text-decoration-line": {
-  	syntax: "none | [ underline || overline || line-through || blink ] | spelling-error | grammar-error",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-line"
-  },
-  	"text-decoration-skip": {
-  	syntax: "none | [ objects || [ spaces | [ leading-spaces || trailing-spaces ] ] || edges || box-decoration ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "objects",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip"
-  },
-  	"text-decoration-skip-ink": {
-  	syntax: "auto | none",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip-ink"
-  },
-  	"text-decoration-style": {
-  	syntax: "solid | double | dotted | dashed | wavy",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "solid",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-style"
-  },
-  	"text-decoration-thickness": {
-  	syntax: "auto | from-font | <length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-thickness"
-  },
-  	"text-emphasis": {
-  	syntax: "<'text-emphasis-style'> || <'text-emphasis-color'>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: [
-  		"text-emphasis-color",
-  		"text-emphasis-style"
-  	],
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: [
-  		"text-emphasis-style",
-  		"text-emphasis-color"
-  	],
-  	appliesto: "allElements",
-  	computed: [
-  		"text-emphasis-style",
-  		"text-emphasis-color"
-  	],
-  	order: "orderOfAppearance",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-emphasis"
-  },
-  	"text-emphasis-color": {
-  	syntax: "<color>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "color",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "currentcolor",
-  	appliesto: "allElements",
-  	computed: "computedColor",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-emphasis-color"
-  },
-  	"text-emphasis-position": {
-  	syntax: "[ over | under ] && [ right | left ]",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "over right",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-emphasis-position"
-  },
-  	"text-emphasis-style": {
-  	syntax: "none | [ [ filled | open ] || [ dot | circle | double-circle | triangle | sesame ] ] | <string>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-emphasis-style"
-  },
-  	"text-indent": {
-  	syntax: "<length-percentage> && hanging? && each-line?",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "lpc",
-  	percentages: "referToWidthOfContainingBlock",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "0",
-  	appliesto: "blockContainers",
-  	computed: "percentageOrAbsoluteLengthPlusKeywords",
-  	order: "lengthOrPercentageBeforeKeywords",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-indent"
-  },
-  	"text-justify": {
-  	syntax: "auto | inter-character | inter-word | none",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "auto",
-  	appliesto: "inlineLevelAndTableCellElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-justify"
-  },
-  	"text-orientation": {
-  	syntax: "mixed | upright | sideways",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Writing Modes"
-  	],
-  	initial: "mixed",
-  	appliesto: "allElementsExceptTableRowGroupsRowsColumnGroupsAndColumns",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-orientation"
-  },
-  	"text-overflow": {
-  	syntax: "[ clip | ellipsis | <string> ]{1,2}",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "clip",
-  	appliesto: "blockContainerElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-overflow"
-  },
-  	"text-rendering": {
-  	syntax: "auto | optimizeSpeed | optimizeLegibility | geometricPrecision",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Miscellaneous"
-  	],
-  	initial: "auto",
-  	appliesto: "textElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-rendering"
-  },
-  	"text-shadow": {
-  	syntax: "none | <shadow-t>#",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "shadowList",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "colorPlusThreeAbsoluteLengths",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-shadow"
-  },
-  	"text-size-adjust": {
-  	syntax: "none | auto | <percentage>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "referToSizeOfFont",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "autoForSmartphoneBrowsersSupportingInflation",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "experimental",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-size-adjust"
-  },
-  	"text-transform": {
-  	syntax: "none | capitalize | uppercase | lowercase | full-width | full-size-kana",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "none",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-transform"
-  },
-  	"text-underline-offset": {
-  	syntax: "auto | from-font | <length>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "byComputedValueType",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-underline-offset"
-  },
-  	"text-underline-position": {
-  	syntax: "auto | [ under || [ left | right ] ]",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text Decoration"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "orderOfAppearance",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/text-underline-position"
-  },
-  	top: top,
-  	"touch-action": {
-  	syntax: "auto | none | [ [ pan-x | pan-left | pan-right ] || [ pan-y | pan-up | pan-down ] || pinch-zoom ] | manipulation",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"Pointer Events"
-  	],
-  	initial: "auto",
-  	appliesto: "allElementsExceptNonReplacedInlineElementsTableRowsColumnsRowColumnGroups",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/touch-action"
-  },
-  	transform: transform,
-  	"transform-box": {
-  	syntax: "border-box | fill-box | view-box",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "border-box ",
-  	appliesto: "transformableElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transform-box"
-  },
-  	"transform-origin": {
-  	syntax: "[ <length-percentage> | left | center | right | top | bottom ] | [ [ <length-percentage> | left | center | right ] && [ <length-percentage> | top | center | bottom ] ] <length>?",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "simpleListOfLpc",
-  	percentages: "referToSizeOfBoundingBox",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "50% 50% 0",
-  	appliesto: "transformableElements",
-  	computed: "forLengthAbsoluteValueOtherwisePercentage",
-  	order: "oneOrTwoValuesLengthAbsoluteKeywordsPercentages",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transform-origin"
-  },
-  	"transform-style": {
-  	syntax: "flat | preserve-3d",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transforms"
-  	],
-  	initial: "flat",
-  	appliesto: "transformableElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transform-style"
-  },
-  	transition: transition,
-  	"transition-delay": {
-  	syntax: "<time>#",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transitions"
-  	],
-  	initial: "0s",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transition-delay"
-  },
-  	"transition-duration": {
-  	syntax: "<time>#",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transitions"
-  	],
-  	initial: "0s",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transition-duration"
-  },
-  	"transition-property": {
-  	syntax: "none | <single-transition-property>#",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transitions"
-  	],
-  	initial: "all",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transition-property"
-  },
-  	"transition-timing-function": {
-  	syntax: "<timing-function>#",
-  	media: "interactive",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Transitions"
-  	],
-  	initial: "ease",
-  	appliesto: "allElementsAndPseudos",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/transition-timing-function"
-  },
-  	translate: translate,
-  	"unicode-bidi": {
-  	syntax: "normal | embed | isolate | bidi-override | isolate-override | plaintext",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Writing Modes"
-  	],
-  	initial: "normal",
-  	appliesto: "allElementsSomeValuesNoEffectOnNonInlineElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/unicode-bidi"
-  },
-  	"user-select": {
-  	syntax: "auto | text | none | contain | all",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Basic User Interface"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "nonstandard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/user-select"
-  },
-  	"vertical-align": {
-  	syntax: "baseline | sub | super | text-top | text-bottom | middle | top | bottom | <percentage> | <length>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "length",
-  	percentages: "referToLineHeight",
-  	groups: [
-  		"CSS Table"
-  	],
-  	initial: "baseline",
-  	appliesto: "inlineLevelAndTableCellElements",
-  	computed: "absoluteLengthOrKeyword",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/vertical-align"
-  },
-  	visibility: visibility,
-  	"white-space": {
-  	syntax: "normal | pre | nowrap | pre-wrap | pre-line | break-spaces",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/white-space"
-  },
-  	widows: widows,
-  	width: width,
-  	"will-change": {
-  	syntax: "auto | <animateable-feature>#",
-  	media: "all",
-  	inherited: false,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Will Change"
-  	],
-  	initial: "auto",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/will-change"
-  },
-  	"word-break": {
-  	syntax: "normal | break-all | keep-all | break-word",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/word-break"
-  },
-  	"word-spacing": {
-  	syntax: "normal | <length-percentage>",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "length",
-  	percentages: "referToWidthOfAffectedGlyph",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "normal",
-  	appliesto: "allElements",
-  	computed: "optimumMinAndMaxValueOfAbsoluteLengthPercentageOrNormal",
-  	order: "uniqueOrder",
-  	alsoAppliesTo: [
-  		"::first-letter",
-  		"::first-line",
-  		"::placeholder"
-  	],
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/word-spacing"
-  },
-  	"word-wrap": {
-  	syntax: "normal | break-word",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Text"
-  	],
-  	initial: "normal",
-  	appliesto: "nonReplacedInlineElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/overflow-wrap"
-  },
-  	"writing-mode": {
-  	syntax: "horizontal-tb | vertical-rl | vertical-lr | sideways-rl | sideways-lr",
-  	media: "visual",
-  	inherited: true,
-  	animationType: "discrete",
-  	percentages: "no",
-  	groups: [
-  		"CSS Writing Modes"
-  	],
-  	initial: "horizontal-tb",
-  	appliesto: "allElementsExceptTableRowColumnGroupsTableRowsColumns",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/writing-mode"
-  },
-  	"z-index": {
-  	syntax: "auto | <integer>",
-  	media: "visual",
-  	inherited: false,
-  	animationType: "integer",
-  	percentages: "no",
-  	groups: [
-  		"CSS Positioning"
-  	],
-  	initial: "auto",
-  	appliesto: "positionedElements",
-  	computed: "asSpecified",
-  	order: "uniqueOrder",
-  	stacking: true,
-  	status: "standard",
-  	mdn_url: "https://developer.mozilla.org/docs/Web/CSS/z-index"
-  },
-  	zoom: zoom
-  };
-
-  var properties$2 = /*#__PURE__*/window.Object.freeze({
-    __proto__: null,
-    all: all,
-    animation: animation,
-    appearance: appearance,
-    azimuth: azimuth,
-    background: background,
-    border: border,
-    bottom: bottom,
-    clear: clear,
-    clip: clip,
-    color: color,
-    columns: columns,
-    contain: contain,
-    content: content,
-    cursor: cursor,
-    direction: direction,
-    display: display,
-    filter: filter,
-    flex: flex,
-    float: float,
-    font: font,
-    gap: gap,
-    grid: grid,
-    height: height,
-    hyphens: hyphens,
-    inset: inset,
-    isolation: isolation,
-    left: left,
-    margin: margin,
-    mask: mask,
-    offset: offset,
-    opacity: opacity,
-    order: order,
-    orphans: orphans,
-    outline: outline,
-    overflow: overflow,
-    padding: padding,
-    perspective: perspective,
-    position: position,
-    quotes: quotes,
-    resize: resize,
-    right: right,
-    rotate: rotate,
-    scale: scale,
-    top: top,
-    transform: transform,
-    transition: transition,
-    translate: translate,
-    visibility: visibility,
-    widows: widows,
-    width: width,
-    zoom: zoom,
-    'default': properties$1
-  });
-
-  var attachment = {
-  	syntax: "scroll | fixed | local"
-  };
-  var box = {
-  	syntax: "border-box | padding-box | content-box"
-  };
-  var color$1 = {
-  	syntax: "<rgb()> | <rgba()> | <hsl()> | <hsla()> | <hex-color> | <named-color> | currentcolor | <deprecated-system-color>"
-  };
-  var combinator = {
-  	syntax: "'>' | '+' | '~' | [ '||' ]"
-  };
-  var compat = {
-  	syntax: "searchfield | textarea | push-button | button-bevel | slider-horizontal | checkbox | radio | square-button | menulist | menulist-button | listbox | meter | progress-bar"
-  };
-  var gradient = {
-  	syntax: "<linear-gradient()> | <repeating-linear-gradient()> | <radial-gradient()> | <repeating-radial-gradient()> | <conic-gradient()>"
-  };
-  var hue = {
-  	syntax: "<number> | <angle>"
-  };
-  var image = {
-  	syntax: "<url> | <image()> | <image-set()> | <element()> | <paint()> | <cross-fade()> | <gradient>"
-  };
-  var nth = {
-  	syntax: "<an-plus-b> | even | odd"
-  };
-  var position$1 = {
-  	syntax: "[ [ left | center | right ] || [ top | center | bottom ] | [ left | center | right | <length-percentage> ] [ top | center | bottom | <length-percentage> ]? | [ [ left | right ] <length-percentage> ] && [ [ top | bottom ] <length-percentage> ] ]"
-  };
-  var quote = {
-  	syntax: "open-quote | close-quote | no-open-quote | no-close-quote"
-  };
-  var shadow = {
-  	syntax: "inset? && <length>{2,4} && <color>?"
-  };
-  var shape$1 = {
-  	syntax: "rect(<top>, <right>, <bottom>, <left>)"
-  };
-  var size = {
-  	syntax: "closest-side | farthest-side | closest-corner | farthest-corner | <length> | <length-percentage>{2}"
-  };
-  var symbol = {
-  	syntax: "<string> | <image> | <custom-ident>"
-  };
-  var target = {
-  	syntax: "<target-counter()> | <target-counters()> | <target-text()>"
-  };
-  var syntaxes = {
-  	"absolute-size": {
-  	syntax: "xx-small | x-small | small | medium | large | x-large | xx-large | xxx-large"
-  },
-  	"alpha-value": {
-  	syntax: "<number> | <percentage>"
-  },
-  	"angle-percentage": {
-  	syntax: "<angle> | <percentage>"
-  },
-  	"angular-color-hint": {
-  	syntax: "<angle-percentage>"
-  },
-  	"angular-color-stop": {
-  	syntax: "<color> && <color-stop-angle>?"
-  },
-  	"angular-color-stop-list": {
-  	syntax: "[ <angular-color-stop> [, <angular-color-hint>]? ]# , <angular-color-stop>"
-  },
-  	"animateable-feature": {
-  	syntax: "scroll-position | contents | <custom-ident>"
-  },
-  	attachment: attachment,
-  	"attr()": {
-  	syntax: "attr( <attr-name> <type-or-unit>? [, <attr-fallback> ]? )"
-  },
-  	"attr-matcher": {
-  	syntax: "[ '~' | '|' | '^' | '$' | '*' ]? '='"
-  },
-  	"attr-modifier": {
-  	syntax: "i | s"
-  },
-  	"attribute-selector": {
-  	syntax: "'[' <wq-name> ']' | '[' <wq-name> <attr-matcher> [ <string-token> | <ident-token> ] <attr-modifier>? ']'"
-  },
-  	"auto-repeat": {
-  	syntax: "repeat( [ auto-fill | auto-fit ] , [ <line-names>? <fixed-size> ]+ <line-names>? )"
-  },
-  	"auto-track-list": {
-  	syntax: "[ <line-names>? [ <fixed-size> | <fixed-repeat> ] ]* <line-names>? <auto-repeat>\n[ <line-names>? [ <fixed-size> | <fixed-repeat> ] ]* <line-names>?"
-  },
-  	"baseline-position": {
-  	syntax: "[ first | last ]? baseline"
-  },
-  	"basic-shape": {
-  	syntax: "<inset()> | <circle()> | <ellipse()> | <polygon()>"
-  },
-  	"bg-image": {
-  	syntax: "none | <image>"
-  },
-  	"bg-layer": {
-  	syntax: "<bg-image> || <bg-position> [ / <bg-size> ]? || <repeat-style> || <attachment> || <box> || <box>"
-  },
-  	"bg-position": {
-  	syntax: "[ [ left | center | right | top | bottom | <length-percentage> ] | [ left | center | right | <length-percentage> ] [ top | center | bottom | <length-percentage> ] | [ center | [ left | right ] <length-percentage>? ] && [ center | [ top | bottom ] <length-percentage>? ] ]"
-  },
-  	"bg-size": {
-  	syntax: "[ <length-percentage> | auto ]{1,2} | cover | contain"
-  },
-  	"blur()": {
-  	syntax: "blur( <length> )"
-  },
-  	"blend-mode": {
-  	syntax: "normal | multiply | screen | overlay | darken | lighten | color-dodge | color-burn | hard-light | soft-light | difference | exclusion | hue | saturation | color | luminosity"
-  },
-  	box: box,
-  	"brightness()": {
-  	syntax: "brightness( <number-percentage> )"
-  },
-  	"calc()": {
-  	syntax: "calc( <calc-sum> )"
-  },
-  	"calc-sum": {
-  	syntax: "<calc-product> [ [ '+' | '-' ] <calc-product> ]*"
-  },
-  	"calc-product": {
-  	syntax: "<calc-value> [ '*' <calc-value> | '/' <number> ]*"
-  },
-  	"calc-value": {
-  	syntax: "<number> | <dimension> | <percentage> | ( <calc-sum> )"
-  },
-  	"cf-final-image": {
-  	syntax: "<image> | <color>"
-  },
-  	"cf-mixing-image": {
-  	syntax: "<percentage>? && <image>"
-  },
-  	"circle()": {
-  	syntax: "circle( [ <shape-radius> ]? [ at <position> ]? )"
-  },
-  	"clamp()": {
-  	syntax: "clamp( <calc-sum>#{3} )"
-  },
-  	"class-selector": {
-  	syntax: "'.' <ident-token>"
-  },
-  	"clip-source": {
-  	syntax: "<url>"
-  },
-  	color: color$1,
-  	"color-stop": {
-  	syntax: "<color-stop-length> | <color-stop-angle>"
-  },
-  	"color-stop-angle": {
-  	syntax: "<angle-percentage>{1,2}"
-  },
-  	"color-stop-length": {
-  	syntax: "<length-percentage>{1,2}"
-  },
-  	"color-stop-list": {
-  	syntax: "[ <linear-color-stop> [, <linear-color-hint>]? ]# , <linear-color-stop>"
-  },
-  	combinator: combinator,
-  	"common-lig-values": {
-  	syntax: "[ common-ligatures | no-common-ligatures ]"
-  },
-  	compat: compat,
-  	"composite-style": {
-  	syntax: "clear | copy | source-over | source-in | source-out | source-atop | destination-over | destination-in | destination-out | destination-atop | xor"
-  },
-  	"compositing-operator": {
-  	syntax: "add | subtract | intersect | exclude"
-  },
-  	"compound-selector": {
-  	syntax: "[ <type-selector>? <subclass-selector>* [ <pseudo-element-selector> <pseudo-class-selector>* ]* ]!"
-  },
-  	"compound-selector-list": {
-  	syntax: "<compound-selector>#"
-  },
-  	"complex-selector": {
-  	syntax: "<compound-selector> [ <combinator>? <compound-selector> ]*"
-  },
-  	"complex-selector-list": {
-  	syntax: "<complex-selector>#"
-  },
-  	"conic-gradient()": {
-  	syntax: "conic-gradient( [ from <angle> ]? [ at <position> ]?, <angular-color-stop-list> )"
-  },
-  	"contextual-alt-values": {
-  	syntax: "[ contextual | no-contextual ]"
-  },
-  	"content-distribution": {
-  	syntax: "space-between | space-around | space-evenly | stretch"
-  },
-  	"content-list": {
-  	syntax: "[ <string> | contents | <image> | <quote> | <target> | <leader()> ]+"
-  },
-  	"content-position": {
-  	syntax: "center | start | end | flex-start | flex-end"
-  },
-  	"content-replacement": {
-  	syntax: "<image>"
-  },
-  	"contrast()": {
-  	syntax: "contrast( [ <number-percentage> ] )"
-  },
-  	"counter()": {
-  	syntax: "counter( <custom-ident>, <counter-style>? )"
-  },
-  	"counter-style": {
-  	syntax: "<counter-style-name> | symbols()"
-  },
-  	"counter-style-name": {
-  	syntax: "<custom-ident>"
-  },
-  	"counters()": {
-  	syntax: "counters( <custom-ident>, <string>, <counter-style>? )"
-  },
-  	"cross-fade()": {
-  	syntax: "cross-fade( <cf-mixing-image> , <cf-final-image>? )"
-  },
-  	"cubic-bezier-timing-function": {
-  	syntax: "ease | ease-in | ease-out | ease-in-out | cubic-bezier(<number>, <number>, <number>, <number>)"
-  },
-  	"deprecated-system-color": {
-  	syntax: "ActiveBorder | ActiveCaption | AppWorkspace | Background | ButtonFace | ButtonHighlight | ButtonShadow | ButtonText | CaptionText | GrayText | Highlight | HighlightText | InactiveBorder | InactiveCaption | InactiveCaptionText | InfoBackground | InfoText | Menu | MenuText | Scrollbar | ThreeDDarkShadow | ThreeDFace | ThreeDHighlight | ThreeDLightShadow | ThreeDShadow | Window | WindowFrame | WindowText"
-  },
-  	"discretionary-lig-values": {
-  	syntax: "[ discretionary-ligatures | no-discretionary-ligatures ]"
-  },
-  	"display-box": {
-  	syntax: "contents | none"
-  },
-  	"display-inside": {
-  	syntax: "flow | flow-root | table | flex | grid | ruby"
-  },
-  	"display-internal": {
-  	syntax: "table-row-group | table-header-group | table-footer-group | table-row | table-cell | table-column-group | table-column | table-caption | ruby-base | ruby-text | ruby-base-container | ruby-text-container"
-  },
-  	"display-legacy": {
-  	syntax: "inline-block | inline-list-item | inline-table | inline-flex | inline-grid"
-  },
-  	"display-listitem": {
-  	syntax: "<display-outside>? && [ flow | flow-root ]? && list-item"
-  },
-  	"display-outside": {
-  	syntax: "block | inline | run-in"
-  },
-  	"drop-shadow()": {
-  	syntax: "drop-shadow( <length>{2,3} <color>? )"
-  },
-  	"east-asian-variant-values": {
-  	syntax: "[ jis78 | jis83 | jis90 | jis04 | simplified | traditional ]"
-  },
-  	"east-asian-width-values": {
-  	syntax: "[ full-width | proportional-width ]"
-  },
-  	"element()": {
-  	syntax: "element( <id-selector> )"
-  },
-  	"ellipse()": {
-  	syntax: "ellipse( [ <shape-radius>{2} ]? [ at <position> ]? )"
-  },
-  	"ending-shape": {
-  	syntax: "circle | ellipse"
-  },
-  	"env()": {
-  	syntax: "env( <custom-ident> , <declaration-value>? )"
-  },
-  	"explicit-track-list": {
-  	syntax: "[ <line-names>? <track-size> ]+ <line-names>?"
-  },
-  	"family-name": {
-  	syntax: "<string> | <custom-ident>+"
-  },
-  	"feature-tag-value": {
-  	syntax: "<string> [ <integer> | on | off ]?"
-  },
-  	"feature-type": {
-  	syntax: "@stylistic | @historical-forms | @styleset | @character-variant | @swash | @ornaments | @annotation"
-  },
-  	"feature-value-block": {
-  	syntax: "<feature-type> '{' <feature-value-declaration-list> '}'"
-  },
-  	"feature-value-block-list": {
-  	syntax: "<feature-value-block>+"
-  },
-  	"feature-value-declaration": {
-  	syntax: "<custom-ident>: <integer>+;"
-  },
-  	"feature-value-declaration-list": {
-  	syntax: "<feature-value-declaration>"
-  },
-  	"feature-value-name": {
-  	syntax: "<custom-ident>"
-  },
-  	"fill-rule": {
-  	syntax: "nonzero | evenodd"
-  },
-  	"filter-function": {
-  	syntax: "<blur()> | <brightness()> | <contrast()> | <drop-shadow()> | <grayscale()> | <hue-rotate()> | <invert()> | <opacity()> | <saturate()> | <sepia()>"
-  },
-  	"filter-function-list": {
-  	syntax: "[ <filter-function> | <url> ]+"
-  },
-  	"final-bg-layer": {
-  	syntax: "<'background-color'> || <bg-image> || <bg-position> [ / <bg-size> ]? || <repeat-style> || <attachment> || <box> || <box>"
-  },
-  	"fit-content()": {
-  	syntax: "fit-content( [ <length> | <percentage> ] )"
-  },
-  	"fixed-breadth": {
-  	syntax: "<length-percentage>"
-  },
-  	"fixed-repeat": {
-  	syntax: "repeat( [ <positive-integer> ] , [ <line-names>? <fixed-size> ]+ <line-names>? )"
-  },
-  	"fixed-size": {
-  	syntax: "<fixed-breadth> | minmax( <fixed-breadth> , <track-breadth> ) | minmax( <inflexible-breadth> , <fixed-breadth> )"
-  },
-  	"font-stretch-absolute": {
-  	syntax: "normal | ultra-condensed | extra-condensed | condensed | semi-condensed | semi-expanded | expanded | extra-expanded | ultra-expanded | <percentage>"
-  },
-  	"font-variant-css21": {
-  	syntax: "[ normal | small-caps ]"
-  },
-  	"font-weight-absolute": {
-  	syntax: "normal | bold | <number>"
-  },
-  	"frequency-percentage": {
-  	syntax: "<frequency> | <percentage>"
-  },
-  	"general-enclosed": {
-  	syntax: "[ <function-token> <any-value> ) ] | ( <ident> <any-value> )"
-  },
-  	"generic-family": {
-  	syntax: "serif | sans-serif | cursive | fantasy | monospace"
-  },
-  	"generic-name": {
-  	syntax: "serif | sans-serif | cursive | fantasy | monospace"
-  },
-  	"geometry-box": {
-  	syntax: "<shape-box> | fill-box | stroke-box | view-box"
-  },
-  	gradient: gradient,
-  	"grayscale()": {
-  	syntax: "grayscale( <number-percentage> )"
-  },
-  	"grid-line": {
-  	syntax: "auto | <custom-ident> | [ <integer> && <custom-ident>? ] | [ span && [ <integer> || <custom-ident> ] ]"
-  },
-  	"historical-lig-values": {
-  	syntax: "[ historical-ligatures | no-historical-ligatures ]"
-  },
-  	"hsl()": {
-  	syntax: "hsl( <hue> <percentage> <percentage> [ / <alpha-value> ]? ) | hsl( <hue>, <percentage>, <percentage>, <alpha-value>? )"
-  },
-  	"hsla()": {
-  	syntax: "hsla( <hue> <percentage> <percentage> [ / <alpha-value> ]? ) | hsla( <hue>, <percentage>, <percentage>, <alpha-value>? )"
-  },
-  	hue: hue,
-  	"hue-rotate()": {
-  	syntax: "hue-rotate( <angle> )"
-  },
-  	"id-selector": {
-  	syntax: "<hash-token>"
-  },
-  	image: image,
-  	"image()": {
-  	syntax: "image( <image-tags>? [ <image-src>? , <color>? ]! )"
-  },
-  	"image-set()": {
-  	syntax: "image-set( <image-set-option># )"
-  },
-  	"image-set-option": {
-  	syntax: "[ <image> | <string> ] <resolution>"
-  },
-  	"image-src": {
-  	syntax: "<url> | <string>"
-  },
-  	"image-tags": {
-  	syntax: "ltr | rtl"
-  },
-  	"inflexible-breadth": {
-  	syntax: "<length> | <percentage> | min-content | max-content | auto"
-  },
-  	"inset()": {
-  	syntax: "inset( <length-percentage>{1,4} [ round <'border-radius'> ]? )"
-  },
-  	"invert()": {
-  	syntax: "invert( <number-percentage> )"
-  },
-  	"keyframes-name": {
-  	syntax: "<custom-ident> | <string>"
-  },
-  	"keyframe-block": {
-  	syntax: "<keyframe-selector># {\n  <declaration-list>\n}"
-  },
-  	"keyframe-block-list": {
-  	syntax: "<keyframe-block>+"
-  },
-  	"keyframe-selector": {
-  	syntax: "from | to | <percentage>"
-  },
-  	"leader()": {
-  	syntax: "leader( <leader-type> )"
-  },
-  	"leader-type": {
-  	syntax: "dotted | solid | space | <string>"
-  },
-  	"length-percentage": {
-  	syntax: "<length> | <percentage>"
-  },
-  	"line-names": {
-  	syntax: "'[' <custom-ident>* ']'"
-  },
-  	"line-name-list": {
-  	syntax: "[ <line-names> | <name-repeat> ]+"
-  },
-  	"line-style": {
-  	syntax: "none | hidden | dotted | dashed | solid | double | groove | ridge | inset | outset"
-  },
-  	"line-width": {
-  	syntax: "<length> | thin | medium | thick"
-  },
-  	"linear-color-hint": {
-  	syntax: "<length-percentage>"
-  },
-  	"linear-color-stop": {
-  	syntax: "<color> <color-stop-length>?"
-  },
-  	"linear-gradient()": {
-  	syntax: "linear-gradient( [ <angle> | to <side-or-corner> ]? , <color-stop-list> )"
-  },
-  	"mask-layer": {
-  	syntax: "<mask-reference> || <position> [ / <bg-size> ]? || <repeat-style> || <geometry-box> || [ <geometry-box> | no-clip ] || <compositing-operator> || <masking-mode>"
-  },
-  	"mask-position": {
-  	syntax: "[ <length-percentage> | left | center | right ] [ <length-percentage> | top | center | bottom ]?"
-  },
-  	"mask-reference": {
-  	syntax: "none | <image> | <mask-source>"
-  },
-  	"mask-source": {
-  	syntax: "<url>"
-  },
-  	"masking-mode": {
-  	syntax: "alpha | luminance | match-source"
-  },
-  	"matrix()": {
-  	syntax: "matrix( <number>#{6} )"
-  },
-  	"matrix3d()": {
-  	syntax: "matrix3d( <number>#{16} )"
-  },
-  	"max()": {
-  	syntax: "max( <calc-sum># )"
-  },
-  	"media-and": {
-  	syntax: "<media-in-parens> [ and <media-in-parens> ]+"
-  },
-  	"media-condition": {
-  	syntax: "<media-not> | <media-and> | <media-or> | <media-in-parens>"
-  },
-  	"media-condition-without-or": {
-  	syntax: "<media-not> | <media-and> | <media-in-parens>"
-  },
-  	"media-feature": {
-  	syntax: "( [ <mf-plain> | <mf-boolean> | <mf-range> ] )"
-  },
-  	"media-in-parens": {
-  	syntax: "( <media-condition> ) | <media-feature> | <general-enclosed>"
-  },
-  	"media-not": {
-  	syntax: "not <media-in-parens>"
-  },
-  	"media-or": {
-  	syntax: "<media-in-parens> [ or <media-in-parens> ]+"
-  },
-  	"media-query": {
-  	syntax: "<media-condition> | [ not | only ]? <media-type> [ and <media-condition-without-or> ]?"
-  },
-  	"media-query-list": {
-  	syntax: "<media-query>#"
-  },
-  	"media-type": {
-  	syntax: "<ident>"
-  },
-  	"mf-boolean": {
-  	syntax: "<mf-name>"
-  },
-  	"mf-name": {
-  	syntax: "<ident>"
-  },
-  	"mf-plain": {
-  	syntax: "<mf-name> : <mf-value>"
-  },
-  	"mf-range": {
-  	syntax: "<mf-name> [ '<' | '>' ]? '='? <mf-value>\n| <mf-value> [ '<' | '>' ]? '='? <mf-name>\n| <mf-value> '<' '='? <mf-name> '<' '='? <mf-value>\n| <mf-value> '>' '='? <mf-name> '>' '='? <mf-value>"
-  },
-  	"mf-value": {
-  	syntax: "<number> | <dimension> | <ident> | <ratio>"
-  },
-  	"min()": {
-  	syntax: "min( <calc-sum># )"
-  },
-  	"minmax()": {
-  	syntax: "minmax( [ <length> | <percentage> | <flex> | min-content | max-content | auto ] , [ <length> | <percentage> | <flex> | min-content | max-content | auto ] )"
-  },
-  	"named-color": {
-  	syntax: "transparent | aliceblue | antiquewhite | aqua | aquamarine | azure | beige | bisque | black | blanchedalmond | blue | blueviolet | brown | burlywood | cadetblue | chartreuse | chocolate | coral | cornflowerblue | cornsilk | crimson | cyan | darkblue | darkcyan | darkgoldenrod | darkgray | darkgreen | darkgrey | darkkhaki | darkmagenta | darkolivegreen | darkorange | darkorchid | darkred | darksalmon | darkseagreen | darkslateblue | darkslategray | darkslategrey | darkturquoise | darkviolet | deeppink | deepskyblue | dimgray | dimgrey | dodgerblue | firebrick | floralwhite | forestgreen | fuchsia | gainsboro | ghostwhite | gold | goldenrod | gray | green | greenyellow | grey | honeydew | hotpink | indianred | indigo | ivory | khaki | lavender | lavenderblush | lawngreen | lemonchiffon | lightblue | lightcoral | lightcyan | lightgoldenrodyellow | lightgray | lightgreen | lightgrey | lightpink | lightsalmon | lightseagreen | lightskyblue | lightslategray | lightslategrey | lightsteelblue | lightyellow | lime | limegreen | linen | magenta | maroon | mediumaquamarine | mediumblue | mediumorchid | mediumpurple | mediumseagreen | mediumslateblue | mediumspringgreen | mediumturquoise | mediumvioletred | midnightblue | mintcream | mistyrose | moccasin | navajowhite | navy | oldlace | olive | olivedrab | orange | orangered | orchid | palegoldenrod | palegreen | paleturquoise | palevioletred | papayawhip | peachpuff | peru | pink | plum | powderblue | purple | rebeccapurple | red | rosybrown | royalblue | saddlebrown | salmon | sandybrown | seagreen | seashell | sienna | silver | skyblue | slateblue | slategray | slategrey | snow | springgreen | steelblue | tan | teal | thistle | tomato | turquoise | violet | wheat | white | whitesmoke | yellow | yellowgreen"
-  },
-  	"namespace-prefix": {
-  	syntax: "<ident>"
-  },
-  	"ns-prefix": {
-  	syntax: "[ <ident-token> | '*' ]? '|'"
-  },
-  	"number-percentage": {
-  	syntax: "<number> | <percentage>"
-  },
-  	"numeric-figure-values": {
-  	syntax: "[ lining-nums | oldstyle-nums ]"
-  },
-  	"numeric-fraction-values": {
-  	syntax: "[ diagonal-fractions | stacked-fractions ]"
-  },
-  	"numeric-spacing-values": {
-  	syntax: "[ proportional-nums | tabular-nums ]"
-  },
-  	nth: nth,
-  	"opacity()": {
-  	syntax: "opacity( [ <number-percentage> ] )"
-  },
-  	"overflow-position": {
-  	syntax: "unsafe | safe"
-  },
-  	"outline-radius": {
-  	syntax: "<length> | <percentage>"
-  },
-  	"page-body": {
-  	syntax: "<declaration>? [ ; <page-body> ]? | <page-margin-box> <page-body>"
-  },
-  	"page-margin-box": {
-  	syntax: "<page-margin-box-type> '{' <declaration-list> '}'"
-  },
-  	"page-margin-box-type": {
-  	syntax: "@top-left-corner | @top-left | @top-center | @top-right | @top-right-corner | @bottom-left-corner | @bottom-left | @bottom-center | @bottom-right | @bottom-right-corner | @left-top | @left-middle | @left-bottom | @right-top | @right-middle | @right-bottom"
-  },
-  	"page-selector-list": {
-  	syntax: "[ <page-selector># ]?"
-  },
-  	"page-selector": {
-  	syntax: "<pseudo-page>+ | <ident> <pseudo-page>*"
-  },
-  	"paint()": {
-  	syntax: "paint( <ident>, <declaration-value>? )"
-  },
-  	"perspective()": {
-  	syntax: "perspective( <length> )"
-  },
-  	"polygon()": {
-  	syntax: "polygon( <fill-rule>? , [ <length-percentage> <length-percentage> ]# )"
-  },
-  	position: position$1,
-  	"pseudo-class-selector": {
-  	syntax: "':' <ident-token> | ':' <function-token> <any-value> ')'"
-  },
-  	"pseudo-element-selector": {
-  	syntax: "':' <pseudo-class-selector>"
-  },
-  	"pseudo-page": {
-  	syntax: ": [ left | right | first | blank ]"
-  },
-  	quote: quote,
-  	"radial-gradient()": {
-  	syntax: "radial-gradient( [ <ending-shape> || <size> ]? [ at <position> ]? , <color-stop-list> )"
-  },
-  	"relative-selector": {
-  	syntax: "<combinator>? <complex-selector>"
-  },
-  	"relative-selector-list": {
-  	syntax: "<relative-selector>#"
-  },
-  	"relative-size": {
-  	syntax: "larger | smaller"
-  },
-  	"repeat-style": {
-  	syntax: "repeat-x | repeat-y | [ repeat | space | round | no-repeat ]{1,2}"
-  },
-  	"repeating-linear-gradient()": {
-  	syntax: "repeating-linear-gradient( [ <angle> | to <side-or-corner> ]? , <color-stop-list> )"
-  },
-  	"repeating-radial-gradient()": {
-  	syntax: "repeating-radial-gradient( [ <ending-shape> || <size> ]? [ at <position> ]? , <color-stop-list> )"
-  },
-  	"rgb()": {
-  	syntax: "rgb( <percentage>{3} [ / <alpha-value> ]? ) | rgb( <number>{3} [ / <alpha-value> ]? ) | rgb( <percentage>#{3} , <alpha-value>? ) | rgb( <number>#{3} , <alpha-value>? )"
-  },
-  	"rgba()": {
-  	syntax: "rgba( <percentage>{3} [ / <alpha-value> ]? ) | rgba( <number>{3} [ / <alpha-value> ]? ) | rgba( <percentage>#{3} , <alpha-value>? ) | rgba( <number>#{3} , <alpha-value>? )"
-  },
-  	"rotate()": {
-  	syntax: "rotate( [ <angle> | <zero> ] )"
-  },
-  	"rotate3d()": {
-  	syntax: "rotate3d( <number> , <number> , <number> , [ <angle> | <zero> ] )"
-  },
-  	"rotateX()": {
-  	syntax: "rotateX( [ <angle> | <zero> ] )"
-  },
-  	"rotateY()": {
-  	syntax: "rotateY( [ <angle> | <zero> ] )"
-  },
-  	"rotateZ()": {
-  	syntax: "rotateZ( [ <angle> | <zero> ] )"
-  },
-  	"saturate()": {
-  	syntax: "saturate( <number-percentage> )"
-  },
-  	"scale()": {
-  	syntax: "scale( <number> , <number>? )"
-  },
-  	"scale3d()": {
-  	syntax: "scale3d( <number> , <number> , <number> )"
-  },
-  	"scaleX()": {
-  	syntax: "scaleX( <number> )"
-  },
-  	"scaleY()": {
-  	syntax: "scaleY( <number> )"
-  },
-  	"scaleZ()": {
-  	syntax: "scaleZ( <number> )"
-  },
-  	"self-position": {
-  	syntax: "center | start | end | self-start | self-end | flex-start | flex-end"
-  },
-  	"shape-radius": {
-  	syntax: "<length-percentage> | closest-side | farthest-side"
-  },
-  	"skew()": {
-  	syntax: "skew( [ <angle> | <zero> ] , [ <angle> | <zero> ]? )"
-  },
-  	"skewX()": {
-  	syntax: "skewX( [ <angle> | <zero> ] )"
-  },
-  	"skewY()": {
-  	syntax: "skewY( [ <angle> | <zero> ] )"
-  },
-  	"sepia()": {
-  	syntax: "sepia( <number-percentage> )"
-  },
-  	shadow: shadow,
-  	"shadow-t": {
-  	syntax: "[ <length>{2,3} && <color>? ]"
-  },
-  	shape: shape$1,
-  	"shape-box": {
-  	syntax: "<box> | margin-box"
-  },
-  	"side-or-corner": {
-  	syntax: "[ left | right ] || [ top | bottom ]"
-  },
-  	"single-animation": {
-  	syntax: "<time> || <timing-function> || <time> || <single-animation-iteration-count> || <single-animation-direction> || <single-animation-fill-mode> || <single-animation-play-state> || [ none | <keyframes-name> ]"
-  },
-  	"single-animation-direction": {
-  	syntax: "normal | reverse | alternate | alternate-reverse"
-  },
-  	"single-animation-fill-mode": {
-  	syntax: "none | forwards | backwards | both"
-  },
-  	"single-animation-iteration-count": {
-  	syntax: "infinite | <number>"
-  },
-  	"single-animation-play-state": {
-  	syntax: "running | paused"
-  },
-  	"single-transition": {
-  	syntax: "[ none | <single-transition-property> ] || <time> || <timing-function> || <time>"
-  },
-  	"single-transition-property": {
-  	syntax: "all | <custom-ident>"
-  },
-  	size: size,
-  	"step-position": {
-  	syntax: "jump-start | jump-end | jump-none | jump-both | start | end"
-  },
-  	"step-timing-function": {
-  	syntax: "step-start | step-end | steps(<integer>[, <step-position>]?)"
-  },
-  	"subclass-selector": {
-  	syntax: "<id-selector> | <class-selector> | <attribute-selector> | <pseudo-class-selector>"
-  },
-  	"supports-condition": {
-  	syntax: "not <supports-in-parens> | <supports-in-parens> [ and <supports-in-parens> ]* | <supports-in-parens> [ or <supports-in-parens> ]*"
-  },
-  	"supports-in-parens": {
-  	syntax: "( <supports-condition> ) | <supports-feature> | <general-enclosed>"
-  },
-  	"supports-feature": {
-  	syntax: "<supports-decl> | <supports-selector-fn>"
-  },
-  	"supports-decl": {
-  	syntax: "( <declaration> )"
-  },
-  	"supports-selector-fn": {
-  	syntax: "selector( <complex-selector> )"
-  },
-  	symbol: symbol,
-  	target: target,
-  	"target-counter()": {
-  	syntax: "target-counter( [ <string> | <url> ] , <custom-ident> , <counter-style>? )"
-  },
-  	"target-counters()": {
-  	syntax: "target-counters( [ <string> | <url> ] , <custom-ident> , <string> , <counter-style>? )"
-  },
-  	"target-text()": {
-  	syntax: "target-text( [ <string> | <url> ] , [ content | before | after | first-letter ]? )"
-  },
-  	"time-percentage": {
-  	syntax: "<time> | <percentage>"
-  },
-  	"timing-function": {
-  	syntax: "linear | <cubic-bezier-timing-function> | <step-timing-function>"
-  },
-  	"track-breadth": {
-  	syntax: "<length-percentage> | <flex> | min-content | max-content | auto"
-  },
-  	"track-list": {
-  	syntax: "[ <line-names>? [ <track-size> | <track-repeat> ] ]+ <line-names>?"
-  },
-  	"track-repeat": {
-  	syntax: "repeat( [ <positive-integer> ] , [ <line-names>? <track-size> ]+ <line-names>? )"
-  },
-  	"track-size": {
-  	syntax: "<track-breadth> | minmax( <inflexible-breadth> , <track-breadth> ) | fit-content( [ <length> | <percentage> ] )"
-  },
-  	"transform-function": {
-  	syntax: "<matrix()> | <translate()> | <translateX()> | <translateY()> | <scale()> | <scaleX()> | <scaleY()> | <rotate()> | <skew()> | <skewX()> | <skewY()> | <matrix3d()> | <translate3d()> | <translateZ()> | <scale3d()> | <scaleZ()> | <rotate3d()> | <rotateX()> | <rotateY()> | <rotateZ()> | <perspective()>"
-  },
-  	"transform-list": {
-  	syntax: "<transform-function>+"
-  },
-  	"translate()": {
-  	syntax: "translate( <length-percentage> , <length-percentage>? )"
-  },
-  	"translate3d()": {
-  	syntax: "translate3d( <length-percentage> , <length-percentage> , <length> )"
-  },
-  	"translateX()": {
-  	syntax: "translateX( <length-percentage> )"
-  },
-  	"translateY()": {
-  	syntax: "translateY( <length-percentage> )"
-  },
-  	"translateZ()": {
-  	syntax: "translateZ( <length> )"
-  },
-  	"type-or-unit": {
-  	syntax: "string | color | url | integer | number | length | angle | time | frequency | cap | ch | em | ex | ic | lh | rlh | rem | vb | vi | vw | vh | vmin | vmax | mm | Q | cm | in | pt | pc | px | deg | grad | rad | turn | ms | s | Hz | kHz | %"
-  },
-  	"type-selector": {
-  	syntax: "<wq-name> | <ns-prefix>? '*'"
-  },
-  	"var()": {
-  	syntax: "var( <custom-property-name> , <declaration-value>? )"
-  },
-  	"viewport-length": {
-  	syntax: "auto | <length-percentage>"
-  },
-  	"wq-name": {
-  	syntax: "<ns-prefix>? <ident-token>"
-  }
-  };
-
-  var syntaxes$1 = /*#__PURE__*/window.Object.freeze({
-    __proto__: null,
-    attachment: attachment,
-    box: box,
-    color: color$1,
-    combinator: combinator,
-    compat: compat,
-    gradient: gradient,
-    hue: hue,
-    image: image,
-    nth: nth,
-    position: position$1,
-    quote: quote,
-    shadow: shadow,
-    shape: shape$1,
-    size: size,
-    symbol: symbol,
-    target: target,
-    'default': syntaxes
-  });
-
-  var properties$3 = {
-  	"-moz-background-clip": {
-  		comment: "deprecated syntax in old Firefox, https://developer.mozilla.org/en/docs/Web/CSS/background-clip",
-  		syntax: "padding | border"
-  	},
-  	"-moz-border-radius-bottomleft": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/border-bottom-left-radius",
-  		syntax: "<'border-bottom-left-radius'>"
-  	},
-  	"-moz-border-radius-bottomright": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/border-bottom-right-radius",
-  		syntax: "<'border-bottom-right-radius'>"
-  	},
-  	"-moz-border-radius-topleft": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/border-top-left-radius",
-  		syntax: "<'border-top-left-radius'>"
-  	},
-  	"-moz-border-radius-topright": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/border-bottom-right-radius",
-  		syntax: "<'border-bottom-right-radius'>"
-  	},
-  	"-moz-control-character-visibility": {
-  		comment: "firefox specific keywords, https://bugzilla.mozilla.org/show_bug.cgi?id=947588",
-  		syntax: "visible | hidden"
-  	},
-  	"-moz-osx-font-smoothing": {
-  		comment: "misssed old syntax https://developer.mozilla.org/en-US/docs/Web/CSS/font-smooth",
-  		syntax: "auto | grayscale"
-  	},
-  	"-moz-user-select": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/user-select",
-  		syntax: "none | text | all | -moz-none"
-  	},
-  	"-ms-flex-align": {
-  		comment: "misssed old syntax implemented in IE, https://www.w3.org/TR/2012/WD-css3-flexbox-20120322/#flex-align",
-  		syntax: "start | end | center | baseline | stretch"
-  	},
-  	"-ms-flex-item-align": {
-  		comment: "misssed old syntax implemented in IE, https://www.w3.org/TR/2012/WD-css3-flexbox-20120322/#flex-align",
-  		syntax: "auto | start | end | center | baseline | stretch"
-  	},
-  	"-ms-flex-line-pack": {
-  		comment: "misssed old syntax implemented in IE, https://www.w3.org/TR/2012/WD-css3-flexbox-20120322/#flex-line-pack",
-  		syntax: "start | end | center | justify | distribute | stretch"
-  	},
-  	"-ms-flex-negative": {
-  		comment: "misssed old syntax implemented in IE; TODO: find references for comfirmation",
-  		syntax: "<'flex-shrink'>"
-  	},
-  	"-ms-flex-pack": {
-  		comment: "misssed old syntax implemented in IE, https://www.w3.org/TR/2012/WD-css3-flexbox-20120322/#flex-pack",
-  		syntax: "start | end | center | justify | distribute"
-  	},
-  	"-ms-flex-order": {
-  		comment: "misssed old syntax implemented in IE; https://msdn.microsoft.com/en-us/library/jj127303(v=vs.85).aspx",
-  		syntax: "<integer>"
-  	},
-  	"-ms-flex-positive": {
-  		comment: "misssed old syntax implemented in IE; TODO: find references for comfirmation",
-  		syntax: "<'flex-grow'>"
-  	},
-  	"-ms-flex-preferred-size": {
-  		comment: "misssed old syntax implemented in IE; TODO: find references for comfirmation",
-  		syntax: "<'flex-basis'>"
-  	},
-  	"-ms-interpolation-mode": {
-  		comment: "https://msdn.microsoft.com/en-us/library/ff521095(v=vs.85).aspx",
-  		syntax: "nearest-neighbor | bicubic"
-  	},
-  	"-ms-grid-column-align": {
-  		comment: "add this property first since it uses as fallback for flexbox, https://msdn.microsoft.com/en-us/library/windows/apps/hh466338.aspx",
-  		syntax: "start | end | center | stretch"
-  	},
-  	"-ms-grid-columns": {
-  		comment: "misssed old syntax implemented in IE; https://www.w3.org/TR/2012/WD-css3-grid-layout-20120322/#grid-columns",
-  		syntax: "<track-list-v0>"
-  	},
-  	"-ms-grid-row-align": {
-  		comment: "add this property first since it uses as fallback for flexbox, https://msdn.microsoft.com/en-us/library/windows/apps/hh466348.aspx",
-  		syntax: "start | end | center | stretch"
-  	},
-  	"-ms-grid-rows": {
-  		comment: "misssed old syntax implemented in IE; https://www.w3.org/TR/2012/WD-css3-grid-layout-20120322/#grid-rows",
-  		syntax: "<track-list-v0>"
-  	},
-  	"-ms-hyphenate-limit-last": {
-  		comment: "misssed old syntax implemented in IE; https://www.w3.org/TR/css-text-4/#hyphenate-line-limits",
-  		syntax: "none | always | column | page | spread"
-  	},
-  	"-webkit-appearance": {
-  		comment: "webkit specific keywords",
-  		references: [
-  			"http://css-infos.net/property/-webkit-appearance"
-  		],
-  		syntax: "none | button | button-bevel | caps-lock-indicator | caret | checkbox | default-button | listbox | listitem | media-fullscreen-button | media-mute-button | media-play-button | media-seek-back-button | media-seek-forward-button | media-slider | media-sliderthumb | menulist | menulist-button | menulist-text | menulist-textfield | push-button | radio | scrollbarbutton-down | scrollbarbutton-left | scrollbarbutton-right | scrollbarbutton-up | scrollbargripper-horizontal | scrollbargripper-vertical | scrollbarthumb-horizontal | scrollbarthumb-vertical | scrollbartrack-horizontal | scrollbartrack-vertical | searchfield | searchfield-cancel-button | searchfield-decoration | searchfield-results-button | searchfield-results-decoration | slider-horizontal | slider-vertical | sliderthumb-horizontal | sliderthumb-vertical | square-button | textarea | textfield"
-  	},
-  	"-webkit-background-clip": {
-  		comment: "https://developer.mozilla.org/en/docs/Web/CSS/background-clip",
-  		syntax: "[ <box> | border | padding | content | text ]#"
-  	},
-  	"-webkit-column-break-after": {
-  		comment: "added, http://help.dottoro.com/lcrthhhv.php",
-  		syntax: "always | auto | avoid"
-  	},
-  	"-webkit-column-break-before": {
-  		comment: "added, http://help.dottoro.com/lcxquvkf.php",
-  		syntax: "always | auto | avoid"
-  	},
-  	"-webkit-column-break-inside": {
-  		comment: "added, http://help.dottoro.com/lclhnthl.php",
-  		syntax: "always | auto | avoid"
-  	},
-  	"-webkit-font-smoothing": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/font-smooth",
-  		syntax: "auto | none | antialiased | subpixel-antialiased"
-  	},
-  	"-webkit-mask-box-image": {
-  		comment: "missed; https://developer.mozilla.org/en-US/docs/Web/CSS/-webkit-mask-box-image",
-  		syntax: "[ <url> | <gradient> | none ] [ <length-percentage>{4} <-webkit-mask-box-repeat>{2} ]?"
-  	},
-  	"-webkit-print-color-adjust": {
-  		comment: "missed",
-  		references: [
-  			"https://developer.mozilla.org/en/docs/Web/CSS/-webkit-print-color-adjust"
-  		],
-  		syntax: "economy | exact"
-  	},
-  	"-webkit-text-security": {
-  		comment: "missed; http://help.dottoro.com/lcbkewgt.php",
-  		syntax: "none | circle | disc | square"
-  	},
-  	"-webkit-user-drag": {
-  		comment: "missed; http://help.dottoro.com/lcbixvwm.php",
-  		syntax: "none | element | auto"
-  	},
-  	"-webkit-user-select": {
-  		comment: "auto is supported by old webkit, https://developer.mozilla.org/en-US/docs/Web/CSS/user-select",
-  		syntax: "auto | none | text | all"
-  	},
-  	"alignment-baseline": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/text.html#AlignmentBaselineProperty"
-  		],
-  		syntax: "auto | baseline | before-edge | text-before-edge | middle | central | after-edge | text-after-edge | ideographic | alphabetic | hanging | mathematical"
-  	},
-  	"baseline-shift": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/text.html#BaselineShiftProperty"
-  		],
-  		syntax: "baseline | sub | super | <svg-length>"
-  	},
-  	behavior: {
-  		comment: "added old IE property https://msdn.microsoft.com/en-us/library/ms530723(v=vs.85).aspx",
-  		syntax: "<url>+"
-  	},
-  	"clip-rule": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/masking.html#ClipRuleProperty"
-  		],
-  		syntax: "nonzero | evenodd"
-  	},
-  	cue: {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<'cue-before'> <'cue-after'>?"
-  	},
-  	"cue-after": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<url> <decibel>? | none"
-  	},
-  	"cue-before": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<url> <decibel>? | none"
-  	},
-  	cursor: {
-  		comment: "added legacy keywords: hand, -webkit-grab. -webkit-grabbing, -webkit-zoom-in, -webkit-zoom-out, -moz-grab, -moz-grabbing, -moz-zoom-in, -moz-zoom-out",
-  		references: [
-  			"https://www.sitepoint.com/css3-cursor-styles/"
-  		],
-  		syntax: "[ [ <url> [ <x> <y> ]? , ]* [ auto | default | none | context-menu | help | pointer | progress | wait | cell | crosshair | text | vertical-text | alias | copy | move | no-drop | not-allowed | e-resize | n-resize | ne-resize | nw-resize | s-resize | se-resize | sw-resize | w-resize | ew-resize | ns-resize | nesw-resize | nwse-resize | col-resize | row-resize | all-scroll | zoom-in | zoom-out | grab | grabbing | hand | -webkit-grab | -webkit-grabbing | -webkit-zoom-in | -webkit-zoom-out | -moz-grab | -moz-grabbing | -moz-zoom-in | -moz-zoom-out ] ]"
-  	},
-  	display: {
-  		comment: "extended with -ms-flexbox",
-  		syntax: "block | contents | flex | flow | flow-root | grid | inline | inline-block | inline-flex | inline-grid | inline-list-item | inline-table | list-item | none | ruby | ruby-base | ruby-base-container | ruby-text | ruby-text-container | run-in | table | table-caption | table-cell | table-column | table-column-group | table-footer-group | table-header-group | table-row | table-row-group | -ms-flexbox | -ms-inline-flexbox | -ms-grid | -ms-inline-grid | -webkit-flex | -webkit-inline-flex | -webkit-box | -webkit-inline-box | -moz-inline-stack | -moz-box | -moz-inline-box"
-  	},
-  	position: {
-  		comment: "extended with -webkit-sticky",
-  		syntax: "static | relative | absolute | sticky | fixed | -webkit-sticky"
-  	},
-  	"dominant-baseline": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/text.html#DominantBaselineProperty"
-  		],
-  		syntax: "auto | use-script | no-change | reset-size | ideographic | alphabetic | hanging | mathematical | central | middle | text-after-edge | text-before-edge"
-  	},
-  	"image-rendering": {
-  		comment: "extended with <-non-standard-image-rendering>, added SVG keywords optimizeSpeed and optimizeQuality",
-  		references: [
-  			"https://developer.mozilla.org/en/docs/Web/CSS/image-rendering",
-  			"https://www.w3.org/TR/SVG/painting.html#ImageRenderingProperty"
-  		],
-  		syntax: "auto | crisp-edges | pixelated | optimizeSpeed | optimizeQuality | <-non-standard-image-rendering>"
-  	},
-  	fill: {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#FillProperty"
-  		],
-  		syntax: "<paint>"
-  	},
-  	"fill-opacity": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#FillProperty"
-  		],
-  		syntax: "<number-zero-one>"
-  	},
-  	"fill-rule": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#FillProperty"
-  		],
-  		syntax: "nonzero | evenodd"
-  	},
-  	filter: {
-  		comment: "extend with IE legacy syntaxes",
-  		syntax: "none | <filter-function-list> | <-ms-filter-function-list>"
-  	},
-  	"glyph-orientation-horizontal": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/text.html#GlyphOrientationHorizontalProperty"
-  		],
-  		syntax: "<angle>"
-  	},
-  	"glyph-orientation-vertical": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/text.html#GlyphOrientationVerticalProperty"
-  		],
-  		syntax: "<angle>"
-  	},
-  	kerning: {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/text.html#KerningProperty"
-  		],
-  		syntax: "auto | <svg-length>"
-  	},
-  	"letter-spacing": {
-  		comment: "fix syntax <length> -> <length-percentage>",
-  		references: [
-  			"https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/letter-spacing"
-  		],
-  		syntax: "normal | <length-percentage>"
-  	},
-  	marker: {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#MarkerProperties"
-  		],
-  		syntax: "none | <url>"
-  	},
-  	"marker-end": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#MarkerProperties"
-  		],
-  		syntax: "none | <url>"
-  	},
-  	"marker-mid": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#MarkerProperties"
-  		],
-  		syntax: "none | <url>"
-  	},
-  	"marker-start": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#MarkerProperties"
-  		],
-  		syntax: "none | <url>"
-  	},
-  	"max-width": {
-  		comment: "extend by non-standard width keywords https://developer.mozilla.org/en-US/docs/Web/CSS/max-width",
-  		syntax: "<length> | <percentage> | none | max-content | min-content | fit-content | fill-available | <-non-standard-width>"
-  	},
-  	"min-width": {
-  		comment: "extend by non-standard width keywords https://developer.mozilla.org/en-US/docs/Web/CSS/width",
-  		syntax: "<length> | <percentage> | auto | max-content | min-content | fit-content | fill-available | <-non-standard-width>"
-  	},
-  	opacity: {
-  		comment: "strict to 0..1 <number> -> <number-zero-one>",
-  		syntax: "<number-zero-one>"
-  	},
-  	overflow: {
-  		comment: "extend by vendor keywords https://developer.mozilla.org/en-US/docs/Web/CSS/overflow",
-  		syntax: "[ visible | hidden | clip | scroll | auto ]{1,2} | <-non-standard-overflow>"
-  	},
-  	pause: {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<'pause-before'> <'pause-after'>?"
-  	},
-  	"pause-after": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<time> | none | x-weak | weak | medium | strong | x-strong"
-  	},
-  	"pause-before": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<time> | none | x-weak | weak | medium | strong | x-strong"
-  	},
-  	rest: {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<'rest-before'> <'rest-after'>?"
-  	},
-  	"rest-after": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<time> | none | x-weak | weak | medium | strong | x-strong"
-  	},
-  	"rest-before": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<time> | none | x-weak | weak | medium | strong | x-strong"
-  	},
-  	"shape-rendering": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#ShapeRenderingPropert"
-  		],
-  		syntax: "auto | optimizeSpeed | crispEdges | geometricPrecision"
-  	},
-  	src: {
-  		comment: "added @font-face's src property https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/src",
-  		syntax: "[ <url> [ format( <string># ) ]? | local( <family-name> ) ]#"
-  	},
-  	speak: {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "auto | none | normal"
-  	},
-  	"speak-as": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "normal | spell-out || digits || [ literal-punctuation | no-punctuation ]"
-  	},
-  	stroke: {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#StrokeProperties"
-  		],
-  		syntax: "<paint>"
-  	},
-  	"stroke-dasharray": {
-  		comment: "added SVG property; a list of comma and/or white space separated <length>s and <percentage>s",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#StrokeProperties"
-  		],
-  		syntax: "none | [ <svg-length>+ ]#"
-  	},
-  	"stroke-dashoffset": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#StrokeProperties"
-  		],
-  		syntax: "<svg-length>"
-  	},
-  	"stroke-linecap": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#StrokeProperties"
-  		],
-  		syntax: "butt | round | square"
-  	},
-  	"stroke-linejoin": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#StrokeProperties"
-  		],
-  		syntax: "miter | round | bevel"
-  	},
-  	"stroke-miterlimit": {
-  		comment: "added SVG property (<miterlimit> = <number-one-or-greater>) ",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#StrokeProperties"
-  		],
-  		syntax: "<number-one-or-greater>"
-  	},
-  	"stroke-opacity": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#StrokeProperties"
-  		],
-  		syntax: "<number-zero-one>"
-  	},
-  	"stroke-width": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/painting.html#StrokeProperties"
-  		],
-  		syntax: "<svg-length>"
-  	},
-  	"text-anchor": {
-  		comment: "added SVG property",
-  		references: [
-  			"https://www.w3.org/TR/SVG/text.html#TextAlignmentProperties"
-  		],
-  		syntax: "start | middle | end"
-  	},
-  	"unicode-bidi": {
-  		comment: "added prefixed keywords https://developer.mozilla.org/en-US/docs/Web/CSS/unicode-bidi",
-  		syntax: "normal | embed | isolate | bidi-override | isolate-override | plaintext | -moz-isolate | -moz-isolate-override | -moz-plaintext | -webkit-isolate"
-  	},
-  	"unicode-range": {
-  		comment: "added missed property https://developer.mozilla.org/en-US/docs/Web/CSS/%40font-face/unicode-range",
-  		syntax: "<urange>#"
-  	},
-  	"voice-balance": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<number> | left | center | right | leftwards | rightwards"
-  	},
-  	"voice-duration": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "auto | <time>"
-  	},
-  	"voice-family": {
-  		comment: "<name> -> <family-name>, https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "[ [ <family-name> | <generic-voice> ] , ]* [ <family-name> | <generic-voice> ] | preserve"
-  	},
-  	"voice-pitch": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<frequency> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency> | <semitones> | <percentage> ] ]"
-  	},
-  	"voice-range": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "<frequency> && absolute | [ [ x-low | low | medium | high | x-high ] || [ <frequency> | <semitones> | <percentage> ] ]"
-  	},
-  	"voice-rate": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "[ normal | x-slow | slow | medium | fast | x-fast ] || <percentage>"
-  	},
-  	"voice-stress": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "normal | strong | moderate | none | reduced"
-  	},
-  	"voice-volume": {
-  		comment: "https://www.w3.org/TR/css3-speech/#property-index",
-  		syntax: "silent | [ [ x-soft | soft | medium | loud | x-loud ] || <decibel> ]"
-  	},
-  	"writing-mode": {
-  		comment: "extend with SVG keywords",
-  		syntax: "horizontal-tb | vertical-rl | vertical-lr | sideways-rl | sideways-lr | <svg-writing-mode>"
-  	}
-  };
-  var syntaxes$2 = {
-  	"-legacy-gradient": {
-  		comment: "added collection of legacy gradient syntaxes",
-  		syntax: "<-webkit-gradient()> | <-legacy-linear-gradient> | <-legacy-repeating-linear-gradient> | <-legacy-radial-gradient> | <-legacy-repeating-radial-gradient>"
-  	},
-  	"-legacy-linear-gradient": {
-  		comment: "like standard syntax but w/o `to` keyword https://developer.mozilla.org/en-US/docs/Web/CSS/linear-gradient",
-  		syntax: "-moz-linear-gradient( <-legacy-linear-gradient-arguments> ) | -webkit-linear-gradient( <-legacy-linear-gradient-arguments> ) | -o-linear-gradient( <-legacy-linear-gradient-arguments> )"
-  	},
-  	"-legacy-repeating-linear-gradient": {
-  		comment: "like standard syntax but w/o `to` keyword https://developer.mozilla.org/en-US/docs/Web/CSS/linear-gradient",
-  		syntax: "-moz-repeating-linear-gradient( <-legacy-linear-gradient-arguments> ) | -webkit-repeating-linear-gradient( <-legacy-linear-gradient-arguments> ) | -o-repeating-linear-gradient( <-legacy-linear-gradient-arguments> )"
-  	},
-  	"-legacy-linear-gradient-arguments": {
-  		comment: "like standard syntax but w/o `to` keyword https://developer.mozilla.org/en-US/docs/Web/CSS/linear-gradient",
-  		syntax: "[ <angle> | <side-or-corner> ]? , <color-stop-list>"
-  	},
-  	"-legacy-radial-gradient": {
-  		comment: "deprecated syntax that implemented by some browsers https://www.w3.org/TR/2011/WD-css3-images-20110908/#radial-gradients",
-  		syntax: "-moz-radial-gradient( <-legacy-radial-gradient-arguments> ) | -webkit-radial-gradient( <-legacy-radial-gradient-arguments> ) | -o-radial-gradient( <-legacy-radial-gradient-arguments> )"
-  	},
-  	"-legacy-repeating-radial-gradient": {
-  		comment: "deprecated syntax that implemented by some browsers https://www.w3.org/TR/2011/WD-css3-images-20110908/#radial-gradients",
-  		syntax: "-moz-repeating-radial-gradient( <-legacy-radial-gradient-arguments> ) | -webkit-repeating-radial-gradient( <-legacy-radial-gradient-arguments> ) | -o-repeating-radial-gradient( <-legacy-radial-gradient-arguments> )"
-  	},
-  	"-legacy-radial-gradient-arguments": {
-  		comment: "deprecated syntax that implemented by some browsers https://www.w3.org/TR/2011/WD-css3-images-20110908/#radial-gradients",
-  		syntax: "[ <position> , ]? [ [ [ <-legacy-radial-gradient-shape> || <-legacy-radial-gradient-size> ] | [ <length> | <percentage> ]{2} ] , ]? <color-stop-list>"
-  	},
-  	"-legacy-radial-gradient-size": {
-  		comment: "before a standard it contains 2 extra keywords (`contain` and `cover`) https://www.w3.org/TR/2011/WD-css3-images-20110908/#ltsize",
-  		syntax: "closest-side | closest-corner | farthest-side | farthest-corner | contain | cover"
-  	},
-  	"-legacy-radial-gradient-shape": {
-  		comment: "define to double sure it doesn't extends in future https://www.w3.org/TR/2011/WD-css3-images-20110908/#ltshape",
-  		syntax: "circle | ellipse"
-  	},
-  	"-non-standard-font": {
-  		comment: "non standard fonts",
-  		references: [
-  			"https://webkit.org/blog/3709/using-the-system-font-in-web-content/"
-  		],
-  		syntax: "-apple-system-body | -apple-system-headline | -apple-system-subheadline | -apple-system-caption1 | -apple-system-caption2 | -apple-system-footnote | -apple-system-short-body | -apple-system-short-headline | -apple-system-short-subheadline | -apple-system-short-caption1 | -apple-system-short-footnote | -apple-system-tall-body"
-  	},
-  	"-non-standard-color": {
-  		comment: "non standard colors",
-  		references: [
-  			"http://cssdot.ru/%D0%A1%D0%BF%D1%80%D0%B0%D0%B2%D0%BE%D1%87%D0%BD%D0%B8%D0%BA_CSS/color-i305.html",
-  			"https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#Mozilla_Color_Preference_Extensions"
-  		],
-  		syntax: "-moz-ButtonDefault | -moz-ButtonHoverFace | -moz-ButtonHoverText | -moz-CellHighlight | -moz-CellHighlightText | -moz-Combobox | -moz-ComboboxText | -moz-Dialog | -moz-DialogText | -moz-dragtargetzone | -moz-EvenTreeRow | -moz-Field | -moz-FieldText | -moz-html-CellHighlight | -moz-html-CellHighlightText | -moz-mac-accentdarkestshadow | -moz-mac-accentdarkshadow | -moz-mac-accentface | -moz-mac-accentlightesthighlight | -moz-mac-accentlightshadow | -moz-mac-accentregularhighlight | -moz-mac-accentregularshadow | -moz-mac-chrome-active | -moz-mac-chrome-inactive | -moz-mac-focusring | -moz-mac-menuselect | -moz-mac-menushadow | -moz-mac-menutextselect | -moz-MenuHover | -moz-MenuHoverText | -moz-MenuBarText | -moz-MenuBarHoverText | -moz-nativehyperlinktext | -moz-OddTreeRow | -moz-win-communicationstext | -moz-win-mediatext | -moz-activehyperlinktext | -moz-default-background-color | -moz-default-color | -moz-hyperlinktext | -moz-visitedhyperlinktext | -webkit-activelink | -webkit-focus-ring-color | -webkit-link | -webkit-text"
-  	},
-  	"-non-standard-image-rendering": {
-  		comment: "non-standard keywords http://phrogz.net/tmp/canvas_image_zoom.html",
-  		syntax: "optimize-contrast | -moz-crisp-edges | -o-crisp-edges | -webkit-optimize-contrast"
-  	},
-  	"-non-standard-overflow": {
-  		comment: "non-standard keywords https://developer.mozilla.org/en-US/docs/Web/CSS/overflow",
-  		syntax: "-moz-scrollbars-none | -moz-scrollbars-horizontal | -moz-scrollbars-vertical | -moz-hidden-unscrollable"
-  	},
-  	"-non-standard-width": {
-  		comment: "non-standard keywords https://developer.mozilla.org/en-US/docs/Web/CSS/width",
-  		syntax: "min-intrinsic | intrinsic | -moz-min-content | -moz-max-content | -webkit-min-content | -webkit-max-content"
-  	},
-  	"-webkit-gradient()": {
-  		comment: "first Apple proposal gradient syntax https://webkit.org/blog/175/introducing-css-gradients/ - TODO: simplify when after match algorithm improvement ( [, point, radius | , point] -> [, radius]? , point )",
-  		syntax: "-webkit-gradient( <-webkit-gradient-type>, <-webkit-gradient-point> [, <-webkit-gradient-point> | , <-webkit-gradient-radius>, <-webkit-gradient-point> ] [, <-webkit-gradient-radius>]? [, <-webkit-gradient-color-stop>]* )"
-  	},
-  	"-webkit-gradient-color-stop": {
-  		comment: "first Apple proposal gradient syntax https://webkit.org/blog/175/introducing-css-gradients/",
-  		syntax: "from( <color> ) | color-stop( [ <number-zero-one> | <percentage> ] , <color> ) | to( <color> )"
-  	},
-  	"-webkit-gradient-point": {
-  		comment: "first Apple proposal gradient syntax https://webkit.org/blog/175/introducing-css-gradients/",
-  		syntax: "[ left | center | right | <length-percentage> ] [ top | center | bottom | <length-percentage> ]"
-  	},
-  	"-webkit-gradient-radius": {
-  		comment: "first Apple proposal gradient syntax https://webkit.org/blog/175/introducing-css-gradients/",
-  		syntax: "<length> | <percentage>"
-  	},
-  	"-webkit-gradient-type": {
-  		comment: "first Apple proposal gradient syntax https://webkit.org/blog/175/introducing-css-gradients/",
-  		syntax: "linear | radial"
-  	},
-  	"-webkit-mask-box-repeat": {
-  		comment: "missed; https://developer.mozilla.org/en-US/docs/Web/CSS/-webkit-mask-box-image",
-  		syntax: "repeat | stretch | round"
-  	},
-  	"-webkit-mask-clip-style": {
-  		comment: "missed; there is no enough information about `-webkit-mask-clip` property, but looks like all those keywords are working",
-  		syntax: "border | border-box | padding | padding-box | content | content-box | text"
-  	},
-  	"-ms-filter-function-list": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/-ms-filter",
-  		syntax: "<-ms-filter-function>+"
-  	},
-  	"-ms-filter-function": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/-ms-filter",
-  		syntax: "<-ms-filter-function-progid> | <-ms-filter-function-legacy>"
-  	},
-  	"-ms-filter-function-progid": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/-ms-filter",
-  		syntax: "'progid:' [ <ident-token> '.' ]* [ <ident-token> | <function-token> <any-value>? ) ]"
-  	},
-  	"-ms-filter-function-legacy": {
-  		comment: "https://developer.mozilla.org/en-US/docs/Web/CSS/-ms-filter",
-  		syntax: "<ident-token> | <function-token> <any-value>? )"
-  	},
-  	"-ms-filter": {
-  		syntax: "<string>"
-  	},
-  	age: {
-  		comment: "https://www.w3.org/TR/css3-speech/#voice-family",
-  		syntax: "child | young | old"
-  	},
-  	"attr-name": {
-  		syntax: "<wq-name>"
-  	},
-  	"attr-fallback": {
-  		syntax: "<any-value>"
-  	},
-  	"border-radius": {
-  		comment: "missed, https://drafts.csswg.org/css-backgrounds-3/#the-border-radius",
-  		syntax: "<length-percentage>{1,2}"
-  	},
-  	bottom: {
-  		comment: "missed; not sure we should add it, but no others except `shape` is using it so it's ok for now; https://drafts.fxtf.org/css-masking-1/#funcdef-clip-rect",
-  		syntax: "<length> | auto"
-  	},
-  	"content-list": {
-  		comment: "missed -> https://drafts.csswg.org/css-content/#typedef-content-list (document-url, <target> and leader() is omitted util stabilization)",
-  		syntax: "[ <string> | contents | <url> | <quote> | <attr()> | counter( <ident>, <'list-style-type'>? ) ]+"
-  	},
-  	"generic-voice": {
-  		comment: "https://www.w3.org/TR/css3-speech/#voice-family",
-  		syntax: "[ <age>? <gender> <integer>? ]"
-  	},
-  	gender: {
-  		comment: "https://www.w3.org/TR/css3-speech/#voice-family",
-  		syntax: "male | female | neutral"
-  	},
-  	"generic-family": {
-  		comment: "added -apple-system",
-  		references: [
-  			"https://webkit.org/blog/3709/using-the-system-font-in-web-content/"
-  		],
-  		syntax: "serif | sans-serif | cursive | fantasy | monospace | -apple-system"
-  	},
-  	gradient: {
-  		comment: "added legacy syntaxes support",
-  		syntax: "<linear-gradient()> | <repeating-linear-gradient()> | <radial-gradient()> | <repeating-radial-gradient()> | <conic-gradient()> | <-legacy-gradient>"
-  	},
-  	left: {
-  		comment: "missed; not sure we should add it, but no others except `shape` is using it so it's ok for now; https://drafts.fxtf.org/css-masking-1/#funcdef-clip-rect",
-  		syntax: "<length> | auto"
-  	},
-  	"mask-image": {
-  		comment: "missed; https://drafts.fxtf.org/css-masking-1/#the-mask-image",
-  		syntax: "<mask-reference>#"
-  	},
-  	"name-repeat": {
-  		comment: "missed, and looks like obsolete, keep it as is since other property syntaxes should be changed too; https://www.w3.org/TR/2015/WD-css-grid-1-20150917/#typedef-name-repeat",
-  		syntax: "repeat( [ <positive-integer> | auto-fill ], <line-names>+)"
-  	},
-  	"named-color": {
-  		comment: "added non standard color names",
-  		syntax: "transparent | aliceblue | antiquewhite | aqua | aquamarine | azure | beige | bisque | black | blanchedalmond | blue | blueviolet | brown | burlywood | cadetblue | chartreuse | chocolate | coral | cornflowerblue | cornsilk | crimson | cyan | darkblue | darkcyan | darkgoldenrod | darkgray | darkgreen | darkgrey | darkkhaki | darkmagenta | darkolivegreen | darkorange | darkorchid | darkred | darksalmon | darkseagreen | darkslateblue | darkslategray | darkslategrey | darkturquoise | darkviolet | deeppink | deepskyblue | dimgray | dimgrey | dodgerblue | firebrick | floralwhite | forestgreen | fuchsia | gainsboro | ghostwhite | gold | goldenrod | gray | green | greenyellow | grey | honeydew | hotpink | indianred | indigo | ivory | khaki | lavender | lavenderblush | lawngreen | lemonchiffon | lightblue | lightcoral | lightcyan | lightgoldenrodyellow | lightgray | lightgreen | lightgrey | lightpink | lightsalmon | lightseagreen | lightskyblue | lightslategray | lightslategrey | lightsteelblue | lightyellow | lime | limegreen | linen | magenta | maroon | mediumaquamarine | mediumblue | mediumorchid | mediumpurple | mediumseagreen | mediumslateblue | mediumspringgreen | mediumturquoise | mediumvioletred | midnightblue | mintcream | mistyrose | moccasin | navajowhite | navy | oldlace | olive | olivedrab | orange | orangered | orchid | palegoldenrod | palegreen | paleturquoise | palevioletred | papayawhip | peachpuff | peru | pink | plum | powderblue | purple | rebeccapurple | red | rosybrown | royalblue | saddlebrown | salmon | sandybrown | seagreen | seashell | sienna | silver | skyblue | slateblue | slategray | slategrey | snow | springgreen | steelblue | tan | teal | thistle | tomato | turquoise | violet | wheat | white | whitesmoke | yellow | yellowgreen | <-non-standard-color>"
-  	},
-  	paint: {
-  		comment: "used by SVG https://www.w3.org/TR/SVG/painting.html#SpecifyingPaint",
-  		syntax: "none | <color> | <url> [ none | <color> ]? | context-fill | context-stroke"
-  	},
-  	"path()": {
-  		comment: "missed, `motion` property was renamed, but left it as is for now; path() syntax was get from last draft https://drafts.fxtf.org/motion-1/#funcdef-offset-path-path",
-  		syntax: "path( <string> )"
-  	},
-  	ratio: {
-  		comment: "missed, https://drafts.csswg.org/mediaqueries-4/#typedef-ratio",
-  		syntax: "<integer> / <integer>"
-  	},
-  	right: {
-  		comment: "missed; not sure we should add it, but no others except `shape` is using it so it's ok for now; https://drafts.fxtf.org/css-masking-1/#funcdef-clip-rect",
-  		syntax: "<length> | auto"
-  	},
-  	shape: {
-  		comment: "missed spaces in function body and add backwards compatible syntax",
-  		syntax: "rect( <top>, <right>, <bottom>, <left> ) | rect( <top> <right> <bottom> <left> )"
-  	},
-  	"svg-length": {
-  		comment: "All coordinates and lengths in SVG can be specified with or without a unit identifier",
-  		references: [
-  			"https://www.w3.org/TR/SVG11/coords.html#Units"
-  		],
-  		syntax: "<percentage> | <length> | <number>"
-  	},
-  	"svg-writing-mode": {
-  		comment: "SVG specific keywords (deprecated for CSS)",
-  		references: [
-  			"https://developer.mozilla.org/en/docs/Web/CSS/writing-mode",
-  			"https://www.w3.org/TR/SVG/text.html#WritingModeProperty"
-  		],
-  		syntax: "lr-tb | rl-tb | tb-rl | lr | rl | tb"
-  	},
-  	top: {
-  		comment: "missed; not sure we should add it, but no others except `shape` is using it so it's ok for now; https://drafts.fxtf.org/css-masking-1/#funcdef-clip-rect",
-  		syntax: "<length> | auto"
-  	},
-  	"track-group": {
-  		comment: "used by old grid-columns and grid-rows syntax v0",
-  		syntax: "'(' [ <string>* <track-minmax> <string>* ]+ ')' [ '[' <positive-integer> ']' ]? | <track-minmax>"
-  	},
-  	"track-list-v0": {
-  		comment: "used by old grid-columns and grid-rows syntax v0",
-  		syntax: "[ <string>* <track-group> <string>* ]+ | none"
-  	},
-  	"track-minmax": {
-  		comment: "used by old grid-columns and grid-rows syntax v0",
-  		syntax: "minmax( <track-breadth> , <track-breadth> ) | auto | <track-breadth> | fit-content"
-  	},
-  	x: {
-  		comment: "missed; not sure we should add it, but no others except `cursor` is using it so it's ok for now; https://drafts.csswg.org/css-ui-3/#cursor",
-  		syntax: "<number>"
-  	},
-  	y: {
-  		comment: "missed; not sure we should add it, but no others except `cursor` is using so it's ok for now; https://drafts.csswg.org/css-ui-3/#cursor",
-  		syntax: "<number>"
-  	},
-  	declaration: {
-  		comment: "missed, restored by https://drafts.csswg.org/css-syntax",
-  		syntax: "<ident-token> : <declaration-value>? [ '!' important ]?"
-  	},
-  	"declaration-list": {
-  		comment: "missed, restored by https://drafts.csswg.org/css-syntax",
-  		syntax: "[ <declaration>? ';' ]* <declaration>?"
-  	},
-  	url: {
-  		comment: "https://drafts.csswg.org/css-values-4/#urls",
-  		syntax: "url( <string> <url-modifier>* ) | <url-token>"
-  	},
-  	"url-modifier": {
-  		comment: "https://drafts.csswg.org/css-values-4/#typedef-url-modifier",
-  		syntax: "<ident> | <function-token> <any-value> )"
-  	},
-  	"number-zero-one": {
-  		syntax: "<number [0,1]>"
-  	},
-  	"number-one-or-greater": {
-  		syntax: "<number [1,∞]>"
-  	},
-  	"positive-integer": {
-  		syntax: "<integer [0,∞]>"
-  	}
-  };
-  var patch = {
-  	properties: properties$3,
-  	syntaxes: syntaxes$2
-  };
-
-  var patch$1 = /*#__PURE__*/window.Object.freeze({
-    __proto__: null,
-    properties: properties$3,
-    syntaxes: syntaxes$2,
-    'default': patch
-  });
-
-  var mdnAtrules = getCjsExportFromNamespace(atRules$1);
-
-  var mdnProperties = getCjsExportFromNamespace(properties$2);
-
-  var mdnSyntaxes = getCjsExportFromNamespace(syntaxes$1);
-
-  var patch$2 = getCjsExportFromNamespace(patch$1);
-
-  function preprocessAtrules(dict) {
-    var result = window.Object.create(null);
-
-    for (var atruleName in dict) {
-      var atrule = dict[atruleName];
-      var descriptors = null;
-
-      if (atrule.descriptors) {
-        descriptors = window.Object.create(null);
-
-        for (var descriptor in atrule.descriptors) {
-          descriptors[descriptor] = atrule.descriptors[descriptor].syntax;
-        }
-      }
-
-      result[atruleName.substr(1)] = {
-        prelude: atrule.syntax.trim().match(/^@\S+\s+([^;\{]*)/)[1].trim() || null,
-        descriptors
-      };
-    }
-
-    return result;
-  }
-
-  function buildDictionary(dict, patchDict) {
-    var result = {}; // copy all syntaxes for an original dict
-
-    for (var key in dict) {
-      result[key] = dict[key].syntax;
-    } // apply a patch
-
-
-    for (var key in patchDict) {
-      if (key in dict) {
-        if (patchDict[key].syntax) {
-          result[key] = patchDict[key].syntax;
-        } else {
-          delete result[key];
-        }
-      } else {
-        if (patchDict[key].syntax) {
-          result[key] = patchDict[key].syntax;
-        }
-      }
-    }
-
-    return result;
-  }
-
-  var data = {
-    types: buildDictionary(mdnSyntaxes, patch$2.syntaxes),
-    atrules: preprocessAtrules(mdnAtrules),
-    properties: buildDictionary(mdnProperties, patch$2.properties)
-  };
-
-  var cmpChar$3 = tokenizer.cmpChar;
-  var isDigit$4 = tokenizer.isDigit;
-  var TYPE$9 = tokenizer.TYPE;
-  var WHITESPACE$4 = TYPE$9.WhiteSpace;
-  var COMMENT$3 = TYPE$9.Comment;
-  var IDENT$3 = TYPE$9.Ident;
-  var NUMBER$3 = TYPE$9.Number;
-  var DIMENSION$2 = TYPE$9.Dimension;
-  var PLUSSIGN$3 = 0x002B; // U+002B PLUS SIGN (+)
-
-  var HYPHENMINUS$3 = 0x002D; // U+002D HYPHEN-MINUS (-)
-
-  var N$4 = 0x006E; // U+006E LATIN SMALL LETTER N (n)
-
-  var DISALLOW_SIGN$1 = true;
-  var ALLOW_SIGN$1 = false;
-
-  function checkInteger$1(offset, disallowSign) {
-    var pos = this.scanner.tokenStart + offset;
-    var code = this.scanner.source.charCodeAt(pos);
-
-    if (code === PLUSSIGN$3 || code === HYPHENMINUS$3) {
-      if (disallowSign) {
-        this.error('Number sign is not allowed');
-      }
-
-      pos++;
-    }
-
-    for (; pos < this.scanner.tokenEnd; pos++) {
-      if (!isDigit$4(this.scanner.source.charCodeAt(pos))) {
-        this.error('Integer is expected', pos);
-      }
-    }
-  }
-
-  function checkTokenIsInteger(disallowSign) {
-    return checkInteger$1.call(this, 0, disallowSign);
-  }
-
-  function expectCharCode(offset, code) {
-    if (!cmpChar$3(this.scanner.source, this.scanner.tokenStart + offset, code)) {
-      var msg = '';
-
-      switch (code) {
-        case N$4:
-          msg = 'N is expected';
-          break;
-
-        case HYPHENMINUS$3:
-          msg = 'HyphenMinus is expected';
-          break;
-      }
-
-      this.error(msg, this.scanner.tokenStart + offset);
-    }
-  } // ... <signed-integer>
-  // ... ['+' | '-'] <signless-integer>
-
-
-  function consumeB$1() {
-    var offset = 0;
-    var sign = 0;
-    var type = this.scanner.tokenType;
-
-    while (type === WHITESPACE$4 || type === COMMENT$3) {
-      type = this.scanner.lookupType(++offset);
-    }
-
-    if (type !== NUMBER$3) {
-      if (this.scanner.isDelim(PLUSSIGN$3, offset) || this.scanner.isDelim(HYPHENMINUS$3, offset)) {
-        sign = this.scanner.isDelim(PLUSSIGN$3, offset) ? PLUSSIGN$3 : HYPHENMINUS$3;
-
-        do {
-          type = this.scanner.lookupType(++offset);
-        } while (type === WHITESPACE$4 || type === COMMENT$3);
-
-        if (type !== NUMBER$3) {
-          this.scanner.skip(offset);
-          checkTokenIsInteger.call(this, DISALLOW_SIGN$1);
-        }
-      } else {
-        return null;
-      }
-    }
-
-    if (offset > 0) {
-      this.scanner.skip(offset);
-    }
-
-    if (sign === 0) {
-      type = this.scanner.source.charCodeAt(this.scanner.tokenStart);
-
-      if (type !== PLUSSIGN$3 && type !== HYPHENMINUS$3) {
-        this.error('Number sign is expected');
-      }
-    }
-
-    checkTokenIsInteger.call(this, sign !== 0);
-    return sign === HYPHENMINUS$3 ? '-' + this.consume(NUMBER$3) : this.consume(NUMBER$3);
-  } // An+B microsyntax https://www.w3.org/TR/css-syntax-3/#anb
-
-
-  var AnPlusB = {
-    name: 'AnPlusB',
-    structure: {
-      a: [String, null],
-      b: [String, null]
-    },
-    parse: function () {
-      /* eslint-disable brace-style*/
-      var start = this.scanner.tokenStart;
-      var a = null;
-      var b = null; // <integer>
-
-      if (this.scanner.tokenType === NUMBER$3) {
-        checkTokenIsInteger.call(this, ALLOW_SIGN$1);
-        b = this.consume(NUMBER$3);
-      } // -n
-      // -n <signed-integer>
-      // -n ['+' | '-'] <signless-integer>
-      // -n- <signless-integer>
-      // <dashndashdigit-ident>
-      else if (this.scanner.tokenType === IDENT$3 && cmpChar$3(this.scanner.source, this.scanner.tokenStart, HYPHENMINUS$3)) {
-          a = '-1';
-          expectCharCode.call(this, 1, N$4);
-
-          switch (this.scanner.getTokenLength()) {
-            // -n
-            // -n <signed-integer>
-            // -n ['+' | '-'] <signless-integer>
-            case 2:
-              this.scanner.next();
-              b = consumeB$1.call(this);
-              break;
-            // -n- <signless-integer>
-
-            case 3:
-              expectCharCode.call(this, 2, HYPHENMINUS$3);
-              this.scanner.next();
-              this.scanner.skipSC();
-              checkTokenIsInteger.call(this, DISALLOW_SIGN$1);
-              b = '-' + this.consume(NUMBER$3);
-              break;
-            // <dashndashdigit-ident>
-
-            default:
-              expectCharCode.call(this, 2, HYPHENMINUS$3);
-              checkInteger$1.call(this, 3, DISALLOW_SIGN$1);
-              this.scanner.next();
-              b = this.scanner.substrToCursor(start + 2);
-          }
-        } // '+'? n
-        // '+'? n <signed-integer>
-        // '+'? n ['+' | '-'] <signless-integer>
-        // '+'? n- <signless-integer>
-        // '+'? <ndashdigit-ident>
-        else if (this.scanner.tokenType === IDENT$3 || this.scanner.isDelim(PLUSSIGN$3) && this.scanner.lookupType(1) === IDENT$3) {
-            var sign = 0;
-            a = '1'; // just ignore a plus
-
-            if (this.scanner.isDelim(PLUSSIGN$3)) {
-              sign = 1;
-              this.scanner.next();
-            }
-
-            expectCharCode.call(this, 0, N$4);
-
-            switch (this.scanner.getTokenLength()) {
-              // '+'? n
-              // '+'? n <signed-integer>
-              // '+'? n ['+' | '-'] <signless-integer>
-              case 1:
-                this.scanner.next();
-                b = consumeB$1.call(this);
-                break;
-              // '+'? n- <signless-integer>
-
-              case 2:
-                expectCharCode.call(this, 1, HYPHENMINUS$3);
-                this.scanner.next();
-                this.scanner.skipSC();
-                checkTokenIsInteger.call(this, DISALLOW_SIGN$1);
-                b = '-' + this.consume(NUMBER$3);
-                break;
-              // '+'? <ndashdigit-ident>
-
-              default:
-                expectCharCode.call(this, 1, HYPHENMINUS$3);
-                checkInteger$1.call(this, 2, DISALLOW_SIGN$1);
-                this.scanner.next();
-                b = this.scanner.substrToCursor(start + sign + 1);
-            }
-          } // <ndashdigit-dimension>
-          // <ndash-dimension> <signless-integer>
-          // <n-dimension>
-          // <n-dimension> <signed-integer>
-          // <n-dimension> ['+' | '-'] <signless-integer>
-          else if (this.scanner.tokenType === DIMENSION$2) {
-              var code = this.scanner.source.charCodeAt(this.scanner.tokenStart);
-              var sign = code === PLUSSIGN$3 || code === HYPHENMINUS$3;
-
-              for (var i = this.scanner.tokenStart + sign; i < this.scanner.tokenEnd; i++) {
-                if (!isDigit$4(this.scanner.source.charCodeAt(i))) {
-                  break;
-                }
-              }
-
-              if (i === this.scanner.tokenStart + sign) {
-                this.error('Integer is expected', this.scanner.tokenStart + sign);
-              }
-
-              expectCharCode.call(this, i - this.scanner.tokenStart, N$4);
-              a = this.scanner.source.substring(start, i); // <n-dimension>
-              // <n-dimension> <signed-integer>
-              // <n-dimension> ['+' | '-'] <signless-integer>
-
-              if (i + 1 === this.scanner.tokenEnd) {
-                this.scanner.next();
-                b = consumeB$1.call(this);
-              } else {
-                expectCharCode.call(this, i - this.scanner.tokenStart + 1, HYPHENMINUS$3); // <ndash-dimension> <signless-integer>
-
-                if (i + 2 === this.scanner.tokenEnd) {
-                  this.scanner.next();
-                  this.scanner.skipSC();
-                  checkTokenIsInteger.call(this, DISALLOW_SIGN$1);
-                  b = '-' + this.consume(NUMBER$3);
-                } // <ndashdigit-dimension>
-                else {
-                    checkInteger$1.call(this, i - this.scanner.tokenStart + 2, DISALLOW_SIGN$1);
-                    this.scanner.next();
-                    b = this.scanner.substrToCursor(i + 1);
-                  }
-              }
-            } else {
-              this.error();
-            }
-
-      if (a !== null && a.charCodeAt(0) === PLUSSIGN$3) {
-        a = a.substr(1);
-      }
-
-      if (b !== null && b.charCodeAt(0) === PLUSSIGN$3) {
-        b = b.substr(1);
-      }
-
-      return {
-        type: 'AnPlusB',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        a: a,
-        b: b
-      };
-    },
-    generate: function (node) {
-      var a = node.a !== null && node.a !== undefined;
-      var b = node.b !== null && node.b !== undefined;
-
-      if (a) {
-        this.chunk(node.a === '+1' ? '+n' : // eslint-disable-line operator-linebreak, indent
-        node.a === '1' ? 'n' : // eslint-disable-line operator-linebreak, indent
-        node.a === '-1' ? '-n' : // eslint-disable-line operator-linebreak, indent
-        node.a + 'n' // eslint-disable-line operator-linebreak, indent
-        );
-
-        if (b) {
-          b = String(node.b);
-
-          if (b.charAt(0) === '-' || b.charAt(0) === '+') {
-            this.chunk(b.charAt(0));
-            this.chunk(b.substr(1));
-          } else {
-            this.chunk('+');
-            this.chunk(b);
-          }
-        }
-      } else {
-        this.chunk(String(node.b));
-      }
-    }
-  };
-
-  var TYPE$a = tokenizer.TYPE;
-  var WhiteSpace = TYPE$a.WhiteSpace;
-  var Semicolon = TYPE$a.Semicolon;
-  var LeftCurlyBracket = TYPE$a.LeftCurlyBracket;
-  var Delim = TYPE$a.Delim;
-  var EXCLAMATIONMARK$1 = 0x0021; // U+0021 EXCLAMATION MARK (!)
-
-  function getOffsetExcludeWS() {
-    if (this.scanner.tokenIndex > 0) {
-      if (this.scanner.lookupType(-1) === WhiteSpace) {
-        return this.scanner.tokenIndex > 1 ? this.scanner.getTokenStart(this.scanner.tokenIndex - 1) : this.scanner.firstCharOffset;
-      }
-    }
-
-    return this.scanner.tokenStart;
-  } // 0, 0, false
-
-
-  function balanceEnd() {
-    return 0;
-  } // LEFTCURLYBRACKET, 0, false
-
-
-  function leftCurlyBracket(tokenType) {
-    return tokenType === LeftCurlyBracket ? 1 : 0;
-  } // LEFTCURLYBRACKET, SEMICOLON, false
-
-
-  function leftCurlyBracketOrSemicolon(tokenType) {
-    return tokenType === LeftCurlyBracket || tokenType === Semicolon ? 1 : 0;
-  } // EXCLAMATIONMARK, SEMICOLON, false
-
-
-  function exclamationMarkOrSemicolon(tokenType, source, offset) {
-    if (tokenType === Delim && source.charCodeAt(offset) === EXCLAMATIONMARK$1) {
-      return 1;
-    }
-
-    return tokenType === Semicolon ? 1 : 0;
-  } // 0, SEMICOLON, true
-
-
-  function semicolonIncluded(tokenType) {
-    return tokenType === Semicolon ? 2 : 0;
-  }
-
-  var Raw = {
-    name: 'Raw',
-    structure: {
-      value: String
-    },
-    parse: function (startToken, mode, excludeWhiteSpace) {
-      var startOffset = this.scanner.getTokenStart(startToken);
-      var endOffset;
-      this.scanner.skip(this.scanner.getRawLength(startToken, mode || balanceEnd));
-
-      if (excludeWhiteSpace && this.scanner.tokenStart > startOffset) {
-        endOffset = getOffsetExcludeWS.call(this);
-      } else {
-        endOffset = this.scanner.tokenStart;
-      }
-
-      return {
-        type: 'Raw',
-        loc: this.getLocation(startOffset, endOffset),
-        value: this.scanner.source.substring(startOffset, endOffset)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.value);
-    },
-    mode: {
-      default: balanceEnd,
-      leftCurlyBracket: leftCurlyBracket,
-      leftCurlyBracketOrSemicolon: leftCurlyBracketOrSemicolon,
-      exclamationMarkOrSemicolon: exclamationMarkOrSemicolon,
-      semicolonIncluded: semicolonIncluded
-    }
-  };
-
-  var TYPE$b = tokenizer.TYPE;
-  var rawMode = Raw.mode;
-  var ATKEYWORD = TYPE$b.AtKeyword;
-  var SEMICOLON = TYPE$b.Semicolon;
-  var LEFTCURLYBRACKET$1 = TYPE$b.LeftCurlyBracket;
-  var RIGHTCURLYBRACKET$1 = TYPE$b.RightCurlyBracket;
-
-  function consumeRaw(startToken) {
-    return this.Raw(startToken, rawMode.leftCurlyBracketOrSemicolon, true);
-  }
-
-  function isDeclarationBlockAtrule() {
-    for (var offset = 1, type; type = this.scanner.lookupType(offset); offset++) {
-      if (type === RIGHTCURLYBRACKET$1) {
-        return true;
-      }
-
-      if (type === LEFTCURLYBRACKET$1 || type === ATKEYWORD) {
-        return false;
-      }
-    }
-
-    return false;
-  }
-
-  var Atrule = {
-    name: 'Atrule',
-    structure: {
-      name: String,
-      prelude: ['AtrulePrelude', 'Raw', null],
-      block: ['Block', null]
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var name;
-      var nameLowerCase;
-      var prelude = null;
-      var block = null;
-      this.eat(ATKEYWORD);
-      name = this.scanner.substrToCursor(start + 1);
-      nameLowerCase = name.toLowerCase();
-      this.scanner.skipSC(); // parse prelude
-
-      if (this.scanner.eof === false && this.scanner.tokenType !== LEFTCURLYBRACKET$1 && this.scanner.tokenType !== SEMICOLON) {
-        if (this.parseAtrulePrelude) {
-          prelude = this.parseWithFallback(this.AtrulePrelude.bind(this, name), consumeRaw); // turn empty AtrulePrelude into null
-
-          if (prelude.type === 'AtrulePrelude' && prelude.children.head === null) {
-            prelude = null;
-          }
-        } else {
-          prelude = consumeRaw.call(this, this.scanner.tokenIndex);
-        }
-
-        this.scanner.skipSC();
-      }
-
-      switch (this.scanner.tokenType) {
-        case SEMICOLON:
-          this.scanner.next();
-          break;
-
-        case LEFTCURLYBRACKET$1:
-          if (this.atrule.hasOwnProperty(nameLowerCase) && typeof this.atrule[nameLowerCase].block === 'function') {
-            block = this.atrule[nameLowerCase].block.call(this);
-          } else {
-            // TODO: should consume block content as Raw?
-            block = this.Block(isDeclarationBlockAtrule.call(this));
-          }
-
-          break;
-      }
-
-      return {
-        type: 'Atrule',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: name,
-        prelude: prelude,
-        block: block
-      };
-    },
-    generate: function (node) {
-      this.chunk('@');
-      this.chunk(node.name);
-
-      if (node.prelude !== null) {
-        this.chunk(' ');
-        this.node(node.prelude);
-      }
-
-      if (node.block) {
-        this.node(node.block);
-      } else {
-        this.chunk(';');
-      }
-    },
-    walkContext: 'atrule'
-  };
-
-  var TYPE$c = tokenizer.TYPE;
-  var SEMICOLON$1 = TYPE$c.Semicolon;
-  var LEFTCURLYBRACKET$2 = TYPE$c.LeftCurlyBracket;
-  var AtrulePrelude = {
-    name: 'AtrulePrelude',
-    structure: {
-      children: [[]]
-    },
-    parse: function (name) {
-      var children = null;
-
-      if (name !== null) {
-        name = name.toLowerCase();
-      }
-
-      this.scanner.skipSC();
-
-      if (this.atrule.hasOwnProperty(name) && typeof this.atrule[name].prelude === 'function') {
-        // custom consumer
-        children = this.atrule[name].prelude.call(this);
-      } else {
-        // default consumer
-        children = this.readSequence(this.scope.AtrulePrelude);
-      }
-
-      this.scanner.skipSC();
-
-      if (this.scanner.eof !== true && this.scanner.tokenType !== LEFTCURLYBRACKET$2 && this.scanner.tokenType !== SEMICOLON$1) {
-        this.error('Semicolon or block is expected');
-      }
-
-      if (children === null) {
-        children = this.createList();
-      }
-
-      return {
-        type: 'AtrulePrelude',
-        loc: this.getLocationFromList(children),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.children(node);
-    },
-    walkContext: 'atrulePrelude'
-  };
-
-  var TYPE$d = tokenizer.TYPE;
-  var IDENT$4 = TYPE$d.Ident;
-  var STRING = TYPE$d.String;
-  var COLON = TYPE$d.Colon;
-  var LEFTSQUAREBRACKET$1 = TYPE$d.LeftSquareBracket;
-  var RIGHTSQUAREBRACKET$1 = TYPE$d.RightSquareBracket;
-  var DOLLARSIGN = 0x0024; // U+0024 DOLLAR SIGN ($)
-
-  var ASTERISK$1 = 0x002A; // U+002A ASTERISK (*)
-
-  var EQUALSSIGN = 0x003D; // U+003D EQUALS SIGN (=)
-
-  var CIRCUMFLEXACCENT = 0x005E; // U+005E (^)
-
-  var VERTICALLINE$1 = 0x007C; // U+007C VERTICAL LINE (|)
-
-  var TILDE = 0x007E; // U+007E TILDE (~)
-
-  function getAttributeName() {
-    if (this.scanner.eof) {
-      this.error('Unexpected end of input');
-    }
-
-    var start = this.scanner.tokenStart;
-    var expectIdent = false;
-    var checkColon = true;
-
-    if (this.scanner.isDelim(ASTERISK$1)) {
-      expectIdent = true;
-      checkColon = false;
-      this.scanner.next();
-    } else if (!this.scanner.isDelim(VERTICALLINE$1)) {
-      this.eat(IDENT$4);
-    }
-
-    if (this.scanner.isDelim(VERTICALLINE$1)) {
-      if (this.scanner.source.charCodeAt(this.scanner.tokenStart + 1) !== EQUALSSIGN) {
-        this.scanner.next();
-        this.eat(IDENT$4);
-      } else if (expectIdent) {
-        this.error('Identifier is expected', this.scanner.tokenEnd);
-      }
-    } else if (expectIdent) {
-      this.error('Vertical line is expected');
-    }
-
-    if (checkColon && this.scanner.tokenType === COLON) {
-      this.scanner.next();
-      this.eat(IDENT$4);
-    }
-
-    return {
-      type: 'Identifier',
-      loc: this.getLocation(start, this.scanner.tokenStart),
-      name: this.scanner.substrToCursor(start)
-    };
-  }
-
-  function getOperator() {
-    var start = this.scanner.tokenStart;
-    var code = this.scanner.source.charCodeAt(start);
-
-    if (code !== EQUALSSIGN && // =
-    code !== TILDE && // ~=
-    code !== CIRCUMFLEXACCENT && // ^=
-    code !== DOLLARSIGN && // $=
-    code !== ASTERISK$1 && // *=
-    code !== VERTICALLINE$1 // |=
-    ) {
-        this.error('Attribute selector (=, ~=, ^=, $=, *=, |=) is expected');
-      }
-
-    this.scanner.next();
-
-    if (code !== EQUALSSIGN) {
-      if (!this.scanner.isDelim(EQUALSSIGN)) {
-        this.error('Equal sign is expected');
-      }
-
-      this.scanner.next();
-    }
-
-    return this.scanner.substrToCursor(start);
-  } // '[' <wq-name> ']'
-  // '[' <wq-name> <attr-matcher> [ <string-token> | <ident-token> ] <attr-modifier>? ']'
-
-
-  var AttributeSelector = {
-    name: 'AttributeSelector',
-    structure: {
-      name: 'Identifier',
-      matcher: [String, null],
-      value: ['String', 'Identifier', null],
-      flags: [String, null]
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var name;
-      var matcher = null;
-      var value = null;
-      var flags = null;
-      this.eat(LEFTSQUAREBRACKET$1);
-      this.scanner.skipSC();
-      name = getAttributeName.call(this);
-      this.scanner.skipSC();
-
-      if (this.scanner.tokenType !== RIGHTSQUAREBRACKET$1) {
-        // avoid case `[name i]`
-        if (this.scanner.tokenType !== IDENT$4) {
-          matcher = getOperator.call(this);
-          this.scanner.skipSC();
-          value = this.scanner.tokenType === STRING ? this.String() : this.Identifier();
-          this.scanner.skipSC();
-        } // attribute flags
-
-
-        if (this.scanner.tokenType === IDENT$4) {
-          flags = this.scanner.getTokenValue();
-          this.scanner.next();
-          this.scanner.skipSC();
-        }
-      }
-
-      this.eat(RIGHTSQUAREBRACKET$1);
-      return {
-        type: 'AttributeSelector',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: name,
-        matcher: matcher,
-        value: value,
-        flags: flags
-      };
-    },
-    generate: function (node) {
-      var flagsPrefix = ' ';
-      this.chunk('[');
-      this.node(node.name);
-
-      if (node.matcher !== null) {
-        this.chunk(node.matcher);
-
-        if (node.value !== null) {
-          this.node(node.value); // space between string and flags is not required
-
-          if (node.value.type === 'String') {
-            flagsPrefix = '';
-          }
-        }
-      }
-
-      if (node.flags !== null) {
-        this.chunk(flagsPrefix);
-        this.chunk(node.flags);
-      }
-
-      this.chunk(']');
-    }
-  };
-
-  var TYPE$e = tokenizer.TYPE;
-  var rawMode$1 = Raw.mode;
-  var WHITESPACE$5 = TYPE$e.WhiteSpace;
-  var COMMENT$4 = TYPE$e.Comment;
-  var SEMICOLON$2 = TYPE$e.Semicolon;
-  var ATKEYWORD$1 = TYPE$e.AtKeyword;
-  var LEFTCURLYBRACKET$3 = TYPE$e.LeftCurlyBracket;
-  var RIGHTCURLYBRACKET$2 = TYPE$e.RightCurlyBracket;
-
-  function consumeRaw$1(startToken) {
-    return this.Raw(startToken, null, true);
-  }
-
-  function consumeRule() {
-    return this.parseWithFallback(this.Rule, consumeRaw$1);
-  }
-
-  function consumeRawDeclaration(startToken) {
-    return this.Raw(startToken, rawMode$1.semicolonIncluded, true);
-  }
-
-  function consumeDeclaration() {
-    if (this.scanner.tokenType === SEMICOLON$2) {
-      return consumeRawDeclaration.call(this, this.scanner.tokenIndex);
-    }
-
-    var node = this.parseWithFallback(this.Declaration, consumeRawDeclaration);
-
-    if (this.scanner.tokenType === SEMICOLON$2) {
-      this.scanner.next();
-    }
-
-    return node;
-  }
-
-  var Block = {
-    name: 'Block',
-    structure: {
-      children: [['Atrule', 'Rule', 'Declaration']]
-    },
-    parse: function (isDeclaration) {
-      var consumer = isDeclaration ? consumeDeclaration : consumeRule;
-      var start = this.scanner.tokenStart;
-      var children = this.createList();
-      this.eat(LEFTCURLYBRACKET$3);
-
-      scan: while (!this.scanner.eof) {
-        switch (this.scanner.tokenType) {
-          case RIGHTCURLYBRACKET$2:
-            break scan;
-
-          case WHITESPACE$5:
-          case COMMENT$4:
-            this.scanner.next();
-            break;
-
-          case ATKEYWORD$1:
-            children.push(this.parseWithFallback(this.Atrule, consumeRaw$1));
-            break;
-
-          default:
-            children.push(consumer.call(this));
-        }
-      }
-
-      if (!this.scanner.eof) {
-        this.eat(RIGHTCURLYBRACKET$2);
-      }
-
-      return {
-        type: 'Block',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.chunk('{');
-      this.children(node, function (prev) {
-        if (prev.type === 'Declaration') {
-          this.chunk(';');
-        }
-      });
-      this.chunk('}');
-    },
-    walkContext: 'block'
-  };
-
-  var TYPE$f = tokenizer.TYPE;
-  var LEFTSQUAREBRACKET$2 = TYPE$f.LeftSquareBracket;
-  var RIGHTSQUAREBRACKET$2 = TYPE$f.RightSquareBracket;
-  var Brackets = {
-    name: 'Brackets',
-    structure: {
-      children: [[]]
-    },
-    parse: function (readSequence, recognizer) {
-      var start = this.scanner.tokenStart;
-      var children = null;
-      this.eat(LEFTSQUAREBRACKET$2);
-      children = readSequence.call(this, recognizer);
-
-      if (!this.scanner.eof) {
-        this.eat(RIGHTSQUAREBRACKET$2);
-      }
-
-      return {
-        type: 'Brackets',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.chunk('[');
-      this.children(node);
-      this.chunk(']');
-    }
-  };
-
-  var CDC = tokenizer.TYPE.CDC;
-  var CDC_1 = {
-    name: 'CDC',
-    structure: [],
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      this.eat(CDC); // -->
-
-      return {
-        type: 'CDC',
-        loc: this.getLocation(start, this.scanner.tokenStart)
-      };
-    },
-    generate: function () {
-      this.chunk('-->');
-    }
-  };
-
-  var CDO = tokenizer.TYPE.CDO;
-  var CDO_1 = {
-    name: 'CDO',
-    structure: [],
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      this.eat(CDO); // <!--
-
-      return {
-        type: 'CDO',
-        loc: this.getLocation(start, this.scanner.tokenStart)
-      };
-    },
-    generate: function () {
-      this.chunk('<!--');
-    }
-  };
-
-  var TYPE$g = tokenizer.TYPE;
-  var IDENT$5 = TYPE$g.Ident;
-  var FULLSTOP = 0x002E; // U+002E FULL STOP (.)
-  // '.' ident
-
-  var ClassSelector = {
-    name: 'ClassSelector',
-    structure: {
-      name: String
-    },
-    parse: function () {
-      if (!this.scanner.isDelim(FULLSTOP)) {
-        this.error('Full stop is expected');
-      }
-
-      this.scanner.next();
-      return {
-        type: 'ClassSelector',
-        loc: this.getLocation(this.scanner.tokenStart - 1, this.scanner.tokenEnd),
-        name: this.consume(IDENT$5)
-      };
-    },
-    generate: function (node) {
-      this.chunk('.');
-      this.chunk(node.name);
-    }
-  };
-
-  var TYPE$h = tokenizer.TYPE;
-  var IDENT$6 = TYPE$h.Ident;
-  var PLUSSIGN$4 = 0x002B; // U+002B PLUS SIGN (+)
-
-  var SOLIDUS = 0x002F; // U+002F SOLIDUS (/)
-
-  var GREATERTHANSIGN$1 = 0x003E; // U+003E GREATER-THAN SIGN (>)
-
-  var TILDE$1 = 0x007E; // U+007E TILDE (~)
-  // + | > | ~ | /deep/
-
-  var Combinator = {
-    name: 'Combinator',
-    structure: {
-      name: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var code = this.scanner.source.charCodeAt(this.scanner.tokenStart);
-
-      switch (code) {
-        case GREATERTHANSIGN$1:
-        case PLUSSIGN$4:
-        case TILDE$1:
-          this.scanner.next();
-          break;
-
-        case SOLIDUS:
-          this.scanner.next();
-
-          if (this.scanner.tokenType !== IDENT$6 || this.scanner.lookupValue(0, 'deep') === false) {
-            this.error('Identifier `deep` is expected');
-          }
-
-          this.scanner.next();
-
-          if (!this.scanner.isDelim(SOLIDUS)) {
-            this.error('Solidus is expected');
-          }
-
-          this.scanner.next();
-          break;
-
-        default:
-          this.error('Combinator is expected');
-      }
-
-      return {
-        type: 'Combinator',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: this.scanner.substrToCursor(start)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.name);
-    }
-  };
-
-  var TYPE$i = tokenizer.TYPE;
-  var COMMENT$5 = TYPE$i.Comment;
-  var ASTERISK$2 = 0x002A; // U+002A ASTERISK (*)
-
-  var SOLIDUS$1 = 0x002F; // U+002F SOLIDUS (/)
-  // '/*' .* '*/'
-
-  var Comment = {
-    name: 'Comment',
-    structure: {
-      value: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var end = this.scanner.tokenEnd;
-      this.eat(COMMENT$5);
-
-      if (end - start + 2 >= 2 && this.scanner.source.charCodeAt(end - 2) === ASTERISK$2 && this.scanner.source.charCodeAt(end - 1) === SOLIDUS$1) {
-        end -= 2;
-      }
-
-      return {
-        type: 'Comment',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        value: this.scanner.source.substring(start + 2, end)
-      };
-    },
-    generate: function (node) {
-      this.chunk('/*');
-      this.chunk(node.value);
-      this.chunk('*/');
-    }
-  };
-
-  var isCustomProperty$1 = names.isCustomProperty;
-  var TYPE$j = tokenizer.TYPE;
-  var rawMode$2 = Raw.mode;
-  var IDENT$7 = TYPE$j.Ident;
-  var HASH$1 = TYPE$j.Hash;
-  var COLON$1 = TYPE$j.Colon;
-  var SEMICOLON$3 = TYPE$j.Semicolon;
-  var DELIM$2 = TYPE$j.Delim;
-  var EXCLAMATIONMARK$2 = 0x0021; // U+0021 EXCLAMATION MARK (!)
-
-  var NUMBERSIGN$2 = 0x0023; // U+0023 NUMBER SIGN (#)
-
-  var DOLLARSIGN$1 = 0x0024; // U+0024 DOLLAR SIGN ($)
-
-  var AMPERSAND$1 = 0x0026; // U+0026 ANPERSAND (&)
-
-  var ASTERISK$3 = 0x002A; // U+002A ASTERISK (*)
-
-  var PLUSSIGN$5 = 0x002B; // U+002B PLUS SIGN (+)
-
-  var SOLIDUS$2 = 0x002F; // U+002F SOLIDUS (/)
-
-  function consumeValueRaw(startToken) {
-    return this.Raw(startToken, rawMode$2.exclamationMarkOrSemicolon, true);
-  }
-
-  function consumeCustomPropertyRaw(startToken) {
-    return this.Raw(startToken, rawMode$2.exclamationMarkOrSemicolon, false);
-  }
-
-  function consumeValue() {
-    var startValueToken = this.scanner.tokenIndex;
-    var value = this.Value();
-
-    if (value.type !== 'Raw' && this.scanner.eof === false && this.scanner.tokenType !== SEMICOLON$3 && this.scanner.isDelim(EXCLAMATIONMARK$2) === false && this.scanner.isBalanceEdge(startValueToken) === false) {
-      this.error();
-    }
-
-    return value;
-  }
-
-  var Declaration = {
-    name: 'Declaration',
-    structure: {
-      important: [Boolean, String],
-      property: String,
-      value: ['Value', 'Raw']
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var startToken = this.scanner.tokenIndex;
-      var property = readProperty$1.call(this);
-      var customProperty = isCustomProperty$1(property);
-      var parseValue = customProperty ? this.parseCustomProperty : this.parseValue;
-      var consumeRaw = customProperty ? consumeCustomPropertyRaw : consumeValueRaw;
-      var important = false;
-      var value;
-      this.scanner.skipSC();
-      this.eat(COLON$1);
-
-      if (!customProperty) {
-        this.scanner.skipSC();
-      }
-
-      if (parseValue) {
-        value = this.parseWithFallback(consumeValue, consumeRaw);
-      } else {
-        value = consumeRaw.call(this, this.scanner.tokenIndex);
-      }
-
-      if (this.scanner.isDelim(EXCLAMATIONMARK$2)) {
-        important = getImportant.call(this);
-        this.scanner.skipSC();
-      } // Do not include semicolon to range per spec
-      // https://drafts.csswg.org/css-syntax/#declaration-diagram
-
-
-      if (this.scanner.eof === false && this.scanner.tokenType !== SEMICOLON$3 && this.scanner.isBalanceEdge(startToken) === false) {
-        this.error();
-      }
-
-      return {
-        type: 'Declaration',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        important: important,
-        property: property,
-        value: value
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.property);
-      this.chunk(':');
-      this.node(node.value);
-
-      if (node.important) {
-        this.chunk(node.important === true ? '!important' : '!' + node.important);
-      }
-    },
-    walkContext: 'declaration'
-  };
-
-  function readProperty$1() {
-    var start = this.scanner.tokenStart;
-
-    if (this.scanner.tokenType === DELIM$2) {
-      switch (this.scanner.source.charCodeAt(this.scanner.tokenStart)) {
-        case ASTERISK$3:
-        case DOLLARSIGN$1:
-        case PLUSSIGN$5:
-        case NUMBERSIGN$2:
-        case AMPERSAND$1:
-          this.scanner.next();
-          break;
-        // TODO: not sure we should support this hack
-
-        case SOLIDUS$2:
-          this.scanner.next();
-
-          if (this.scanner.isDelim(SOLIDUS$2)) {
-            this.scanner.next();
-          }
-
-          break;
-      }
-    }
-
-    if (this.scanner.tokenType === HASH$1) {
-      this.eat(HASH$1);
-    } else {
-      this.eat(IDENT$7);
-    }
-
-    return this.scanner.substrToCursor(start);
-  } // ! ws* important
-
-
-  function getImportant() {
-    this.eat(DELIM$2);
-    this.scanner.skipSC();
-    var important = this.consume(IDENT$7); // store original value in case it differ from `important`
-    // for better original source restoring and hacks like `!ie` support
-
-    return important === 'important' ? true : important;
-  }
-
-  var TYPE$k = tokenizer.TYPE;
-  var rawMode$3 = Raw.mode;
-  var WHITESPACE$6 = TYPE$k.WhiteSpace;
-  var COMMENT$6 = TYPE$k.Comment;
-  var SEMICOLON$4 = TYPE$k.Semicolon;
-
-  function consumeRaw$2(startToken) {
-    return this.Raw(startToken, rawMode$3.semicolonIncluded, true);
-  }
-
-  var DeclarationList = {
-    name: 'DeclarationList',
-    structure: {
-      children: [['Declaration']]
-    },
-    parse: function () {
-      var children = this.createList();
-
-       while (!this.scanner.eof) {
-        switch (this.scanner.tokenType) {
-          case WHITESPACE$6:
-          case COMMENT$6:
-          case SEMICOLON$4:
-            this.scanner.next();
-            break;
-
-          default:
-            children.push(this.parseWithFallback(this.Declaration, consumeRaw$2));
-        }
-      }
-
-      return {
-        type: 'DeclarationList',
-        loc: this.getLocationFromList(children),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.children(node, function (prev) {
-        if (prev.type === 'Declaration') {
-          this.chunk(';');
-        }
-      });
-    }
-  };
-
-  var consumeNumber$3 = utils.consumeNumber;
-  var TYPE$l = tokenizer.TYPE;
-  var DIMENSION$3 = TYPE$l.Dimension;
-  var Dimension = {
-    name: 'Dimension',
-    structure: {
-      value: String,
-      unit: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var numberEnd = consumeNumber$3(this.scanner.source, start);
-      this.eat(DIMENSION$3);
-      return {
-        type: 'Dimension',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        value: this.scanner.source.substring(start, numberEnd),
-        unit: this.scanner.source.substring(numberEnd, this.scanner.tokenStart)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.value);
-      this.chunk(node.unit);
-    }
-  };
-
-  var TYPE$m = tokenizer.TYPE;
-  var RIGHTPARENTHESIS$2 = TYPE$m.RightParenthesis; // <function-token> <sequence> )
-
-  var _Function = {
-    name: 'Function',
-    structure: {
-      name: String,
-      children: [[]]
-    },
-    parse: function (readSequence, recognizer) {
-      var start = this.scanner.tokenStart;
-      var name = this.consumeFunctionName();
-      var nameLowerCase = name.toLowerCase();
-      var children;
-      children = recognizer.hasOwnProperty(nameLowerCase) ? recognizer[nameLowerCase].call(this, recognizer) : readSequence.call(this, recognizer);
-
-      if (!this.scanner.eof) {
-        this.eat(RIGHTPARENTHESIS$2);
-      }
-
-      return {
-        type: 'Function',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: name,
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.name);
-      this.chunk('(');
-      this.children(node);
-      this.chunk(')');
-    },
-    walkContext: 'function'
-  };
-
-  var TYPE$n = tokenizer.TYPE;
-  var HASH$2 = TYPE$n.Hash; // '#' ident
-
-  var HexColor = {
-    name: 'HexColor',
-    structure: {
-      value: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      this.eat(HASH$2);
-      return {
-        type: 'HexColor',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        value: this.scanner.substrToCursor(start + 1)
-      };
-    },
-    generate: function (node) {
-      this.chunk('#');
-      this.chunk(node.value);
-    }
-  };
-
-  var TYPE$o = tokenizer.TYPE;
-  var IDENT$8 = TYPE$o.Ident;
-  var Identifier = {
-    name: 'Identifier',
-    structure: {
-      name: String
-    },
-    parse: function () {
-      return {
-        type: 'Identifier',
-        loc: this.getLocation(this.scanner.tokenStart, this.scanner.tokenEnd),
-        name: this.consume(IDENT$8)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.name);
-    }
-  };
-
-  var TYPE$p = tokenizer.TYPE;
-  var HASH$3 = TYPE$p.Hash; // <hash-token>
-
-  var IdSelector = {
-    name: 'IdSelector',
-    structure: {
-      name: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart; // TODO: check value is an ident
-
-      this.eat(HASH$3);
-      return {
-        type: 'IdSelector',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: this.scanner.substrToCursor(start + 1)
-      };
-    },
-    generate: function (node) {
-      this.chunk('#');
-      this.chunk(node.name);
-    }
-  };
-
-  var TYPE$q = tokenizer.TYPE;
-  var IDENT$9 = TYPE$q.Ident;
-  var NUMBER$4 = TYPE$q.Number;
-  var DIMENSION$4 = TYPE$q.Dimension;
-  var LEFTPARENTHESIS$2 = TYPE$q.LeftParenthesis;
-  var RIGHTPARENTHESIS$3 = TYPE$q.RightParenthesis;
-  var COLON$2 = TYPE$q.Colon;
-  var DELIM$3 = TYPE$q.Delim;
-  var MediaFeature = {
-    name: 'MediaFeature',
-    structure: {
-      name: String,
-      value: ['Identifier', 'Number', 'Dimension', 'Ratio', null]
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var name;
-      var value = null;
-      this.eat(LEFTPARENTHESIS$2);
-      this.scanner.skipSC();
-      name = this.consume(IDENT$9);
-      this.scanner.skipSC();
-
-      if (this.scanner.tokenType !== RIGHTPARENTHESIS$3) {
-        this.eat(COLON$2);
-        this.scanner.skipSC();
-
-        switch (this.scanner.tokenType) {
-          case NUMBER$4:
-            if (this.lookupNonWSType(1) === DELIM$3) {
-              value = this.Ratio();
-            } else {
-              value = this.Number();
-            }
-
-            break;
-
-          case DIMENSION$4:
-            value = this.Dimension();
-            break;
-
-          case IDENT$9:
-            value = this.Identifier();
-            break;
-
-          default:
-            this.error('Number, dimension, ratio or identifier is expected');
-        }
-
-        this.scanner.skipSC();
-      }
-
-      this.eat(RIGHTPARENTHESIS$3);
-      return {
-        type: 'MediaFeature',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: name,
-        value: value
-      };
-    },
-    generate: function (node) {
-      this.chunk('(');
-      this.chunk(node.name);
-
-      if (node.value !== null) {
-        this.chunk(':');
-        this.node(node.value);
-      }
-
-      this.chunk(')');
-    }
-  };
-
-  var TYPE$r = tokenizer.TYPE;
-  var WHITESPACE$7 = TYPE$r.WhiteSpace;
-  var COMMENT$7 = TYPE$r.Comment;
-  var IDENT$a = TYPE$r.Ident;
-  var LEFTPARENTHESIS$3 = TYPE$r.LeftParenthesis;
-  var MediaQuery = {
-    name: 'MediaQuery',
-    structure: {
-      children: [['Identifier', 'MediaFeature', 'WhiteSpace']]
-    },
-    parse: function () {
-      this.scanner.skipSC();
-      var children = this.createList();
-      var child = null;
-      var space = null;
-
-      scan: while (!this.scanner.eof) {
-        switch (this.scanner.tokenType) {
-          case COMMENT$7:
-            this.scanner.next();
-            continue;
-
-          case WHITESPACE$7:
-            space = this.WhiteSpace();
-            continue;
-
-          case IDENT$a:
-            child = this.Identifier();
-            break;
-
-          case LEFTPARENTHESIS$3:
-            child = this.MediaFeature();
-            break;
-
-          default:
-            break scan;
-        }
-
-        if (space !== null) {
-          children.push(space);
-          space = null;
-        }
-
-        children.push(child);
-      }
-
-      if (child === null) {
-        this.error('Identifier or parenthesis is expected');
-      }
-
-      return {
-        type: 'MediaQuery',
-        loc: this.getLocationFromList(children),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.children(node);
-    }
-  };
-
-  var COMMA$1 = tokenizer.TYPE.Comma;
-  var MediaQueryList = {
-    name: 'MediaQueryList',
-    structure: {
-      children: [['MediaQuery']]
-    },
-    parse: function (relative) {
-      var children = this.createList();
-      this.scanner.skipSC();
-
-      while (!this.scanner.eof) {
-        children.push(this.MediaQuery(relative));
-
-        if (this.scanner.tokenType !== COMMA$1) {
-          break;
-        }
-
-        this.scanner.next();
-      }
-
-      return {
-        type: 'MediaQueryList',
-        loc: this.getLocationFromList(children),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.children(node, function () {
-        this.chunk(',');
-      });
-    }
-  };
-
-  var Nth = {
-    name: 'Nth',
-    structure: {
-      nth: ['AnPlusB', 'Identifier'],
-      selector: ['SelectorList', null]
-    },
-    parse: function (allowOfClause) {
-      this.scanner.skipSC();
-      var start = this.scanner.tokenStart;
-      var end = start;
-      var selector = null;
-      var query;
-
-      if (this.scanner.lookupValue(0, 'odd') || this.scanner.lookupValue(0, 'even')) {
-        query = this.Identifier();
-      } else {
-        query = this.AnPlusB();
-      }
-
-      this.scanner.skipSC();
-
-      if (allowOfClause && this.scanner.lookupValue(0, 'of')) {
-        this.scanner.next();
-        selector = this.SelectorList();
-
-        if (this.needPositions) {
-          end = this.getLastListNode(selector.children).loc.end.offset;
-        }
-      } else {
-        if (this.needPositions) {
-          end = query.loc.end.offset;
-        }
-      }
-
-      return {
-        type: 'Nth',
-        loc: this.getLocation(start, end),
-        nth: query,
-        selector: selector
-      };
-    },
-    generate: function (node) {
-      this.node(node.nth);
-
-      if (node.selector !== null) {
-        this.chunk(' of ');
-        this.node(node.selector);
-      }
-    }
-  };
-
-  var NUMBER$5 = tokenizer.TYPE.Number;
-  var _Number = {
-    name: 'Number',
-    structure: {
-      value: String
-    },
-    parse: function () {
-      return {
-        type: 'Number',
-        loc: this.getLocation(this.scanner.tokenStart, this.scanner.tokenEnd),
-        value: this.consume(NUMBER$5)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.value);
-    }
-  };
-
-  // '/' | '*' | ',' | ':' | '+' | '-'
-  var Operator = {
-    name: 'Operator',
-    structure: {
-      value: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      this.scanner.next();
-      return {
-        type: 'Operator',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        value: this.scanner.substrToCursor(start)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.value);
-    }
-  };
-
-  var TYPE$s = tokenizer.TYPE;
-  var LEFTPARENTHESIS$4 = TYPE$s.LeftParenthesis;
-  var RIGHTPARENTHESIS$4 = TYPE$s.RightParenthesis;
-  var Parentheses = {
-    name: 'Parentheses',
-    structure: {
-      children: [[]]
-    },
-    parse: function (readSequence, recognizer) {
-      var start = this.scanner.tokenStart;
-      var children = null;
-      this.eat(LEFTPARENTHESIS$4);
-      children = readSequence.call(this, recognizer);
-
-      if (!this.scanner.eof) {
-        this.eat(RIGHTPARENTHESIS$4);
-      }
-
-      return {
-        type: 'Parentheses',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.chunk('(');
-      this.children(node);
-      this.chunk(')');
-    }
-  };
-
-  var consumeNumber$4 = utils.consumeNumber;
-  var TYPE$t = tokenizer.TYPE;
-  var PERCENTAGE$1 = TYPE$t.Percentage;
-  var Percentage = {
-    name: 'Percentage',
-    structure: {
-      value: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var numberEnd = consumeNumber$4(this.scanner.source, start);
-      this.eat(PERCENTAGE$1);
-      return {
-        type: 'Percentage',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        value: this.scanner.source.substring(start, numberEnd)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.value);
-      this.chunk('%');
-    }
-  };
-
-  var TYPE$u = tokenizer.TYPE;
-  var IDENT$b = TYPE$u.Ident;
-  var FUNCTION$1 = TYPE$u.Function;
-  var COLON$3 = TYPE$u.Colon;
-  var RIGHTPARENTHESIS$5 = TYPE$u.RightParenthesis; // : [ <ident> | <function-token> <any-value>? ) ]
-
-  var PseudoClassSelector = {
-    name: 'PseudoClassSelector',
-    structure: {
-      name: String,
-      children: [['Raw'], null]
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var children = null;
-      var name;
-      var nameLowerCase;
-      this.eat(COLON$3);
-
-      if (this.scanner.tokenType === FUNCTION$1) {
-        name = this.consumeFunctionName();
-        nameLowerCase = name.toLowerCase();
-
-        if (this.pseudo.hasOwnProperty(nameLowerCase)) {
-          this.scanner.skipSC();
-          children = this.pseudo[nameLowerCase].call(this);
-          this.scanner.skipSC();
-        } else {
-          children = this.createList();
-          children.push(this.Raw(this.scanner.tokenIndex, null, false));
-        }
-
-        this.eat(RIGHTPARENTHESIS$5);
-      } else {
-        name = this.consume(IDENT$b);
-      }
-
-      return {
-        type: 'PseudoClassSelector',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: name,
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.chunk(':');
-      this.chunk(node.name);
-
-      if (node.children !== null) {
-        this.chunk('(');
-        this.children(node);
-        this.chunk(')');
-      }
-    },
-    walkContext: 'function'
-  };
-
-  var TYPE$v = tokenizer.TYPE;
-  var IDENT$c = TYPE$v.Ident;
-  var FUNCTION$2 = TYPE$v.Function;
-  var COLON$4 = TYPE$v.Colon;
-  var RIGHTPARENTHESIS$6 = TYPE$v.RightParenthesis; // :: [ <ident> | <function-token> <any-value>? ) ]
-
-  var PseudoElementSelector = {
-    name: 'PseudoElementSelector',
-    structure: {
-      name: String,
-      children: [['Raw'], null]
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var children = null;
-      var name;
-      var nameLowerCase;
-      this.eat(COLON$4);
-      this.eat(COLON$4);
-
-      if (this.scanner.tokenType === FUNCTION$2) {
-        name = this.consumeFunctionName();
-        nameLowerCase = name.toLowerCase();
-
-        if (this.pseudo.hasOwnProperty(nameLowerCase)) {
-          this.scanner.skipSC();
-          children = this.pseudo[nameLowerCase].call(this);
-          this.scanner.skipSC();
-        } else {
-          children = this.createList();
-          children.push(this.Raw(this.scanner.tokenIndex, null, false));
-        }
-
-        this.eat(RIGHTPARENTHESIS$6);
-      } else {
-        name = this.consume(IDENT$c);
-      }
-
-      return {
-        type: 'PseudoElementSelector',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: name,
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.chunk('::');
-      this.chunk(node.name);
-
-      if (node.children !== null) {
-        this.chunk('(');
-        this.children(node);
-        this.chunk(')');
-      }
-    },
-    walkContext: 'function'
-  };
-
-  var isDigit$5 = tokenizer.isDigit;
-  var TYPE$w = tokenizer.TYPE;
-  var NUMBER$6 = TYPE$w.Number;
-  var DELIM$4 = TYPE$w.Delim;
-  var SOLIDUS$3 = 0x002F; // U+002F SOLIDUS (/)
-
-  var FULLSTOP$1 = 0x002E; // U+002E FULL STOP (.)
-  // Terms of <ratio> should be a positive numbers (not zero or negative)
-  // (see https://drafts.csswg.org/mediaqueries-3/#values)
-  // However, -o-min-device-pixel-ratio takes fractional values as a ratio's term
-  // and this is using by various sites. Therefore we relax checking on parse
-  // to test a term is unsigned number without an exponent part.
-  // Additional checking may be applied on lexer validation.
-
-  function consumeNumber$5() {
-    this.scanner.skipWS();
-    var value = this.consume(NUMBER$6);
-
-    for (var i = 0; i < value.length; i++) {
-      var code = value.charCodeAt(i);
-
-      if (!isDigit$5(code) && code !== FULLSTOP$1) {
-        this.error('Unsigned number is expected', this.scanner.tokenStart - value.length + i);
-      }
-    }
-
-    if (Number(value) === 0) {
-      this.error('Zero number is not allowed', this.scanner.tokenStart - value.length);
-    }
-
-    return value;
-  } // <positive-integer> S* '/' S* <positive-integer>
-
-
-  var Ratio = {
-    name: 'Ratio',
-    structure: {
-      left: String,
-      right: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var left = consumeNumber$5.call(this);
-      var right;
-      this.scanner.skipWS();
-
-      if (!this.scanner.isDelim(SOLIDUS$3)) {
-        this.error('Solidus is expected');
-      }
-
-      this.eat(DELIM$4);
-      right = consumeNumber$5.call(this);
-      return {
-        type: 'Ratio',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        left: left,
-        right: right
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.left);
-      this.chunk('/');
-      this.chunk(node.right);
-    }
-  };
-
-  var TYPE$x = tokenizer.TYPE;
-  var rawMode$4 = Raw.mode;
-  var LEFTCURLYBRACKET$4 = TYPE$x.LeftCurlyBracket;
-
-  function consumeRaw$3(startToken) {
-    return this.Raw(startToken, rawMode$4.leftCurlyBracket, true);
-  }
-
-  function consumePrelude() {
-    var prelude = this.SelectorList();
-
-    if (prelude.type !== 'Raw' && this.scanner.eof === false && this.scanner.tokenType !== LEFTCURLYBRACKET$4) {
-      this.error();
-    }
-
-    return prelude;
-  }
-
-  var Rule = {
-    name: 'Rule',
-    structure: {
-      prelude: ['SelectorList', 'Raw'],
-      block: ['Block']
-    },
-    parse: function () {
-      var startToken = this.scanner.tokenIndex;
-      var startOffset = this.scanner.tokenStart;
-      var prelude;
-      var block;
-
-      if (this.parseRulePrelude) {
-        prelude = this.parseWithFallback(consumePrelude, consumeRaw$3);
-      } else {
-        prelude = consumeRaw$3.call(this, startToken);
-      }
-
-      block = this.Block(true);
-      return {
-        type: 'Rule',
-        loc: this.getLocation(startOffset, this.scanner.tokenStart),
-        prelude: prelude,
-        block: block
-      };
-    },
-    generate: function (node) {
-      this.node(node.prelude);
-      this.node(node.block);
-    },
-    walkContext: 'rule'
-  };
-
-  var Selector = {
-    name: 'Selector',
-    structure: {
-      children: [['TypeSelector', 'IdSelector', 'ClassSelector', 'AttributeSelector', 'PseudoClassSelector', 'PseudoElementSelector', 'Combinator', 'WhiteSpace']]
-    },
-    parse: function () {
-      var children = this.readSequence(this.scope.Selector); // nothing were consumed
-
-      if (this.getFirstListNode(children) === null) {
-        this.error('Selector is expected');
-      }
-
-      return {
-        type: 'Selector',
-        loc: this.getLocationFromList(children),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.children(node);
-    }
-  };
-
-  var TYPE$y = tokenizer.TYPE;
-  var COMMA$2 = TYPE$y.Comma;
-  var SelectorList = {
-    name: 'SelectorList',
-    structure: {
-      children: [['Selector', 'Raw']]
-    },
-    parse: function () {
-      var children = this.createList();
-
-      while (!this.scanner.eof) {
-        children.push(this.Selector());
-
-        if (this.scanner.tokenType === COMMA$2) {
-          this.scanner.next();
-          continue;
-        }
-
-        break;
-      }
-
-      return {
-        type: 'SelectorList',
-        loc: this.getLocationFromList(children),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.children(node, function () {
-        this.chunk(',');
-      });
-    },
-    walkContext: 'selector'
-  };
-
-  var STRING$1 = tokenizer.TYPE.String;
-  var _String = {
-    name: 'String',
-    structure: {
-      value: String
-    },
-    parse: function () {
-      return {
-        type: 'String',
-        loc: this.getLocation(this.scanner.tokenStart, this.scanner.tokenEnd),
-        value: this.consume(STRING$1)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.value);
-    }
-  };
-
-  var TYPE$z = tokenizer.TYPE;
-  var WHITESPACE$8 = TYPE$z.WhiteSpace;
-  var COMMENT$8 = TYPE$z.Comment;
-  var ATKEYWORD$2 = TYPE$z.AtKeyword;
-  var CDO$1 = TYPE$z.CDO;
-  var CDC$1 = TYPE$z.CDC;
-  var EXCLAMATIONMARK$3 = 0x0021; // U+0021 EXCLAMATION MARK (!)
-
-  function consumeRaw$4(startToken) {
-    return this.Raw(startToken, null, false);
-  }
-
-  var StyleSheet = {
-    name: 'StyleSheet',
-    structure: {
-      children: [['Comment', 'CDO', 'CDC', 'Atrule', 'Rule', 'Raw']]
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var children = this.createList();
-      var child;
-
-       while (!this.scanner.eof) {
-        switch (this.scanner.tokenType) {
-          case WHITESPACE$8:
-            this.scanner.next();
-            continue;
-
-          case COMMENT$8:
-            // ignore comments except exclamation comments (i.e. /*! .. */) on top level
-            if (this.scanner.source.charCodeAt(this.scanner.tokenStart + 2) !== EXCLAMATIONMARK$3) {
-              this.scanner.next();
-              continue;
-            }
-
-            child = this.Comment();
-            break;
-
-          case CDO$1:
-            // <!--
-            child = this.CDO();
-            break;
-
-          case CDC$1:
-            // -->
-            child = this.CDC();
-            break;
-          // CSS Syntax Module Level 3
-          // §2.2 Error handling
-          // At the "top level" of a stylesheet, an <at-keyword-token> starts an at-rule.
-
-          case ATKEYWORD$2:
-            child = this.parseWithFallback(this.Atrule, consumeRaw$4);
-            break;
-          // Anything else starts a qualified rule ...
-
-          default:
-            child = this.parseWithFallback(this.Rule, consumeRaw$4);
-        }
-
-        children.push(child);
-      }
-
-      return {
-        type: 'StyleSheet',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.children(node);
-    },
-    walkContext: 'stylesheet'
-  };
-
-  var TYPE$A = tokenizer.TYPE;
-  var IDENT$d = TYPE$A.Ident;
-  var ASTERISK$4 = 0x002A; // U+002A ASTERISK (*)
-
-  var VERTICALLINE$2 = 0x007C; // U+007C VERTICAL LINE (|)
-
-  function eatIdentifierOrAsterisk() {
-    if (this.scanner.tokenType !== IDENT$d && this.scanner.isDelim(ASTERISK$4) === false) {
-      this.error('Identifier or asterisk is expected');
-    }
-
-    this.scanner.next();
-  } // ident
-  // ident|ident
-  // ident|*
-  // *
-  // *|ident
-  // *|*
-  // |ident
-  // |*
-
-
-  var TypeSelector = {
-    name: 'TypeSelector',
-    structure: {
-      name: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-
-      if (this.scanner.isDelim(VERTICALLINE$2)) {
-        this.scanner.next();
-        eatIdentifierOrAsterisk.call(this);
-      } else {
-        eatIdentifierOrAsterisk.call(this);
-
-        if (this.scanner.isDelim(VERTICALLINE$2)) {
-          this.scanner.next();
-          eatIdentifierOrAsterisk.call(this);
-        }
-      }
-
-      return {
-        type: 'TypeSelector',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        name: this.scanner.substrToCursor(start)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.name);
-    }
-  };
-
-  var isHexDigit$4 = tokenizer.isHexDigit;
-  var cmpChar$4 = tokenizer.cmpChar;
-  var TYPE$B = tokenizer.TYPE;
-  var NAME$3 = tokenizer.NAME;
-  var IDENT$e = TYPE$B.Ident;
-  var NUMBER$7 = TYPE$B.Number;
-  var DIMENSION$5 = TYPE$B.Dimension;
-  var PLUSSIGN$6 = 0x002B; // U+002B PLUS SIGN (+)
-
-  var HYPHENMINUS$4 = 0x002D; // U+002D HYPHEN-MINUS (-)
-
-  var QUESTIONMARK$2 = 0x003F; // U+003F QUESTION MARK (?)
-
-  var U$1 = 0x0075; // U+0075 LATIN SMALL LETTER U (u)
-
-  function eatHexSequence(offset, allowDash) {
-    for (var pos = this.scanner.tokenStart + offset, len = 0; pos < this.scanner.tokenEnd; pos++) {
-      var code = this.scanner.source.charCodeAt(pos);
-
-      if (code === HYPHENMINUS$4 && allowDash && len !== 0) {
-        if (eatHexSequence.call(this, offset + len + 1, false) === 0) {
-          this.error();
-        }
-
-        return -1;
-      }
-
-      if (!isHexDigit$4(code)) {
-        this.error(allowDash && len !== 0 ? 'HyphenMinus' + (len < 6 ? ' or hex digit' : '') + ' is expected' : len < 6 ? 'Hex digit is expected' : 'Unexpected input', pos);
-      }
-
-      if (++len > 6) {
-        this.error('Too many hex digits', pos);
-      }
-    }
-
-    this.scanner.next();
-    return len;
-  }
-
-  function eatQuestionMarkSequence(max) {
-    var count = 0;
-
-    while (this.scanner.isDelim(QUESTIONMARK$2)) {
-      if (++count > max) {
-        this.error('Too many question marks');
-      }
-
-      this.scanner.next();
-    }
-  }
-
-  function startsWith$1(code) {
-    if (this.scanner.source.charCodeAt(this.scanner.tokenStart) !== code) {
-      this.error(NAME$3[code] + ' is expected');
-    }
-  } // https://drafts.csswg.org/css-syntax/#urange
-  // Informally, the <urange> production has three forms:
-  // U+0001
-  //      Defines a range consisting of a single code point, in this case the code point "1".
-  // U+0001-00ff
-  //      Defines a range of codepoints between the first and the second value, in this case
-  //      the range between "1" and "ff" (255 in decimal) inclusive.
-  // U+00??
-  //      Defines a range of codepoints where the "?" characters range over all hex digits,
-  //      in this case defining the same as the value U+0000-00ff.
-  // In each form, a maximum of 6 digits is allowed for each hexadecimal number (if you treat "?" as a hexadecimal digit).
-  //
-  // <urange> =
-  //   u '+' <ident-token> '?'* |
-  //   u <dimension-token> '?'* |
-  //   u <number-token> '?'* |
-  //   u <number-token> <dimension-token> |
-  //   u <number-token> <number-token> |
-  //   u '+' '?'+
-
-
-  function scanUnicodeRange() {
-    var hexLength = 0; // u '+' <ident-token> '?'*
-    // u '+' '?'+
-
-    if (this.scanner.isDelim(PLUSSIGN$6)) {
-      this.scanner.next();
-
-      if (this.scanner.tokenType === IDENT$e) {
-        hexLength = eatHexSequence.call(this, 0, true);
-
-        if (hexLength > 0) {
-          eatQuestionMarkSequence.call(this, 6 - hexLength);
-        }
-
-        return;
-      }
-
-      if (this.scanner.isDelim(QUESTIONMARK$2)) {
-        this.scanner.next();
-        eatQuestionMarkSequence.call(this, 5);
-        return;
-      }
-
-      this.error('Hex digit or question mark is expected');
-      return;
-    } // u <number-token> '?'*
-    // u <number-token> <dimension-token>
-    // u <number-token> <number-token>
-
-
-    if (this.scanner.tokenType === NUMBER$7) {
-      startsWith$1.call(this, PLUSSIGN$6);
-      hexLength = eatHexSequence.call(this, 1, true);
-
-      if (this.scanner.isDelim(QUESTIONMARK$2)) {
-        eatQuestionMarkSequence.call(this, 6 - hexLength);
-        return;
-      }
-
-      if (this.scanner.tokenType === DIMENSION$5 || this.scanner.tokenType === NUMBER$7) {
-        startsWith$1.call(this, HYPHENMINUS$4);
-        eatHexSequence.call(this, 1, false);
-        return;
-      }
-
-      return;
-    } // u <dimension-token> '?'*
-
-
-    if (this.scanner.tokenType === DIMENSION$5) {
-      startsWith$1.call(this, PLUSSIGN$6);
-      hexLength = eatHexSequence.call(this, 1, true);
-
-      if (hexLength > 0) {
-        eatQuestionMarkSequence.call(this, 6 - hexLength);
-      }
-
-      return;
-    }
-
-    this.error();
-  }
-
-  var UnicodeRange = {
-    name: 'UnicodeRange',
-    structure: {
-      value: String
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart; // U or u
-
-      if (!cmpChar$4(this.scanner.source, start, U$1)) {
-        this.error('U is expected');
-      }
-
-      if (!cmpChar$4(this.scanner.source, start + 1, PLUSSIGN$6)) {
-        this.error('Plus sign is expected');
-      }
-
-      this.scanner.next();
-      scanUnicodeRange.call(this);
-      return {
-        type: 'UnicodeRange',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        value: this.scanner.substrToCursor(start)
-      };
-    },
-    generate: function (node) {
-      this.chunk(node.value);
-    }
-  };
-
-  var isWhiteSpace$2 = tokenizer.isWhiteSpace;
-  var cmpStr$4 = tokenizer.cmpStr;
-  var TYPE$C = tokenizer.TYPE;
-  var FUNCTION$3 = TYPE$C.Function;
-  var URL$2 = TYPE$C.Url;
-  var RIGHTPARENTHESIS$7 = TYPE$C.RightParenthesis; // <url-token> | <function-token> <string> )
-
-  var Url = {
-    name: 'Url',
-    structure: {
-      value: ['String', 'Raw']
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var value;
-
-      switch (this.scanner.tokenType) {
-        case URL$2:
-          var rawStart = start + 4;
-          var rawEnd = this.scanner.tokenEnd - 1;
-
-          while (rawStart < rawEnd && isWhiteSpace$2(this.scanner.source.charCodeAt(rawStart))) {
-            rawStart++;
-          }
-
-          while (rawStart < rawEnd && isWhiteSpace$2(this.scanner.source.charCodeAt(rawEnd - 1))) {
-            rawEnd--;
-          }
-
-          value = {
-            type: 'Raw',
-            loc: this.getLocation(rawStart, rawEnd),
-            value: this.scanner.source.substring(rawStart, rawEnd)
-          };
-          this.eat(URL$2);
-          break;
-
-        case FUNCTION$3:
-          if (!cmpStr$4(this.scanner.source, this.scanner.tokenStart, this.scanner.tokenEnd, 'url(')) {
-            this.error('Function name must be `url`');
-          }
-
-          this.eat(FUNCTION$3);
-          this.scanner.skipSC();
-          value = this.String();
-          this.scanner.skipSC();
-          this.eat(RIGHTPARENTHESIS$7);
-          break;
-
-        default:
-          this.error('Url or Function is expected');
-      }
-
-      return {
-        type: 'Url',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        value: value
-      };
-    },
-    generate: function (node) {
-      this.chunk('url');
-      this.chunk('(');
-      this.node(node.value);
-      this.chunk(')');
-    }
-  };
-
-  var Value = {
-    name: 'Value',
-    structure: {
-      children: [[]]
-    },
-    parse: function () {
-      var start = this.scanner.tokenStart;
-      var children = this.readSequence(this.scope.Value);
-      return {
-        type: 'Value',
-        loc: this.getLocation(start, this.scanner.tokenStart),
-        children: children
-      };
-    },
-    generate: function (node) {
-      this.children(node);
-    }
-  };
-
-  var WHITESPACE$9 = tokenizer.TYPE.WhiteSpace;
-  var SPACE$2 = window.Object.freeze({
-    type: 'WhiteSpace',
-    loc: null,
-    value: ' '
-  });
-  var WhiteSpace$1 = {
-    name: 'WhiteSpace',
-    structure: {
-      value: String
-    },
-    parse: function () {
-      this.eat(WHITESPACE$9);
-      return SPACE$2; // return {
-      //     type: 'WhiteSpace',
-      //     loc: this.getLocation(this.scanner.tokenStart, this.scanner.tokenEnd),
-      //     value: this.consume(WHITESPACE)
-      // };
-    },
-    generate: function (node) {
-      this.chunk(node.value);
-    }
-  };
-
-  var node = {
-    AnPlusB: AnPlusB,
-    Atrule: Atrule,
-    AtrulePrelude: AtrulePrelude,
-    AttributeSelector: AttributeSelector,
-    Block: Block,
-    Brackets: Brackets,
-    CDC: CDC_1,
-    CDO: CDO_1,
-    ClassSelector: ClassSelector,
-    Combinator: Combinator,
-    Comment: Comment,
-    Declaration: Declaration,
-    DeclarationList: DeclarationList,
-    Dimension: Dimension,
-    Function: _Function,
-    HexColor: HexColor,
-    Identifier: Identifier,
-    IdSelector: IdSelector,
-    MediaFeature: MediaFeature,
-    MediaQuery: MediaQuery,
-    MediaQueryList: MediaQueryList,
-    Nth: Nth,
-    Number: _Number,
-    Operator: Operator,
-    Parentheses: Parentheses,
-    Percentage: Percentage,
-    PseudoClassSelector: PseudoClassSelector,
-    PseudoElementSelector: PseudoElementSelector,
-    Ratio: Ratio,
-    Raw: Raw,
-    Rule: Rule,
-    Selector: Selector,
-    SelectorList: SelectorList,
-    String: _String,
-    StyleSheet: StyleSheet,
-    TypeSelector: TypeSelector,
-    UnicodeRange: UnicodeRange,
-    Url: Url,
-    Value: Value,
-    WhiteSpace: WhiteSpace$1
-  };
-
-  var lexer = {
-    generic: true,
-    types: data.types,
-    atrules: data.atrules,
-    properties: data.properties,
-    node: node
-  };
-
-  var cmpChar$5 = tokenizer.cmpChar;
-  var cmpStr$5 = tokenizer.cmpStr;
-  var TYPE$D = tokenizer.TYPE;
-  var IDENT$f = TYPE$D.Ident;
-  var STRING$2 = TYPE$D.String;
-  var NUMBER$8 = TYPE$D.Number;
-  var FUNCTION$4 = TYPE$D.Function;
-  var URL$3 = TYPE$D.Url;
-  var HASH$4 = TYPE$D.Hash;
-  var DIMENSION$6 = TYPE$D.Dimension;
-  var PERCENTAGE$2 = TYPE$D.Percentage;
-  var LEFTPARENTHESIS$5 = TYPE$D.LeftParenthesis;
-  var LEFTSQUAREBRACKET$3 = TYPE$D.LeftSquareBracket;
-  var COMMA$3 = TYPE$D.Comma;
-  var DELIM$5 = TYPE$D.Delim;
-  var NUMBERSIGN$3 = 0x0023; // U+0023 NUMBER SIGN (#)
-
-  var ASTERISK$5 = 0x002A; // U+002A ASTERISK (*)
-
-  var PLUSSIGN$7 = 0x002B; // U+002B PLUS SIGN (+)
-
-  var HYPHENMINUS$5 = 0x002D; // U+002D HYPHEN-MINUS (-)
-
-  var SOLIDUS$4 = 0x002F; // U+002F SOLIDUS (/)
-
-  var U$2 = 0x0075; // U+0075 LATIN SMALL LETTER U (u)
-
-  var _default = function defaultRecognizer(context) {
-    switch (this.scanner.tokenType) {
-      case HASH$4:
-        return this.HexColor();
-
-      case COMMA$3:
-        context.space = null;
-        context.ignoreWSAfter = true;
-        return this.Operator();
-
-      case LEFTPARENTHESIS$5:
-        return this.Parentheses(this.readSequence, context.recognizer);
-
-      case LEFTSQUAREBRACKET$3:
-        return this.Brackets(this.readSequence, context.recognizer);
-
-      case STRING$2:
-        return this.String();
-
-      case DIMENSION$6:
-        return this.Dimension();
-
-      case PERCENTAGE$2:
-        return this.Percentage();
-
-      case NUMBER$8:
-        return this.Number();
-
-      case FUNCTION$4:
-        return cmpStr$5(this.scanner.source, this.scanner.tokenStart, this.scanner.tokenEnd, 'url(') ? this.Url() : this.Function(this.readSequence, context.recognizer);
-
-      case URL$3:
-        return this.Url();
-
-      case IDENT$f:
-        // check for unicode range, it should start with u+ or U+
-        if (cmpChar$5(this.scanner.source, this.scanner.tokenStart, U$2) && cmpChar$5(this.scanner.source, this.scanner.tokenStart + 1, PLUSSIGN$7)) {
-          return this.UnicodeRange();
-        } else {
-          return this.Identifier();
-        }
-
-      case DELIM$5:
-        var code = this.scanner.source.charCodeAt(this.scanner.tokenStart);
-
-        if (code === SOLIDUS$4 || code === ASTERISK$5 || code === PLUSSIGN$7 || code === HYPHENMINUS$5) {
-          return this.Operator(); // TODO: replace with Delim
-        } // TODO: produce a node with Delim node type
-
-
-        if (code === NUMBERSIGN$3) {
-          this.error('Hex or identifier is expected', this.scanner.tokenStart + 1);
-        }
-
-        break;
-    }
-  };
-
-  var atrulePrelude = {
-    getNode: _default
-  };
-
-  var TYPE$E = tokenizer.TYPE;
-  var DELIM$6 = TYPE$E.Delim;
-  var IDENT$g = TYPE$E.Ident;
-  var DIMENSION$7 = TYPE$E.Dimension;
-  var PERCENTAGE$3 = TYPE$E.Percentage;
-  var NUMBER$9 = TYPE$E.Number;
-  var HASH$5 = TYPE$E.Hash;
-  var COLON$5 = TYPE$E.Colon;
-  var LEFTSQUAREBRACKET$4 = TYPE$E.LeftSquareBracket;
-  var NUMBERSIGN$4 = 0x0023; // U+0023 NUMBER SIGN (#)
-
-  var ASTERISK$6 = 0x002A; // U+002A ASTERISK (*)
-
-  var PLUSSIGN$8 = 0x002B; // U+002B PLUS SIGN (+)
-
-  var SOLIDUS$5 = 0x002F; // U+002F SOLIDUS (/)
-
-  var FULLSTOP$2 = 0x002E; // U+002E FULL STOP (.)
-
-  var GREATERTHANSIGN$2 = 0x003E; // U+003E GREATER-THAN SIGN (>)
-
-  var VERTICALLINE$3 = 0x007C; // U+007C VERTICAL LINE (|)
-
-  var TILDE$2 = 0x007E; // U+007E TILDE (~)
-
-  function getNode(context) {
-    switch (this.scanner.tokenType) {
-      case LEFTSQUAREBRACKET$4:
-        return this.AttributeSelector();
-
-      case HASH$5:
-        return this.IdSelector();
-
-      case COLON$5:
-        if (this.scanner.lookupType(1) === COLON$5) {
-          return this.PseudoElementSelector();
-        } else {
-          return this.PseudoClassSelector();
-        }
-
-      case IDENT$g:
-        return this.TypeSelector();
-
-      case NUMBER$9:
-      case PERCENTAGE$3:
-        return this.Percentage();
-
-      case DIMENSION$7:
-        // throws when .123ident
-        if (this.scanner.source.charCodeAt(this.scanner.tokenStart) === FULLSTOP$2) {
-          this.error('Identifier is expected', this.scanner.tokenStart + 1);
-        }
-
-        break;
-
-      case DELIM$6:
-        var code = this.scanner.source.charCodeAt(this.scanner.tokenStart);
-
-        switch (code) {
-          case PLUSSIGN$8:
-          case GREATERTHANSIGN$2:
-          case TILDE$2:
-            context.space = null;
-            context.ignoreWSAfter = true;
-            return this.Combinator();
-
-          case SOLIDUS$5:
-            // /deep/
-            return this.Combinator();
-
-          case FULLSTOP$2:
-            return this.ClassSelector();
-
-          case ASTERISK$6:
-          case VERTICALLINE$3:
-            return this.TypeSelector();
-
-          case NUMBERSIGN$4:
-            return this.IdSelector();
-        }
-
-        break;
-    }
-  }
-  var selector = {
-    getNode: getNode
-  };
-
-  // https://drafts.csswg.org/css-images-4/#element-notation
-  // https://developer.mozilla.org/en-US/docs/Web/CSS/element
-  var element = function () {
-    this.scanner.skipSC();
-    var children = this.createSingleNodeList(this.IdSelector());
-    this.scanner.skipSC();
-    return children;
-  };
-
-  // legacy IE function
-  // expression( <any-value> )
-  var expression = function () {
-    return this.createSingleNodeList(this.Raw(this.scanner.tokenIndex, null, false));
-  };
-
-  var TYPE$F = tokenizer.TYPE;
-  var rawMode$5 = Raw.mode;
-  var COMMA$4 = TYPE$F.Comma; // var( <ident> , <value>? )
-
-  var _var = function () {
-    var children = this.createList();
-    this.scanner.skipSC(); // NOTE: Don't check more than a first argument is an ident, rest checks are for lexer
-
-    children.push(this.Identifier());
-    this.scanner.skipSC();
-
-    if (this.scanner.tokenType === COMMA$4) {
-      children.push(this.Operator());
-      children.push(this.parseCustomProperty ? this.Value(null) : this.Raw(this.scanner.tokenIndex, rawMode$5.exclamationMarkOrSemicolon, false));
-    }
-
-    return children;
-  };
-
-  var value = {
-    getNode: _default,
-    '-moz-element': element,
-    'element': element,
-    'expression': expression,
-    'var': _var
-  };
-
-  var scope = {
-    AtrulePrelude: atrulePrelude,
-    Selector: selector,
-    Value: value
-  };
-
-  var fontFace = {
-    parse: {
-      prelude: null,
-      block: function () {
-        return this.Block(true);
-      }
-    }
-  };
-
-  var TYPE$G = tokenizer.TYPE;
-  var STRING$3 = TYPE$G.String;
-  var IDENT$h = TYPE$G.Ident;
-  var URL$4 = TYPE$G.Url;
-  var FUNCTION$5 = TYPE$G.Function;
-  var LEFTPARENTHESIS$6 = TYPE$G.LeftParenthesis;
-  var _import = {
-    parse: {
-      prelude: function () {
-        var children = this.createList();
-        this.scanner.skipSC();
-
-        switch (this.scanner.tokenType) {
-          case STRING$3:
-            children.push(this.String());
-            break;
-
-          case URL$4:
-          case FUNCTION$5:
-            children.push(this.Url());
-            break;
-
-          default:
-            this.error('String or url() is expected');
-        }
-
-        if (this.lookupNonWSType(0) === IDENT$h || this.lookupNonWSType(0) === LEFTPARENTHESIS$6) {
-          children.push(this.WhiteSpace());
-          children.push(this.MediaQueryList());
-        }
-
-        return children;
-      },
-      block: null
-    }
-  };
-
-  var media = {
-    parse: {
-      prelude: function () {
-        return this.createSingleNodeList(this.MediaQueryList());
-      },
-      block: function () {
-        return this.Block(false);
-      }
-    }
-  };
-
-  var page = {
-    parse: {
-      prelude: function () {
-        return this.createSingleNodeList(this.SelectorList());
-      },
-      block: function () {
-        return this.Block(true);
-      }
-    }
-  };
-
-  var TYPE$H = tokenizer.TYPE;
-  var WHITESPACE$a = TYPE$H.WhiteSpace;
-  var COMMENT$9 = TYPE$H.Comment;
-  var IDENT$i = TYPE$H.Ident;
-  var FUNCTION$6 = TYPE$H.Function;
-  var COLON$6 = TYPE$H.Colon;
-  var LEFTPARENTHESIS$7 = TYPE$H.LeftParenthesis;
-
-  function consumeRaw$5() {
-    return this.createSingleNodeList(this.Raw(this.scanner.tokenIndex, null, false));
-  }
-
-  function parentheses() {
-    this.scanner.skipSC();
-
-    if (this.scanner.tokenType === IDENT$i && this.lookupNonWSType(1) === COLON$6) {
-      return this.createSingleNodeList(this.Declaration());
-    }
-
-    return readSequence.call(this);
-  }
-
-  function readSequence() {
-    var children = this.createList();
-    var space = null;
-    var child;
-    this.scanner.skipSC();
-
-    scan: while (!this.scanner.eof) {
-      switch (this.scanner.tokenType) {
-        case WHITESPACE$a:
-          space = this.WhiteSpace();
-          continue;
-
-        case COMMENT$9:
-          this.scanner.next();
-          continue;
-
-        case FUNCTION$6:
-          child = this.Function(consumeRaw$5, this.scope.AtrulePrelude);
-          break;
-
-        case IDENT$i:
-          child = this.Identifier();
-          break;
-
-        case LEFTPARENTHESIS$7:
-          child = this.Parentheses(parentheses, this.scope.AtrulePrelude);
-          break;
-
-        default:
-          break scan;
-      }
-
-      if (space !== null) {
-        children.push(space);
-        space = null;
-      }
-
-      children.push(child);
-    }
-
-    return children;
-  }
-
-  var supports = {
-    parse: {
-      prelude: function () {
-        var children = readSequence.call(this);
-
-        if (this.getFirstListNode(children) === null) {
-          this.error('Condition is expected');
-        }
-
-        return children;
-      },
-      block: function () {
-        return this.Block(false);
-      }
-    }
-  };
-
-  var atrule = {
-    'font-face': fontFace,
-    'import': _import,
-    'media': media,
-    'page': page,
-    'supports': supports
-  };
-
-  var dir = {
-    parse: function () {
-      return this.createSingleNodeList(this.Identifier());
-    }
-  };
-
-  var has$1 = {
-    parse: function () {
-      return this.createSingleNodeList(this.SelectorList());
-    }
-  };
-
-  var lang = {
-    parse: function () {
-      return this.createSingleNodeList(this.Identifier());
-    }
-  };
-
-  var selectorList = {
-    parse: function selectorList() {
-      return this.createSingleNodeList(this.SelectorList());
-    }
-  };
-
-  var matches = selectorList;
-
-  var not = selectorList;
-
-  var ALLOW_OF_CLAUSE = true;
-  var nthWithOfClause = {
-    parse: function nthWithOfClause() {
-      return this.createSingleNodeList(this.Nth(ALLOW_OF_CLAUSE));
-    }
-  };
-
-  var nthChild = nthWithOfClause;
-
-  var nthLastChild = nthWithOfClause;
-
-  var DISALLOW_OF_CLAUSE = false;
-  var nth$1 = {
-    parse: function nth() {
-      return this.createSingleNodeList(this.Nth(DISALLOW_OF_CLAUSE));
-    }
-  };
-
-  var nthLastOfType = nth$1;
-
-  var nthOfType = nth$1;
-
-  var slotted = {
-    parse: function compoundSelector() {
-      return this.createSingleNodeList(this.Selector());
-    }
-  };
-
-  var pseudo = {
-    'dir': dir,
-    'has': has$1,
-    'lang': lang,
-    'matches': matches,
-    'not': not,
-    'nth-child': nthChild,
-    'nth-last-child': nthLastChild,
-    'nth-last-of-type': nthLastOfType,
-    'nth-of-type': nthOfType,
-    'slotted': slotted
-  };
-
-  var parser = {
-    parseContext: {
-      default: 'StyleSheet',
-      stylesheet: 'StyleSheet',
-      atrule: 'Atrule',
-      atrulePrelude: function (options) {
-        return this.AtrulePrelude(options.atrule ? String(options.atrule) : null);
-      },
-      mediaQueryList: 'MediaQueryList',
-      mediaQuery: 'MediaQuery',
-      rule: 'Rule',
-      selectorList: 'SelectorList',
-      selector: 'Selector',
-      block: function () {
-        return this.Block(true);
-      },
-      declarationList: 'DeclarationList',
-      declaration: 'Declaration',
-      value: 'Value'
-    },
-    scope: scope,
-    atrule: atrule,
-    pseudo: pseudo,
-    node: node
-  };
-
-  var walker = {
-    node: node
-  };
-
-  function merge() {
-    var dest = {};
-
-    for (var i = 0; i < arguments.length; i++) {
-      var src = arguments[i];
-
-      for (var key in src) {
-        dest[key] = src[key];
-      }
-    }
-
-    return dest;
-  }
-
-  var syntax = create$4.create(merge(lexer, parser, walker));
-
-  var lib = syntax;
-
-  const shorthandProperties = new window.Map([['background', new window.Set(['background-color', 'background-position', 'background-position-x', 'background-position-y', 'background-size', 'background-repeat', 'background-repeat-x', 'background-repeat-y', 'background-clip', 'background-origin', 'background-attachment', 'background-image'])], ['background-position', new window.Set(['background-position-x', 'background-position-y'])], ['background-repeat', new window.Set(['background-repeat-x', 'background-repeat-y'])], ['font', new window.Set(['font-style', 'font-variant-caps', 'font-weight', 'font-stretch', 'font-size', 'line-height', 'font-family', 'font-size-adjust', 'font-kerning', 'font-optical-sizing', 'font-variant-alternates', 'font-variant-east-asian', 'font-variant-ligatures', 'font-variant-numeric', 'font-variant-position', 'font-language-override', 'font-feature-settings', 'font-variation-settings'])], ['font-variant', new window.Set(['font-variant-caps', 'font-variant-numeric', 'font-variant-alternates', 'font-variant-ligatures', 'font-variant-east-asian'])], ['outline', new window.Set(['outline-width', 'outline-style', 'outline-color'])], ['border', new window.Set(['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width', 'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'])], ['border-width', new window.Set(['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width'])], ['border-style', new window.Set(['border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style'])], ['border-color', new window.Set(['border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'])], ['border-block', new window.Set(['border-block-start-width', 'border-block-end-width', 'border-block-start-style', 'border-block-end-style', 'border-block-start-color', 'border-block-end-color'])], ['border-block-start', new window.Set(['border-block-start-width', 'border-block-start-style', 'border-block-start-color'])], ['border-block-end', new window.Set(['border-block-end-width', 'border-block-end-style', 'border-block-end-color'])], ['border-inline', new window.Set(['border-inline-start-width', 'border-inline-end-width', 'border-inline-start-style', 'border-inline-end-style', 'border-inline-start-color', 'border-inline-end-color'])], ['border-inline-start', new window.Set(['border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color'])], ['border-inline-end', new window.Set(['border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color'])], ['border-image', new window.Set(['border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'])], ['border-radius', new window.Set(['border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius'])], ['padding', new window.Set(['padding-top', 'padding-right', 'padding-bottom', 'padding-left'])], ['padding-block', new window.Set(['padding-block-start', 'padding-block-end'])], ['padding-inline', new window.Set(['padding-inline-start', 'padding-inline-end'])], ['margin', new window.Set(['margin-top', 'margin-right', 'margin-bottom', 'margin-left'])], ['margin-block', new window.Set(['margin-block-start', 'margin-block-end'])], ['margin-inline', new window.Set(['margin-inline-start', 'margin-inline-end'])], ['inset', new window.Set(['top', 'right', 'bottom', 'left'])], ['inset-block', new window.Set(['inset-block-start', 'inset-block-end'])], ['inset-inline', new window.Set(['inset-inline-start', 'inset-inline-end'])], ['flex', new window.Set(['flex-grow', 'flex-shrink', 'flex-basis'])], ['flex-flow', new window.Set(['flex-direction', 'flex-wrap'])], ['gap', new window.Set(['row-gap', 'column-gap'])], ['transition', new window.Set(['transition-duration', 'transition-timing-function', 'transition-delay', 'transition-property'])], ['grid', new window.Set(['grid-template-rows', 'grid-template-columns', 'grid-template-areas', 'grid-auto-flow', 'grid-auto-columns', 'grid-auto-rows'])], ['grid-template', new window.Set(['grid-template-rows', 'grid-template-columns', 'grid-template-areas'])], ['grid-row', new window.Set(['grid-row-start', 'grid-row-end'])], ['grid-column', new window.Set(['grid-column-start', 'grid-column-end'])], ['grid-gap', new window.Set(['grid-row-gap', 'grid-column-gap'])], ['place-content', new window.Set(['align-content', 'justify-content'])], ['place-items', new window.Set(['align-items', 'justify-items'])], ['place-self', new window.Set(['align-self', 'justify-self'])], ['columns', new window.Set(['column-width', 'column-count'])], ['column-rule', new window.Set(['column-rule-width', 'column-rule-style', 'column-rule-color'])], ['list-style', new window.Set(['list-style-type', 'list-style-position', 'list-style-image'])], ['offset', new window.Set(['offset-position', 'offset-path', 'offset-distance', 'offset-rotate', 'offset-anchor'])], ['overflow', new window.Set(['overflow-x', 'overflow-y'])], ['overscroll-behavior', new window.Set(['overscroll-behavior-x', 'overscroll-behavior-y'])], ['scroll-margin', new window.Set(['scroll-margin-top', 'scroll-margin-right', 'scroll-margin-bottom', 'scroll-margin-left'])], ['scroll-padding', new window.Set(['scroll-padding-top', 'scroll-padding-right', 'scroll-padding-bottom', 'scroll-padding-left'])], ['text-decaration', new window.Set(['text-decoration-line', 'text-decoration-style', 'text-decoration-color'])], ['text-stroke', new window.Set(['text-stroke-color', 'text-stroke-width'])], ['animation', new window.Set(['animation-duration', 'animation-timing-function', 'animation-delay', 'animation-iteration-count', 'animation-direction', 'animation-fill-mode', 'animation-play-state', 'animation-name'])], ['mask', new window.Set(['mask-image', 'mask-mode', 'mask-repeat-x', 'mask-repeat-y', 'mask-position-x', 'mask-position-y', 'mask-clip', 'mask-origin', 'mask-size', 'mask-composite'])], ['mask-repeat', new window.Set(['mask-repeat-x', 'mask-repeat-y'])], ['mask-position', new window.Set(['mask-position-x', 'mask-position-y'])], ['perspective-origin', new window.Set(['perspective-origin-x', 'perspective-origin-y'])], ['transform-origin', new window.Set(['transform-origin-x', 'transform-origin-y', 'transform-origin-z'])]]);
-  const mozShorthandProperties = new window.Map([withVendor('animation', 'moz'), withVendor('border-image', 'moz'), withVendor('mask', 'moz'), withVendor('transition', 'moz'), withVendor('columns', 'moz'), withVendor('text-stroke', 'moz'), withVendor('column-rule', 'moz'), ['-moz-border-end', new window.Set(['-moz-border-end-color', '-moz-border-end-style', '-moz-border-end-width'])], ['-moz-border-start', new window.Set(['-moz-border-start-color', '-moz-border-start-style', '-moz-border-start-width'])], ['-moz-outline-radius', new window.Set(['-moz-outline-radius-topleft', '-moz-outline-radius-topright', '-moz-outline-radius-bottomright', '-moz-outline-radius-bottomleft'])]]);
-  const webkitShorthandProperties = new window.Map([withVendor('animation', 'webkit'), withVendor('border-radius', 'webkit'), withVendor('column-rule', 'webkit'), withVendor('columns', 'webkit'), withVendor('flex', 'webkit'), withVendor('flex-flow', 'webkit'), withVendor('mask', 'webkit'), withVendor('text-stroke', 'webkit'), withVendor('perspective-origin', 'webkit'), withVendor('transform-origin', 'webkit'), withVendor('transition', 'webkit'), ['-webkit-border-start', new window.Set(['-webkit-border-start-color', '-webkit-border-start-style', '-webkit-border-start-width'])], ['-webkit-border-before', new window.Set(['-webkit-border-before-color', '-webkit-border-before-style', '-webkit-border-before-width'])], ['-webkit-border-end', new window.Set(['-webkit-border-end-color', '-webkit-border-end-style', '-webkit-border-end-width'])], ['-webkit-border-after', new window.Set(['-webkit-border-after-color', '-webkit-border-after-style', '-webkit-border-after-width'])]]);
-  const experimentalLonghandProperties = new window.Map([['background-position-x', 'background-position'], ['background-position-y', 'background-position'], ['background-repeat-x', 'background-repeat'], ['background-repeat-y', 'background-repeat']]);
-  mozShorthandProperties.forEach((longhandSet, shorthand) => shorthandProperties.set(shorthand, longhandSet));
-  webkitShorthandProperties.forEach((longhandSet, shorthand) => shorthandProperties.set(shorthand, longhandSet));
-  const longhandProperties = new window.Set(window.Array.from(shorthandProperties.values()).reduce((longhandProperties, longhandSet) => longhandProperties.concat(window.Array.from(longhandSet)), []));
-
-  function withVendor(shorthand, vendor) {
-    const longhands = shorthandProperties.get(shorthand);
-
-    if (longhands) {
-      return [`-${vendor}-${shorthand}`, new window.Set(window.Array.from(longhands, longhand => `-${vendor}-${longhand}`))];
-    }
-  }
-
-  function isShorthandFor(shorthand, longhand) {
-    const longhands = shorthandProperties.get(shorthand);
-    return longhands ? longhands.has(longhand) : false;
-  }
-
-  function hasShorthand(longhand) {
-    return longhandProperties.has(longhand);
-  }
-
-  function hasShorthandWithin(longhand, shorthands) {
-    return shorthands.some(shorthand => isShorthandFor(shorthand, longhand));
-  }
-
-  function preferredShorthand(longhand) {
-    return experimentalLonghandProperties.get(longhand);
-  }
-
-  var isShorthandFor_1 = isShorthandFor;
-  var hasShorthand_1 = hasShorthand;
-  var hasShorthandWithin_1 = hasShorthandWithin;
-  var preferredShorthand_1 = preferredShorthand;
-  var styleProperties = {
-    isShorthandFor: isShorthandFor_1,
-    hasShorthand: hasShorthand_1,
-    hasShorthandWithin: hasShorthandWithin_1,
-    preferredShorthand: preferredShorthand_1
-  };
-
-  const {
-    preferredShorthand: preferredShorthand$1
-  } = styleProperties;
-  const CSSOM_TYPES = {
-    UNKNOWN_RULE: 0,
-    STYLE_RULE: 1,
-    CHARSET_RULE: 2,
-    IMPORT_RULE: 3,
-    MEDIA_RULE: 4,
-    FONT_FACE_RULE: 5,
-    PAGE_RULE: 6,
-    KEYFRAMES_RULE: 7,
-    KEYFRAME_RULE: 8,
-    NAMESPACE_RULE: 10,
-    COUNTER_STYLE_RULE: 11,
-    SUPPORTS_RULE: 12,
-    DOCUMENT_RULE: 13,
-    FONT_FEATURE_VALUES_RULE: 14,
-    VIEWPORT_RULE: 15,
-    REGION_STYLE_RULE: 16
-  };
-  const RULE_PROPS = {
-    [CSSOM_TYPES.CHARSET_RULE]: {
-      atrule: 'charset',
-      prelude: 'charset'
-    },
-    [CSSOM_TYPES.IMPORT_RULE]: {
-      atrule: 'import',
-      prelude: 'import'
-    },
-    [CSSOM_TYPES.NAMESPACE_RULE]: {
-      atrule: 'namespace',
-      prelude: 'namespace'
-    },
-    [CSSOM_TYPES.STYLE_RULE]: {
-      prelude: 'selector',
-      block: 'style'
-    },
-    [CSSOM_TYPES.KEYFRAME_RULE]: {
-      prelude: 'key',
-      block: 'style'
-    },
-    [CSSOM_TYPES.PAGE_RULE]: {
-      atrule: 'page',
-      prelude: 'selector',
-      block: 'style'
-    },
-    [CSSOM_TYPES.FONT_FACE_RULE]: {
-      atrule: 'font-face',
-      block: 'style'
-    },
-    [CSSOM_TYPES.MEDIA_RULE]: {
-      atrule: 'media',
-      prelude: 'condition',
-      block: 'nested'
-    },
-    [CSSOM_TYPES.SUPPORTS_RULE]: {
-      atrule: 'supports',
-      prelude: 'condition',
-      block: 'nested'
-    },
-    [CSSOM_TYPES.DOCUMENT_RULE]: {
-      atrule: 'document',
-      prelude: 'condition',
-      block: 'nested'
-    },
-    [CSSOM_TYPES.KEYFRAMES_RULE]: {
-      atrule: 'keyframes',
-      prelude: 'name',
-      block: 'nested'
-    }
-  };
-
-  function createAstFromCssom(cssomRules) {
-    return window.Array.from(cssomRules, cssomRule => {
-      const props = RULE_PROPS[cssomRule.type];
-      const rule = {};
-
-      if (props.atrule) {
-        rule.type = 'Atrule';
-        const [_, vendor] = cssomRule.cssText.match(new RegExp(`^@(-\\w+-)?${props.atrule}`));
-        rule.name = vendor ? vendor + props.atrule : props.atrule;
-      } else {
-        rule.type = 'Rule';
-      }
-
-      let cssomPrelude;
-
-      if (props.prelude === 'selector') {
-        cssomPrelude = cssomRule.selectorText;
-      } else if (props.prelude === 'key') {
-        cssomPrelude = cssomRule.keyText;
-      } else if (props.prelude === 'condition') {
-        cssomPrelude = cssomRule.conditionText;
-      } else if (props.prelude === 'name') {
-        cssomPrelude = cssomRule.name;
-      } else if (props.prelude === 'import') {
-        cssomPrelude = `url("${cssomRule.href}") ${cssomRule.media.mediaText}`;
-      } else if (props.prelude === 'namespace') {
-        cssomPrelude = `${cssomRule.prefix} url("${cssomRule.namespaceURI}")`;
-      } else if (props.prelude === 'charset') {
-        cssomPrelude = `"${cssomRule.encoding}"`;
-      }
-
-      if (cssomPrelude) {
-        const parseOptions = props.atrule ? {
-          context: 'atrulePrelude',
-          atrule: props.atrule
-        } : {
-          context: 'selectorList'
-        };
-        rule.prelude = lib.toPlainObject(lib.parse(cssomPrelude, parseOptions));
-      } else {
-        rule.prelude = null;
-      }
-
-      if (props.block === 'style') {
-        const children = window.Array.from(cssomRule.style).reduce((children, longhand) => {
-          const property = preferredShorthand$1(longhand) || longhand;
-          children.set(property, {
-            type: 'Declaration',
-            important: Boolean(cssomRule.style.getPropertyPriority(property)),
-            property,
-            value: {
-              type: 'Raw',
-              value: cssomRule.style.getPropertyValue(property)
-            }
-          });
-          return children;
-        }, new window.Map());
-        rule.block = {
-          type: 'Block',
-          children: window.Array.from(children.values())
-        };
-      } else if (props.block === 'nested') {
-        rule.block = {
-          type: 'Block',
-          children: createAstFromCssom(cssomRule.cssRules)
-        };
-      } else {
-        rule.block = null;
-      }
-
-      return rule;
-    });
-  }
-
-  var createAstFromCssom_1 = createAstFromCssom;
-
-  function createAstFromTextContent(textContent) {
-    const textAst = lib.parse(textContent, {
-      context: 'stylesheet',
-      parseAtrulePrelude: true,
-      parseRulePrelude: true,
-      parseValue: false,
-      parseCustomProperty: false
-    }); // replace keyframe's key aliases
-
-    lib.walk(textAst, {
-      visit: 'TypeSelector',
-
-      enter(node, item) {
-        if (node.name === 'from') {
-          item.data = {
-            type: 'Percentage',
-            value: '0'
-          };
-        } else if (node.name === 'to') {
-          item.data = {
-            type: 'Percentage',
-            value: '100'
-          };
-        }
-      }
-
-    }); // unify urls in atrules
-
-    lib.walk(textAst, {
-      visit: 'AtrulePrelude',
-
-      enter(node) {
-        if (['import', 'namespace'].includes(this.atrule.name)) {
-          const children = node.children.toArray();
-          const urlIndex = node.name === 'import' ? 0 : children.length - 1;
-          const url = children[urlIndex];
-          let value;
-
-          if (url.type === 'String') {
-            value = url.value.slice(1, -1);
-          } else if (url.type === 'Url') {
-            if (url.value.type === 'String') {
-              value = url.value.value.slice(1, -1);
-            } else if (url.value.type === 'Raw') {
-              value = url.value.value;
-            }
-          }
-
-          if (value) {
-            children[urlIndex] = {
-              type: 'Url',
-              value: {
-                type: 'String',
-                value: `"${value}"`
-              }
-            };
-            node.children.fromArray(children);
-          }
-        }
-      }
-
-    });
-    return lib.toPlainObject(textAst);
-  }
-
-  var createAstFromTextContent_1 = createAstFromTextContent;
-
-  const {
-    isShorthandFor: isShorthandFor$1,
-    hasShorthandWithin: hasShorthandWithin$1
-  } = styleProperties;
-  const PROPERTY_ALIASES = {
-    'word-wrap': 'overflow-wrap',
-    clip: 'clip-path'
-  };
-
-  function mergeRules(textRules, cssomRules) {
-    let cursor = 0;
-    const mergedRules = [];
-    textRules.forEach(textRule => {
-      const rule = {};
-      rule.type = textRule.type;
-      rule.name = textRule.name;
-      rule.prelude = textRule.prelude;
-      rule.block = textRule.block;
-      const index = findRule(cssomRules, cursor, textRule);
-
-      if (index > cursor) {
-        forEach(cssomRules, cursor, index, cssomRule => mergedRules.push(cssomRule));
-      }
-
-      if (index >= 0) {
-        cursor = index + 1;
-
-        if (isNestedRule(textRule)) {
-          rule.block = {
-            type: 'Block',
-            children: mergeRules(textRule.block.children, cssomRules[index].block.children)
-          };
-        } else if (isStyleRule(textRule)) {
-          rule.block = {
-            type: 'Block',
-            children: mergeStyles(textRule.block.children, cssomRules[index].block.children)
-          };
-        }
-      }
-
-      mergedRules.push(rule);
-    }, []);
-
-    if (cursor < cssomRules.length) {
-      forEach(cssomRules, cursor, cssomRules.length, cssomRule => mergedRules.push(cssomRule));
-    }
-
-    return mergedRules;
-  }
-
-  function mergeStyles(textDeclarations, cssomDeclarations) {
-    const mergedProperties = new window.Map();
-    textDeclarations.forEach(({
-      type,
-      property,
-      important,
-      value: {
-        value
-      } = {}
-    }) => {
-      if (type !== 'Declaration') return;
-      let values = mergedProperties.get(property);
-
-      if (!values) {
-        values = new window.Map();
-        mergedProperties.set(property, values);
-      }
-
-      values.set(value, important);
-    });
-    cssomDeclarations.forEach(({
-      type,
-      property,
-      important,
-      value: {
-        value
-      } = {}
-    }) => {
-      if (type !== 'Declaration') return;
-      if (hasShorthandWithin$1(property, window.Array.from(mergedProperties.keys()))) return;
-      let values = mergedProperties.get(property);
-
-      if (!values) {
-        values = new window.Map();
-        mergedProperties.set(property, values);
-      } else if (!values.has(value)) {
-        values.clear();
-      } else if (values.get(value) !== important) {
-        values.forEach((_, value) => values.set(value, important));
-      }
-
-      values.set(value, important);
-    });
-    const mergedDeclarations = [];
-    mergedProperties.forEach((values, property) => {
-      values.forEach((important, value) => mergedDeclarations.push({
-        type: 'Declaration',
-        property,
-        value: {
-          type: 'Raw',
-          value
-        },
-        important
-      }));
-    });
-    return mergedDeclarations;
-  }
-
-  function comparePreludes(leftPrelude, rightPrelude) {
-    return !leftPrelude && !rightPrelude || leftPrelude.type === rightPrelude.type && compareChildren(leftPrelude.children, rightPrelude.children);
-  }
-
-  function compareChildren(leftChildren, rightChildren) {
-    if (!Array.isArray(leftChildren) && !Array.isArray(rightChildren)) {
-      return true;
-    } else {
-      return window.Array.isArray(leftChildren) && window.Array.isArray(rightChildren) && leftChildren.length === rightChildren.length && leftChildren.every((leftChild, index) => {
-        const rightChild = rightChildren[index];
-        return leftChild.type === rightChild.type && leftChild.name === rightChild.name && (leftChild.value === rightChild.value || leftChild.value.type === rightChild.value.type && leftChild.value.value === rightChild.value.value) && compareChildren(leftChild.children, rightChild.children);
-      });
-    }
-  }
-
-  function compareStyles(leftStyles, rightStyles) {
-    const relevantPropsCount = rightStyles.reduce((relevantPropsCount, rightDeclaration) => {
-      const matched = rightDeclaration.type === 'Declaration' && (isVendorProperty(rightDeclaration.property) || leftStyles.some(leftDeclaration => compareProperties(leftDeclaration.property, rightDeclaration.property)));
-      return relevantPropsCount + (matched ? 1 : 0);
-    }, 0);
-    return relevantPropsCount >= rightStyles.length;
-  }
-
-  function compareProperties(leftProperty, rightProperty) {
-    const explicifiedLeftProperty = PROPERTY_ALIASES[leftProperty] || leftProperty;
-    const explicifiedRightProperty = PROPERTY_ALIASES[rightProperty] || rightProperty;
-    return explicifiedLeftProperty === explicifiedRightProperty || isShorthandFor$1(explicifiedRightProperty, explicifiedLeftProperty) || isShorthandFor$1(explicifiedLeftProperty, explicifiedRightProperty);
-  }
-
-  function findRule(ruleSet, cursor, baseRule) {
-    return findIndex(ruleSet, cursor, rule => {
-      return rule.type === baseRule.type && rule.name === baseRule.name && comparePreludes(rule.prelude, baseRule.prelude) && (!isStyleRule(baseRule) || compareStyles(rule.block.children, baseRule.block.children));
-    });
-  }
-
-  function isVendorProperty(property) {
-    return /^(-\w+-)/.test(property);
-  }
-
-  function isStyleRule(rule) {
-    return rule.type === 'Rule' || /^(-\w+-)?(page|font-face)$/.test(rule.name);
-  }
-
-  function isNestedRule(rule) {
-    return rule.type === 'Atrule' && /^(-\w+-)?(media|supports|document|keyframes)$/.test(rule.name);
-  }
-
-  function findIndex(array, startIndex, comparator) {
-    for (let index = startIndex; index < array.length; ++index) {
-      if (comparator(array[index], index, array)) {
-        return index;
-      }
-    }
-
-    return -1;
-  }
-
-  function forEach(array, indexFrom, indexTo, callback) {
-    for (let index = indexFrom; index < indexTo; ++index) {
-      callback(array[index], index, array);
-    }
-  }
-
-  var mergeRules_1 = mergeRules;
-
-  var noop$4 = () => {};
-
-  function getElementAttrSelector(el) {
-    const attrString = window.Array.from(el.attributes).map(attr => {
-      if (attr.name === 'id') {
-        return `#${attr.value}`;
-      } else if (attr.name === 'class') {
-        return window.Array.from(el.classList).map(c => `.${c}`).join('');
-      } else {
-        return `[${attr.name}="${attr.value}"]`;
-      }
-    }).join('');
-    return `${el.nodeName}${attrString}`;
-  }
-
-  var getElementAttrSelector_1 = getElementAttrSelector;
-
-  function processInlineCss(styleNode, log = noop$4) {
-    log('[processInlineCss] processing inline css for', getElementAttrSelector_1(styleNode));
-
-    try {
-      const textContentAst = createAstFromTextContent_1(styleNode.textContent);
-      log('[processInlineCss] created AST for textContent');
-      const cssomAst = createAstFromCssom_1(styleNode.sheet.cssRules);
-      log('[processInlineCss] created AST for CSSOM');
-      const mergedRules = mergeRules_1(textContentAst.children, cssomAst);
-      log('[processInlineCss] merged AST');
-      const cssText = lib.generate(lib.fromPlainObject({
-        type: 'StyleSheet',
-        children: mergedRules
-      }));
-      log('[processInlineCss] generated cssText of length', cssText.length);
-      return cssText;
-    } catch (err) {
-      log('[processInlineCss] error while processing inline css:', err.message, err);
-      return styleNode.textContent;
-    }
-  }
-
-  var processInlineCss_1 = processInlineCss;
-
-  const NEED_MAP_INPUT_TYPES = new window.Set(['date', 'datetime-local', 'email', 'month', 'number', 'password', 'search', 'tel', 'text', 'time', 'url', 'week']);
-  const ON_EVENT_REGEX = /^on[a-z]+$/;
-
-  function domNodesToCdt(docNode, baseUrl, log = noop$4) {
-    const cdt = [{
-      nodeType: Node.DOCUMENT_NODE
-    }];
-    const docRoots = [docNode];
-    const canvasElements = [];
-    const inlineFrames = [];
-    cdt[0].childNodeIndexes = childrenFactory(cdt, docNode.childNodes);
-    return {
-      cdt,
-      docRoots,
-      canvasElements,
-      inlineFrames
-    };
-
-    function childrenFactory(cdt, elementNodes) {
-      if (!elementNodes || elementNodes.length === 0) return null;
-      const childIndexes = [];
-      window.Array.prototype.forEach.call(elementNodes, elementNode => {
-        const index = elementNodeFactory(cdt, elementNode);
-
-        if (index !== null) {
-          childIndexes.push(index);
-        }
-      });
-      return childIndexes;
-    }
-
-    function elementNodeFactory(cdt, elementNode) {
-      let node, manualChildNodeIndexes, dummyUrl;
-      const {
-        nodeType
-      } = elementNode;
-
-      if ([Node.ELEMENT_NODE, Node.DOCUMENT_FRAGMENT_NODE].includes(nodeType)) {
-        if (elementNode.nodeName !== 'SCRIPT') {
-          if (elementNode.nodeName === 'STYLE' && elementNode.sheet && elementNode.sheet.cssRules.length) {
-            cdt.push(getCssRulesNode(elementNode));
-            manualChildNodeIndexes = [cdt.length - 1];
-          }
-
-          if (elementNode.tagName === 'TEXTAREA' && elementNode.value !== elementNode.textContent) {
-            cdt.push(getTextContentNode(elementNode));
-            manualChildNodeIndexes = [cdt.length - 1];
-          }
-
-          node = getBasicNode(elementNode);
-          node.childNodeIndexes = manualChildNodeIndexes || (elementNode.childNodes.length ? childrenFactory(cdt, elementNode.childNodes) : []);
-
-          if (elementNode.shadowRoot) {
-            node.shadowRootIndex = elementNodeFactory(cdt, elementNode.shadowRoot);
-            docRoots.push(elementNode.shadowRoot);
-          }
-
-          if (elementNode.nodeName === 'CANVAS') {
-            dummyUrl = absolutizeUrl_1(`applitools-canvas-${uuid_1()}.png`, baseUrl);
-            node.attributes.push({
-              name: 'data-applitools-src',
-              value: dummyUrl
-            });
-            canvasElements.push({
-              element: elementNode,
-              url: dummyUrl
-            });
-          }
-
-          if (elementNode.nodeName === 'IFRAME' && isAccessibleFrame_1(elementNode) && isInlineFrame_1(elementNode)) {
-            dummyUrl = absolutizeUrl_1(`?applitools-iframe=${uuid_1()}`, baseUrl);
-            node.attributes.push({
-              name: 'data-applitools-src',
-              value: dummyUrl
-            });
-            inlineFrames.push({
-              element: elementNode,
-              url: dummyUrl
-            });
-          }
-        } else {
-          node = getScriptNode(elementNode);
-        }
-      } else if (nodeType === Node.TEXT_NODE) {
-        node = getTextNode(elementNode);
-      } else if (nodeType === Node.DOCUMENT_TYPE_NODE) {
-        node = getDocNode(elementNode);
-      }
-
-      if (node) {
-        cdt.push(node);
-        return cdt.length - 1;
-      } else {
-        return null;
-      }
-    }
-
-    function nodeAttributes({
-      attributes = {}
-    }) {
-      return window.Object.keys(attributes).filter(k => attributes[k] && attributes[k].name);
-    }
-
-    function getCssRulesNode(elementNode) {
-      return {
-        nodeType: Node.TEXT_NODE,
-        nodeValue: processInlineCss_1(elementNode, log)
-      };
-    }
-
-    function getTextContentNode(elementNode) {
-      return {
-        nodeType: Node.TEXT_NODE,
-        nodeValue: elementNode.value
-      };
-    }
-
-    function getBasicNode(elementNode) {
-      const node = {
-        nodeType: elementNode.nodeType,
-        nodeName: elementNode.nodeName,
-        attributes: nodeAttributes(elementNode).map(key => {
-          let value = elementNode.attributes[key].value;
-          const name = elementNode.attributes[key].name;
-
-          if (/^blob:/.test(value)) {
-            value = value.replace(/^blob:/, '');
-          } else if (ON_EVENT_REGEX.test(name)) {
-            value = '';
-          } else if (elementNode.nodeName === 'IFRAME' && isAccessibleFrame_1(elementNode) && name === 'src' && elementNode.contentDocument.location.href !== 'about:blank' && elementNode.contentDocument.location.href !== absolutizeUrl_1(value, elementNode.ownerDocument.location.href)) {
-            value = elementNode.contentDocument.location.href;
-          }
-
-          return {
-            name,
-            value
-          };
-        })
-      };
-
-      if (elementNode.tagName === 'INPUT' && ['checkbox', 'radio'].includes(elementNode.type)) {
-        if (elementNode.attributes.checked && !elementNode.checked) {
-          const idx = node.attributes.findIndex(a => a.name === 'checked');
-          node.attributes.splice(idx, 1);
-        }
-
-        if (!elementNode.attributes.checked && elementNode.checked) {
-          node.attributes.push({
-            name: 'checked'
-          });
-        }
-      }
-
-      if (elementNode.tagName === 'INPUT' && NEED_MAP_INPUT_TYPES.has(elementNode.type) && (elementNode.attributes.value && elementNode.attributes.value.value) !== elementNode.value) {
-        addOrUpdateAttribute(node.attributes, 'value', elementNode.value);
-      }
-
-      if (elementNode.tagName === 'OPTION' && elementNode.parentElement.selectedOptions && window.Array.from(elementNode.parentElement.selectedOptions).indexOf(elementNode) > -1) {
-        addOrUpdateAttribute(node.attributes, 'selected', '');
-      }
-
-      if (elementNode.tagName === 'STYLE' && elementNode.sheet && elementNode.sheet.disabled) {
-        node.attributes.push({
-          name: 'data-applitools-disabled',
-          value: ''
-        });
-      }
-
-      if (elementNode.tagName === 'LINK' && elementNode.type === 'text/css' && elementNode.sheet && elementNode.sheet.disabled) {
-        addOrUpdateAttribute(node.attributes, 'disabled', '');
-      }
-
-      return node;
-    }
-
-    function addOrUpdateAttribute(attributes, name, value) {
-      const nodeAttr = attributes.find(a => a.name === name);
-
-      if (nodeAttr) {
-        nodeAttr.value = value;
-      } else {
-        attributes.push({
-          name,
-          value
-        });
-      }
-    }
-
-    function getScriptNode(elementNode) {
-      return {
-        nodeType: Node.ELEMENT_NODE,
-        nodeName: 'SCRIPT',
-        attributes: nodeAttributes(elementNode).map(key => {
-          const name = elementNode.attributes[key].name;
-          const value = ON_EVENT_REGEX.test(name) ? '' : elementNode.attributes[key].value;
-          return {
-            name,
-            value
-          };
-        }).filter(attr => attr.name !== 'src'),
-        childNodeIndexes: []
-      };
-    }
-
-    function getTextNode(elementNode) {
-      return {
-        nodeType: Node.TEXT_NODE,
-        nodeValue: elementNode.nodeValue
-      };
-    }
-
-    function getDocNode(elementNode) {
-      return {
-        nodeType: Node.DOCUMENT_TYPE_NODE,
-        nodeName: elementNode.nodeName
-      };
-    }
-  }
-
-  var domNodesToCdt_1 = domNodesToCdt;
-
-  function uniq(arr) {
-    const result = [];
-    new window.Set(arr).forEach(v => v && result.push(v));
-    return result;
-  }
-
-  var uniq_1 = uniq;
-
-  function aggregateResourceUrlsAndBlobs(resourceUrlsAndBlobsArr) {
-    return resourceUrlsAndBlobsArr.reduce(({
-      resourceUrls: allResourceUrls,
-      blobsObj: allBlobsObj
-    }, {
-      resourceUrls,
-      blobsObj
-    }) => ({
-      resourceUrls: uniq_1(allResourceUrls.concat(resourceUrls)),
-      blobsObj: window.Object.assign(allBlobsObj, blobsObj)
-    }), {
-      resourceUrls: [],
-      blobsObj: {}
-    });
-  }
-
-  var aggregateResourceUrlsAndBlobs_1 = aggregateResourceUrlsAndBlobs;
-
-  function makeGetResourceUrlsAndBlobs({
-    processResource,
-    aggregateResourceUrlsAndBlobs
-  }) {
-    return function getResourceUrlsAndBlobs({
-      documents,
-      urls,
-      forceCreateStyle = false,
-      skipResources
-    }) {
-      return Promise.all(urls.map(url => processResource({
-        url,
-        documents,
-        getResourceUrlsAndBlobs,
-        forceCreateStyle,
-        skipResources
-      }))).then(resourceUrlsAndBlobsArr => aggregateResourceUrlsAndBlobs(resourceUrlsAndBlobsArr));
-    };
-  }
-
-  var getResourceUrlsAndBlobs = makeGetResourceUrlsAndBlobs;
-
-  function filterInlineUrl(absoluteUrl) {
-    return /^(blob|https?):/.test(absoluteUrl);
-  }
-
-  var filterInlineUrl_1 = filterInlineUrl;
-
-  function toUnAnchoredUri(url) {
-    const m = url && url.match(/(^[^#]*)/);
-    const res = m && m[1] || url;
-    return res && res.replace(/\?\s*$/, '?') || url;
-  }
-
-  var toUnAnchoredUri_1 = toUnAnchoredUri;
-
-  function flat(arr) {
-    return arr.reduce((flatArr, item) => flatArr.concat(item), []);
-  }
-
-  var flat_1 = flat;
-
-  function makeProcessResource({
-    fetchUrl,
-    findStyleSheetByUrl,
-    getCorsFreeStyleSheet,
-    extractResourcesFromStyleSheet,
-    extractResourcesFromSvg,
-    sessionCache,
-    cache = {},
-    log = noop$4
-  }) {
-    return function processResource({
-      url,
-      documents,
-      getResourceUrlsAndBlobs,
-      forceCreateStyle = false,
-      skipResources
-    }) {
-      if (!cache[url]) {
-        if (sessionCache && sessionCache.getItem(url)) {
-          const resourceUrls = getDependencies(url);
-          log('doProcessResource from sessionStorage', url, 'deps:', resourceUrls.slice(1));
-          cache[url] = Promise.resolve({
-            resourceUrls
-          });
-        } else if (skipResources && skipResources.indexOf(url) > -1 || /https:\/\/fonts.googleapis.com/.test(url)) {
-          log('not processing resource from skip list (or google font):', url);
-          cache[url] = Promise.resolve({
-            resourceUrls: [url]
-          });
-        } else {
-          const now = Date.now();
-          cache[url] = doProcessResource(url).then(result => {
-            log('doProcessResource', `[${Date.now() - now}ms]`, url);
-            return result;
-          });
-        }
-      }
-
-      return cache[url];
-
-      function doProcessResource(url) {
-        log('fetching', url);
-        const now = Date.now();
-        return fetchUrl(url).catch(e => {
-          if (probablyCORS(e)) {
-            return {
-              probablyCORS: true,
-              url
-            };
-          } else if (e.isTimeout) {
-            return {
-              isTimeout: true,
-              url
-            };
-          } else {
-            throw e;
-          }
-        }).then(({
-          url,
-          type,
-          value,
-          probablyCORS,
-          errorStatusCode,
-          isTimeout
-        }) => {
-          if (probablyCORS) {
-            log('not fetched due to CORS', `[${Date.now() - now}ms]`, url);
-            sessionCache && sessionCache.setItem(url, []);
-            return {
-              resourceUrls: [url]
-            };
-          }
-
-          if (errorStatusCode) {
-            const blobsObj = {
-              [url]: {
-                errorStatusCode
-              }
-            };
-            sessionCache && sessionCache.setItem(url, []);
-            return {
-              blobsObj
-            };
-          }
-
-          if (isTimeout) {
-            log('not fetched due to timeout, returning error status code 504 (Gateway timeout)');
-            sessionCache && sessionCache.setItem(url, []);
-            return {
-              blobsObj: {
-                [url]: {
-                  errorStatusCode: 504
-                }
-              }
-            };
-          }
-
-          log(`fetched [${Date.now() - now}ms] ${url} bytes: ${value.byteLength}`);
-          const thisBlob = {
-            [url]: {
-              type,
-              value
-            }
-          };
-          let dependentUrls;
-
-          if (/text\/css/.test(type)) {
-            let styleSheet = findStyleSheetByUrl(url, documents);
-
-            if (styleSheet || forceCreateStyle) {
-              const {
-                corsFreeStyleSheet,
-                cleanStyleSheet
-              } = getCorsFreeStyleSheet(value, styleSheet);
-              dependentUrls = extractResourcesFromStyleSheet(corsFreeStyleSheet);
-              cleanStyleSheet();
-            }
-          } else if (/image\/svg/.test(type)) {
-            try {
-              dependentUrls = extractResourcesFromSvg(value);
-              forceCreateStyle = !!dependentUrls;
-            } catch (e) {
-              log('could not parse svg content', e);
-            }
-          }
-
-          if (dependentUrls) {
-            const absoluteDependentUrls = dependentUrls.map(resourceUrl => absolutizeUrl_1(resourceUrl, url.replace(/^blob:/, ''))).map(toUnAnchoredUri_1).filter(filterInlineUrl_1);
-            sessionCache && sessionCache.setItem(url, absoluteDependentUrls);
-            return getResourceUrlsAndBlobs({
-              documents,
-              urls: absoluteDependentUrls,
-              forceCreateStyle,
-              skipResources
-            }).then(({
-              resourceUrls,
-              blobsObj
-            }) => ({
-              resourceUrls,
-              blobsObj: window.Object.assign(blobsObj, thisBlob)
-            }));
-          } else {
-            sessionCache && sessionCache.setItem(url, []);
-            return {
-              blobsObj: thisBlob
-            };
-          }
-        }).catch(err => {
-          log('error while fetching', url, err, err ? `message=${err.message} | name=${err.name}` : '');
-          sessionCache && clearFromSessionStorage();
-          return {};
-        });
-      }
-
-      function probablyCORS(err) {
-        const msg = err.message && (err.message.includes('Failed to fetch') || err.message.includes('Network request failed'));
-        const name = err.name && err.name.includes('TypeError');
-        return msg && name;
-      }
-
-      function getDependencies(url) {
-        const dependentUrls = sessionCache.getItem(url);
-        return [url].concat(dependentUrls ? uniq_1(flat_1(dependentUrls.map(getDependencies))) : []);
-      }
-
-      function clearFromSessionStorage() {
-        log('clearing from sessionStorage:', url);
-        sessionCache.keys().forEach(key => {
-          const dependentUrls = sessionCache.getItem(key);
-          sessionCache.setItem(key, dependentUrls.filter(dep => dep !== url));
-        });
-        log('cleared from sessionStorage:', url);
-      }
-    };
-  }
-
-  var processResource = makeProcessResource;
-
-  function getUrlFromCssText(cssText) {
-    const re = /url\((?!['"]?:)['"]?([^'")]*)['"]?\)/g;
-    const ret = [];
-    let result;
-
-    while ((result = re.exec(cssText)) !== null) {
-      ret.push(result[1]);
-    }
-
-    return ret;
-  }
-
-  var getUrlFromCssText_1 = getUrlFromCssText;
-
-  function makeExtractResourcesFromSvg({
-    parser,
-    decoder,
-    extractResourceUrlsFromStyleTags
-  }) {
-    return function (svgArrayBuffer) {
-      const decooder = decoder || new TextDecoder('utf-8');
-      const svgStr = decooder.decode(svgArrayBuffer);
-      const domparser = parser || new DOMParser();
-      const doc = domparser.parseFromString(svgStr, 'image/svg+xml');
-      const srcsetUrls = window.Array.from(doc.querySelectorAll('img[srcset]')).map(srcsetEl => srcsetEl.getAttribute('srcset').split(', ').map(str => str.trim().split(/\s+/)[0])).reduce((acc, urls) => acc.concat(urls), []);
-      const srcUrls = window.Array.from(doc.querySelectorAll('img[src]')).map(srcEl => srcEl.getAttribute('src'));
-      const fromHref = window.Array.from(doc.querySelectorAll('image,use,link[rel="stylesheet"]')).map(e => e.getAttribute('href') || e.getAttribute('xlink:href'));
-      const fromObjects = window.Array.from(doc.getElementsByTagName('object')).map(e => e.getAttribute('data'));
-      const fromStyleTags = extractResourceUrlsFromStyleTags(doc, false);
-      const fromStyleAttrs = urlsFromStyleAttrOfDoc(doc);
-      return srcsetUrls.concat(srcUrls).concat(fromHref).concat(fromObjects).concat(fromStyleTags).concat(fromStyleAttrs).filter(u => u[0] !== '#');
-    };
-  }
-
-  function urlsFromStyleAttrOfDoc(doc) {
-    return flat_1(window.Array.from(doc.querySelectorAll('*[style]')).map(e => e.style.cssText).map(getUrlFromCssText_1).filter(Boolean));
-  }
-
-  var makeExtractResourcesFromSvg_1 = makeExtractResourcesFromSvg;
-
-  function makeFetchUrl({
-    fetch = window.fetch,
-    AbortController = window.AbortController,
-    timeout = 10000
-  }) {
-    return function fetchUrl(url) {
-      // Why return a `new Promise` like this? Because people like Atlassian do horrible things.
-      // They monkey patched window.fetch, and made it so it throws a synchronous exception if the route is not well known.
-      // Returning a new Promise guarantees that `fetchUrl` is the async function that it declares to be.
-      return new Promise((resolve, reject) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          const err = new Error('fetchUrl timeout reached');
-          err.isTimeout = true;
-          reject(err);
-          controller.abort();
-        }, timeout);
-        return fetch(url, {
-          cache: 'force-cache',
-          credentials: 'same-origin',
-          signal: controller.signal
-        }).then(resp => {
-          clearTimeout(timeoutId);
-
-          if (resp.status === 200) {
-            return resp.arrayBuffer().then(buff => ({
-              url,
-              type: resp.headers.get('Content-Type'),
-              value: buff
-            }));
-          } else {
-            return {
-              url,
-              errorStatusCode: resp.status
-            };
-          }
-        }).then(resolve).catch(err => reject(err));
-      });
-    };
-  }
-
-  var fetchUrl = makeFetchUrl;
-
-  function sanitizeAuthUrl(urlStr) {
-    const url = new URL(urlStr);
-
-    if (url.username) {
-      url.username = '';
-    }
-
-    if (url.password) {
-      url.password = '';
-    }
-
-    return url.href;
-  }
-
-  var sanitizeAuthUrl_1 = sanitizeAuthUrl;
-
-  function makeFindStyleSheetByUrl({
-    styleSheetCache
-  }) {
-    return function findStyleSheetByUrl(url, documents) {
-      const allStylesheets = flat_1(documents.map(d => {
-        try {
-          return window.Array.from(d.styleSheets);
-        } catch (_e) {
-          // A 'fake' documnetFragment doesn't have styleSheets
-          return [];
-        }
-      }));
-      return styleSheetCache[url] || allStylesheets.find(styleSheet => {
-        const styleUrl = styleSheet.href && toUnAnchoredUri_1(styleSheet.href);
-        return styleUrl && sanitizeAuthUrl_1(styleUrl) === url;
-      });
-    };
-  }
-
-  var findStyleSheetByUrl = makeFindStyleSheetByUrl;
-
-  function makeExtractResourcesFromStyleSheet({
-    styleSheetCache,
-    CSSRule = window.CSSRule
-  }) {
-    return function extractResourcesFromStyleSheet(styleSheet) {
-      const urls = uniq_1(window.Array.from(styleSheet.cssRules || []).reduce((acc, rule) => {
-        const getRuleUrls = {
-          [CSSRule.IMPORT_RULE]: () => {
-            if (rule.styleSheet) {
-              styleSheetCache[rule.styleSheet.href] = rule.styleSheet;
-            }
-
-            return rule.href;
-          },
-          [CSSRule.FONT_FACE_RULE]: () => getUrlFromCssText_1(rule.cssText),
-          [CSSRule.SUPPORTS_RULE]: () => extractResourcesFromStyleSheet(rule),
-          [CSSRule.MEDIA_RULE]: () => extractResourcesFromStyleSheet(rule),
-          [CSSRule.STYLE_RULE]: () => {
-            let rv = [];
-
-            for (let i = 0, ii = rule.style.length; i < ii; i++) {
-              const urls = getUrlFromCssText_1(rule.style.getPropertyValue(rule.style[i]));
-              rv = rv.concat(urls);
-            }
-
-            return rv;
-          }
-        }[rule.type];
-        const urls = getRuleUrls && getRuleUrls() || [];
-        return acc.concat(urls);
-      }, []));
-      return urls.filter(u => u[0] !== '#');
-    };
-  }
-
-  var extractResourcesFromStyleSheet = makeExtractResourcesFromStyleSheet;
-
-  function extractResourceUrlsFromStyleAttrs(cdt) {
-    return cdt.reduce((acc, node) => {
-      if (node.nodeType === 1) {
-        const styleAttr = node.attributes && node.attributes.find(attr => attr.name.toUpperCase() === 'STYLE');
-        if (styleAttr) acc = acc.concat(getUrlFromCssText_1(styleAttr.value));
-      }
-
-      return acc;
-    }, []);
-  }
-
-  var extractResourceUrlsFromStyleAttrs_1 = extractResourceUrlsFromStyleAttrs;
-
-  function makeExtractResourceUrlsFromStyleTags(extractResourcesFromStyleSheet) {
-    return function extractResourceUrlsFromStyleTags(doc, onlyDocStylesheet = true) {
-      return uniq_1(window.Array.from(doc.querySelectorAll('style')).reduce((resourceUrls, styleEl) => {
-        const styleSheet = onlyDocStylesheet ? window.Array.from(doc.styleSheets).find(styleSheet => styleSheet.ownerNode === styleEl) : styleEl.sheet;
-        return styleSheet ? resourceUrls.concat(extractResourcesFromStyleSheet(styleSheet)) : resourceUrls;
-      }, []));
-    };
-  }
-
-  var extractResourceUrlsFromStyleTags = makeExtractResourceUrlsFromStyleTags;
-
-  function createTempStylsheet(cssArrayBuffer) {
-    const cssText = new TextDecoder('utf-8').decode(cssArrayBuffer);
-    const head = document.head || document.querySelectorAll('head')[0];
-    const style = document.createElement('style');
-    style.type = 'text/css';
-    style.setAttribute('data-desc', 'Applitools tmp variable created by DOM SNAPSHOT');
-    head.appendChild(style); // This is required for IE8 and below.
-
-    if (style.styleSheet) {
-      style.styleSheet.cssText = cssText;
-    } else {
-      style.appendChild(document.createTextNode(cssText));
-    }
-
-    return style.sheet;
-  }
-
-  var createTempStyleSheet = createTempStylsheet;
-
-  function getCorsFreeStyleSheet(cssArrayBuffer, styleSheet, log = noop$4) {
-    let corsFreeStyleSheet;
-
-    if (styleSheet) {
-      try {
-        styleSheet.cssRules;
-        corsFreeStyleSheet = styleSheet;
-      } catch (e) {
-        log(`[dom-snapshot] could not access cssRules for ${styleSheet.href} ${e}\ncreating temp style for access.`);
-        corsFreeStyleSheet = createTempStyleSheet(cssArrayBuffer);
-      }
-    } else {
-      corsFreeStyleSheet = createTempStyleSheet(cssArrayBuffer);
-    }
-
-    return {
-      corsFreeStyleSheet,
-      cleanStyleSheet
-    };
-
-    function cleanStyleSheet() {
-      if (corsFreeStyleSheet !== styleSheet) {
-        corsFreeStyleSheet.ownerNode.parentNode.removeChild(corsFreeStyleSheet.ownerNode);
-      }
-    }
-  }
-
-  var getCorsFreeStyleSheet_1 = getCorsFreeStyleSheet;
-
-  function base64ToArrayBuffer(base64) {
-    var binary_string = window.atob(base64);
-    var len = binary_string.length;
-    var bytes = new Uint8Array(len);
-
-    for (var i = 0; i < len; i++) {
-      bytes[i] = binary_string.charCodeAt(i);
-    }
-
-    return bytes.buffer;
-  }
-
-  var base64ToArrayBuffer_1 = base64ToArrayBuffer;
-
-  function buildCanvasBlobs(canvasElements) {
-    return canvasElements.map(({
-      url,
-      element
-    }) => {
-      const data = element.toDataURL('image/png');
-      const value = base64ToArrayBuffer_1(data.split(',')[1]);
-      return {
-        url,
-        type: 'image/png',
-        value
-      };
-    });
-  }
-
-  var buildCanvasBlobs_1 = buildCanvasBlobs;
-
-  function extractFrames(documents = [document]) {
-    const iframes = flat_1(documents.map(d => window.Array.from(d.querySelectorAll('iframe[src]:not([src=""]),iframe[srcdoc]:not([srcdoc=""])'))));
-    return iframes.filter(f => isAccessibleFrame_1(f) && !isInlineFrame_1(f)).map(f => f.contentDocument);
-  }
-
-  var extractFrames_1 = extractFrames;
-
-  const getBaesUrl = function (doc) {
-    const baseUrl = doc.querySelectorAll('base')[0] && doc.querySelectorAll('base')[0].href;
-
-    if (baseUrl && isUrl(baseUrl)) {
-      return baseUrl;
-    }
-  };
-
-  function isUrl(url) {
-    return url && !/^(about:blank|javascript:void|blob:)/.test(url);
-  }
-
-  var getBaseUrl = getBaesUrl;
-
-  function toUriEncoding(url) {
-    const result = url && url.replace(/(\\[0-9a-fA-F]{1,6}\s?)/g, s => {
-      const int = parseInt(s.substr(1).trim(), 16);
-      return String.fromCodePoint(int);
-    }) || url;
-    return result;
-  }
-
-  var toUriEncoding_1 = toUriEncoding;
-
-  function makeLog(referenceTime) {
-    return function log() {
-      const args = ['[dom-snapshot]', `[+${Date.now() - referenceTime}ms]`].concat(window.Array.from(arguments));
-      console.log.apply(console, args);
-    };
-  }
-
-  var log = makeLog;
-
-  const RESOURCE_STORAGE_KEY = '__process_resource';
-
-  function makeSessionCache({
-    log,
-    sessionStorage
-  }) {
-    let sessionStorageCache;
-
-    try {
-      sessionStorage = sessionStorage || window.sessionStorage;
-      const sessionStorageCacheStr = sessionStorage.getItem(RESOURCE_STORAGE_KEY);
-      sessionStorageCache = sessionStorageCacheStr ? JSON.parse(sessionStorageCacheStr) : {};
-    } catch (ex) {
-      log('error creating session cache', ex);
-    }
-
-    return {
-      getItem,
-      setItem,
-      keys,
-      persist
-    };
-
-    function getItem(key) {
-      if (sessionStorageCache) {
-        return sessionStorageCache[key];
-      }
-    }
-
-    function setItem(key, value) {
-      if (sessionStorageCache) {
-        log('saving to in-memory sessionStorage, key:', key, 'value:', value);
-        sessionStorageCache[key] = value;
-      }
-    }
-
-    function keys() {
-      if (sessionStorageCache) {
-        return window.Object.keys(sessionStorageCache);
-      } else {
-        return [];
-      }
-    }
-
-    function persist() {
-      if (sessionStorageCache) {
-        sessionStorage.setItem(RESOURCE_STORAGE_KEY, JSON.stringify(sessionStorageCache));
-      }
-    }
-  }
-
-  var sessionCache = makeSessionCache;
-
-  function processPage(doc = document, {
-    showLogs,
-    useSessionCache,
-    dontFetchResources,
-    fetchTimeout,
-    skipResources
-  } = {}) {
-    /* MARKER FOR TEST - DO NOT DELETE */
-    const log$1 = showLogs ? log(Date.now()) : noop$4;
-    log$1('processPage start');
-    log$1(`skipResources length: ${skipResources && skipResources.length}`);
-    const sessionCache$1 = useSessionCache && sessionCache({
-      log: log$1
-    });
-    const styleSheetCache = {};
-    const extractResourcesFromStyleSheet$1 = extractResourcesFromStyleSheet({
-      styleSheetCache
-    });
-    const findStyleSheetByUrl$1 = findStyleSheetByUrl({
-      styleSheetCache
-    });
-    const extractResourceUrlsFromStyleTags$1 = extractResourceUrlsFromStyleTags(extractResourcesFromStyleSheet$1);
-    const extractResourcesFromSvg = makeExtractResourcesFromSvg_1({
-      extractResourceUrlsFromStyleTags: extractResourceUrlsFromStyleTags$1
-    });
-    const fetchUrl$1 = fetchUrl({
-      timeout: fetchTimeout
-    });
-    const processResource$1 = processResource({
-      fetchUrl: fetchUrl$1,
-      findStyleSheetByUrl: findStyleSheetByUrl$1,
-      getCorsFreeStyleSheet: getCorsFreeStyleSheet_1,
-      extractResourcesFromStyleSheet: extractResourcesFromStyleSheet$1,
-      extractResourcesFromSvg,
-      absolutizeUrl: absolutizeUrl_1,
-      log: log$1,
-      sessionCache: sessionCache$1
-    });
-    const getResourceUrlsAndBlobs$1 = getResourceUrlsAndBlobs({
-      processResource: processResource$1,
-      aggregateResourceUrlsAndBlobs: aggregateResourceUrlsAndBlobs_1
-    });
-    return doProcessPage(doc).then(result => {
-      log$1('processPage end');
-      result.scriptVersion = 'DOM_SNAPSHOT_SCRIPT_VERSION_TO_BE_REPLACED';
-      return result;
-    });
-
-    function doProcessPage(doc, pageUrl = doc.location.href) {
-      const baseUrl = getBaseUrl(doc) || pageUrl;
-      const {
-        cdt,
-        docRoots,
-        canvasElements,
-        inlineFrames
-      } = domNodesToCdt_1(doc, baseUrl, log$1);
-      const linkUrls = flat_1(docRoots.map(extractLinks_1));
-      const styleTagUrls = flat_1(docRoots.map(extractResourceUrlsFromStyleTags$1));
-      const absolutizeThisUrl = getAbsolutizeByUrl(baseUrl);
-      const urls = uniq_1(window.Array.from(linkUrls).concat(window.Array.from(styleTagUrls)).concat(extractResourceUrlsFromStyleAttrs_1(cdt))).map(toUriEncoding_1).map(absolutizeThisUrl).map(toUnAnchoredUri_1).filter(filterInlineUrlsIfExisting);
-      const resourceUrlsAndBlobsPromise = dontFetchResources ? Promise.resolve({
-        resourceUrls: urls,
-        blobsObj: {}
-      }) : getResourceUrlsAndBlobs$1({
-        documents: docRoots,
-        urls,
-        skipResources
-      }).then(result => {
-        sessionCache$1 && sessionCache$1.persist();
-        return result;
-      });
-      const canvasBlobs = buildCanvasBlobs_1(canvasElements);
-      const frameDocs = extractFrames_1(docRoots);
-      const processFramesPromise = frameDocs.map(f => doProcessPage(f));
-      const processInlineFramesPromise = inlineFrames.map(({
-        element,
-        url
-      }) => doProcessPage(element.contentDocument, url));
-      const srcAttr = doc.defaultView && doc.defaultView.frameElement && doc.defaultView.frameElement.getAttribute('src');
-      return Promise.all([resourceUrlsAndBlobsPromise].concat(processFramesPromise).concat(processInlineFramesPromise)).then(function (resultsWithFrameResults) {
-        const {
-          resourceUrls,
-          blobsObj
-        } = resultsWithFrameResults[0];
-        const framesResults = resultsWithFrameResults.slice(1);
-        return {
-          cdt,
-          url: pageUrl,
-          srcAttr,
-          resourceUrls: resourceUrls.map(url => url.replace(/^blob:/, '')),
-          blobs: blobsObjToArray(blobsObj).concat(canvasBlobs),
-          frames: framesResults
-        };
-      });
-    }
-  }
-
-  function getAbsolutizeByUrl(url) {
-    return function (someUrl) {
-      try {
-        return absolutizeUrl_1(someUrl, url);
-      } catch (err) {// can't do anything with a non-absolute url
-      }
-    };
-  }
-
-  function blobsObjToArray(blobsObj) {
-    return window.Object.keys(blobsObj).map(blobUrl => window.Object.assign({
-      url: blobUrl.replace(/^blob:/, '')
-    }, blobsObj[blobUrl]));
-  }
-
-  function filterInlineUrlsIfExisting(absoluteUrl) {
-    return absoluteUrl && filterInlineUrl_1(absoluteUrl);
-  }
-
-  var processPage_1 = processPage;
-
-  function processPageAndSerialize() {
-    return processPage_1.apply(this, arguments).then(serializeFrame);
-  }
-
-  function serializeFrame(frame) {
-    frame.blobs = frame.blobs.map(blob => blob.value ? window.Object.assign(blob, {
-      value: arrayBufferToBase64_1(blob.value)
-    }) : blob);
-    frame.frames.forEach(serializeFrame);
-    return frame;
-  }
-
-  var processPageAndSerialize_1 = processPageAndSerialize;
-
-  return processPageAndSerialize_1;
+	'use strict';
+
+	/* @applitools/dom-snapshot@4.0.4 */
+
+	var e = function (e) {
+	  const t = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".split(""),
+	        n = new Uint8Array(e),
+	        r = n.length,
+	        o = r % 3,
+	        a = [];
+	  let i;
+
+	  for (let e = 0, t = r - o; e < t; e += 16383) a.push(s(e, e + 16383 > t ? t : e + 16383));
+
+	  return 1 === o ? (i = n[r - 1], a.push(t[i >> 2] + t[i << 4 & 63] + "==")) : 2 === o && (i = (n[r - 2] << 8) + n[r - 1], a.push(t[i >> 10] + t[i >> 4 & 63] + t[i << 2 & 63] + "=")), a.join("");
+
+	  function s(e, r) {
+	    let o;
+	    const a = [];
+
+	    for (let s = e; s < r; s += 3) o = (n[s] << 16 & 16711680) + (n[s + 1] << 8 & 65280) + (255 & n[s + 2]), a.push(t[(i = o) >> 18 & 63] + t[i >> 12 & 63] + t[i >> 6 & 63] + t[63 & i]);
+
+	    var i;
+	    return a.join("");
+	  }
+	};
+
+	var t = function () {
+	  return window.crypto.getRandomValues(new Uint32Array(1))[0];
+	};
+
+	var n = function (e) {
+	  return !/^https?:.+/.test(e.src) || e.contentDocument && e.contentDocument.location && ["about:blank", "about:srcdoc"].includes(e.contentDocument.location.href);
+	};
+
+	var r = function (e) {
+	  try {
+	    const t = e.contentDocument;
+	    return Boolean(t && t.defaultView && t.defaultView.frameElement);
+	  } catch (e) {}
+	};
+
+	var o = function (e, t) {
+	  return new URL(e, t).href;
+	};
+
+	function a(e) {
+	  return {
+	    prev: null,
+	    next: null,
+	    data: e
+	  };
+	}
+
+	function i(e, t, n) {
+	  var r;
+	  return null !== l ? (r = l, l = l.cursor, r.prev = t, r.next = n, r.cursor = e.cursor) : r = {
+	    prev: t,
+	    next: n,
+	    cursor: e.cursor
+	  }, e.cursor = r, r;
+	}
+
+	function s(e) {
+	  var t = e.cursor;
+	  e.cursor = t.cursor, t.prev = null, t.next = null, t.cursor = l, l = t;
+	}
+
+	var l = null,
+	    c = function () {
+	  this.cursor = null, this.head = null, this.tail = null;
+	};
+
+	c.createItem = a, c.prototype.createItem = a, c.prototype.updateCursors = function (e, t, n, r) {
+	  for (var o = this.cursor; null !== o;) o.prev === e && (o.prev = t), o.next === n && (o.next = r), o = o.cursor;
+	}, c.prototype.getSize = function () {
+	  for (var e = 0, t = this.head; t;) e++, t = t.next;
+
+	  return e;
+	}, c.prototype.fromArray = function (e) {
+	  var t = null;
+	  this.head = null;
+
+	  for (var n = 0; n < e.length; n++) {
+	    var r = a(e[n]);
+	    null !== t ? t.next = r : this.head = r, r.prev = t, t = r;
+	  }
+
+	  return this.tail = t, this;
+	}, c.prototype.toArray = function () {
+	  for (var e = this.head, t = []; e;) t.push(e.data), e = e.next;
+
+	  return t;
+	}, c.prototype.toJSON = c.prototype.toArray, c.prototype.isEmpty = function () {
+	  return null === this.head;
+	}, c.prototype.first = function () {
+	  return this.head && this.head.data;
+	}, c.prototype.last = function () {
+	  return this.tail && this.tail.data;
+	}, c.prototype.each = function (e, t) {
+	  var n;
+	  void 0 === t && (t = this);
+
+	  for (var r = i(this, null, this.head); null !== r.next;) n = r.next, r.next = n.next, e.call(t, n.data, n, this);
+
+	  s(this);
+	}, c.prototype.forEach = c.prototype.each, c.prototype.eachRight = function (e, t) {
+	  var n;
+	  void 0 === t && (t = this);
+
+	  for (var r = i(this, this.tail, null); null !== r.prev;) n = r.prev, r.prev = n.prev, e.call(t, n.data, n, this);
+
+	  s(this);
+	}, c.prototype.forEachRight = c.prototype.eachRight, c.prototype.nextUntil = function (e, t, n) {
+	  if (null !== e) {
+	    var r;
+	    void 0 === n && (n = this);
+
+	    for (var o = i(this, null, e); null !== o.next && (r = o.next, o.next = r.next, !t.call(n, r.data, r, this)););
+
+	    s(this);
+	  }
+	}, c.prototype.prevUntil = function (e, t, n) {
+	  if (null !== e) {
+	    var r;
+	    void 0 === n && (n = this);
+
+	    for (var o = i(this, e, null); null !== o.prev && (r = o.prev, o.prev = r.prev, !t.call(n, r.data, r, this)););
+
+	    s(this);
+	  }
+	}, c.prototype.some = function (e, t) {
+	  var n = this.head;
+
+	  for (void 0 === t && (t = this); null !== n;) {
+	    if (e.call(t, n.data, n, this)) return !0;
+	    n = n.next;
+	  }
+
+	  return !1;
+	}, c.prototype.map = function (e, t) {
+	  var n = new c(),
+	      r = this.head;
+
+	  for (void 0 === t && (t = this); null !== r;) n.appendData(e.call(t, r.data, r, this)), r = r.next;
+
+	  return n;
+	}, c.prototype.filter = function (e, t) {
+	  var n = new c(),
+	      r = this.head;
+
+	  for (void 0 === t && (t = this); null !== r;) e.call(t, r.data, r, this) && n.appendData(r.data), r = r.next;
+
+	  return n;
+	}, c.prototype.clear = function () {
+	  this.head = null, this.tail = null;
+	}, c.prototype.copy = function () {
+	  for (var e = new c(), t = this.head; null !== t;) e.insert(a(t.data)), t = t.next;
+
+	  return e;
+	}, c.prototype.prepend = function (e) {
+	  return this.updateCursors(null, e, this.head, e), null !== this.head ? (this.head.prev = e, e.next = this.head) : this.tail = e, this.head = e, this;
+	}, c.prototype.prependData = function (e) {
+	  return this.prepend(a(e));
+	}, c.prototype.append = function (e) {
+	  return this.insert(e);
+	}, c.prototype.appendData = function (e) {
+	  return this.insert(a(e));
+	}, c.prototype.insert = function (e, t) {
+	  if (null != t) {
+	    if (this.updateCursors(t.prev, e, t, e), null === t.prev) {
+	      if (this.head !== t) throw new Error("before doesn't belong to list");
+	      this.head = e, t.prev = e, e.next = t, this.updateCursors(null, e);
+	    } else t.prev.next = e, e.prev = t.prev, t.prev = e, e.next = t;
+	  } else this.updateCursors(this.tail, e, null, e), null !== this.tail ? (this.tail.next = e, e.prev = this.tail) : this.head = e, this.tail = e;
+	  return this;
+	}, c.prototype.insertData = function (e, t) {
+	  return this.insert(a(e), t);
+	}, c.prototype.remove = function (e) {
+	  if (this.updateCursors(e, e.prev, e, e.next), null !== e.prev) e.prev.next = e.next;else {
+	    if (this.head !== e) throw new Error("item doesn't belong to list");
+	    this.head = e.next;
+	  }
+	  if (null !== e.next) e.next.prev = e.prev;else {
+	    if (this.tail !== e) throw new Error("item doesn't belong to list");
+	    this.tail = e.prev;
+	  }
+	  return e.prev = null, e.next = null, e;
+	}, c.prototype.push = function (e) {
+	  this.insert(a(e));
+	}, c.prototype.pop = function () {
+	  if (null !== this.tail) return this.remove(this.tail);
+	}, c.prototype.unshift = function (e) {
+	  this.prepend(a(e));
+	}, c.prototype.shift = function () {
+	  if (null !== this.head) return this.remove(this.head);
+	}, c.prototype.prependList = function (e) {
+	  return this.insertList(e, this.head);
+	}, c.prototype.appendList = function (e) {
+	  return this.insertList(e);
+	}, c.prototype.insertList = function (e, t) {
+	  return null === e.head || (null != t ? (this.updateCursors(t.prev, e.tail, t, e.head), null !== t.prev ? (t.prev.next = e.head, e.head.prev = t.prev) : this.head = e.head, t.prev = e.tail, e.tail.next = t) : (this.updateCursors(this.tail, e.tail, null, e.head), null !== this.tail ? (this.tail.next = e.head, e.head.prev = this.tail) : this.head = e.head, this.tail = e.tail), e.head = null, e.tail = null), this;
+	}, c.prototype.replace = function (e, t) {
+	  "head" in t ? this.insertList(t, e) : this.insert(t, e), this.remove(e);
+	};
+
+	var u = c,
+	    h = function (e, t) {
+	  var n = window.Object.create(SyntaxError.prototype),
+	      r = new Error();
+	  return n.name = e, n.message = t, window.Object.defineProperty(n, "stack", {
+	    get: function () {
+	      return (r.stack || "").replace(/^(.+\n){1,3}/, e + ": " + t + "\n");
+	    }
+	  }), n;
+	};
+
+	function d(e, t) {
+	  function n(e, t) {
+	    return r.slice(e, t).map(function (t, n) {
+	      for (var r = String(e + n + 1); r.length < l;) r = " " + r;
+
+	      return r + " |" + t;
+	    }).join("\n");
+	  }
+
+	  var r = e.source.split(/\r\n?|\n|\f/),
+	      o = e.line,
+	      a = e.column,
+	      i = Math.max(1, o - t) - 1,
+	      s = Math.min(o + t, r.length + 1),
+	      l = Math.max(4, String(s).length) + 1,
+	      c = 0;
+	  (a += ("    ".length - 1) * (r[o - 1].substr(0, a - 1).match(/\t/g) || []).length) > 100 && (c = a - 60 + 3, a = 58);
+
+	  for (var u = i; u <= s; u++) u >= 0 && u < r.length && (r[u] = r[u].replace(/\t/g, "    "), r[u] = (c > 0 && r[u].length > c ? "…" : "") + r[u].substr(c, 98) + (r[u].length > c + 100 - 1 ? "…" : ""));
+
+	  return [n(i, o), new window.Array(a + l + 2).join("-") + "^", n(o, s)].filter(Boolean).join("\n");
+	}
+
+	var p = function (e, t, n, r, o) {
+	  var a = h("SyntaxError", e);
+	  return a.source = t, a.offset = n, a.line = r, a.column = o, a.sourceFragment = function (e) {
+	    return d(a, isNaN(e) ? 0 : e);
+	  }, window.Object.defineProperty(a, "formattedMessage", {
+	    get: function () {
+	      return "Parse error: " + a.message + "\n" + d(a, 2);
+	    }
+	  }), a.parseError = {
+	    offset: n,
+	    line: r,
+	    column: o
+	  }, a;
+	},
+	    m = {
+	  EOF: 0,
+	  Ident: 1,
+	  Function: 2,
+	  AtKeyword: 3,
+	  Hash: 4,
+	  String: 5,
+	  BadString: 6,
+	  Url: 7,
+	  BadUrl: 8,
+	  Delim: 9,
+	  Number: 10,
+	  Percentage: 11,
+	  Dimension: 12,
+	  WhiteSpace: 13,
+	  CDO: 14,
+	  CDC: 15,
+	  Colon: 16,
+	  Semicolon: 17,
+	  Comma: 18,
+	  LeftSquareBracket: 19,
+	  RightSquareBracket: 20,
+	  LeftParenthesis: 21,
+	  RightParenthesis: 22,
+	  LeftCurlyBracket: 23,
+	  RightCurlyBracket: 24,
+	  Comment: 25
+	},
+	    f = window.Object.keys(m).reduce(function (e, t) {
+	  return e[m[t]] = t, e;
+	}, {}),
+	    g = {
+	  TYPE: m,
+	  NAME: f
+	};
+
+	function b(e) {
+	  return e >= 48 && e <= 57;
+	}
+
+	function y(e) {
+	  return e >= 65 && e <= 90;
+	}
+
+	function k(e) {
+	  return e >= 97 && e <= 122;
+	}
+
+	function v(e) {
+	  return y(e) || k(e);
+	}
+
+	function w(e) {
+	  return e >= 128;
+	}
+
+	function x(e) {
+	  return v(e) || w(e) || 95 === e;
+	}
+
+	function S(e) {
+	  return e >= 0 && e <= 8 || 11 === e || e >= 14 && e <= 31 || 127 === e;
+	}
+
+	function C(e) {
+	  return 10 === e || 13 === e || 12 === e;
+	}
+
+	function A(e) {
+	  return C(e) || 32 === e || 9 === e;
+	}
+
+	function T(e, t) {
+	  return 92 === e && !C(t) && 0 !== t;
+	}
+
+	var z = new window.Array(128);
+	E.Eof = 128, E.WhiteSpace = 130, E.Digit = 131, E.NameStart = 132, E.NonPrintable = 133;
+
+	for (var P = 0; P < z.length; P++) switch (!0) {
+	  case A(P):
+	    z[P] = E.WhiteSpace;
+	    break;
+
+	  case b(P):
+	    z[P] = E.Digit;
+	    break;
+
+	  case x(P):
+	    z[P] = E.NameStart;
+	    break;
+
+	  case S(P):
+	    z[P] = E.NonPrintable;
+	    break;
+
+	  default:
+	    z[P] = P || E.Eof;
+	}
+
+	function E(e) {
+	  return e < 128 ? z[e] : E.NameStart;
+	}
+
+	var L = {
+	  isDigit: b,
+	  isHexDigit: function (e) {
+	    return b(e) || e >= 65 && e <= 70 || e >= 97 && e <= 102;
+	  },
+	  isUppercaseLetter: y,
+	  isLowercaseLetter: k,
+	  isLetter: v,
+	  isNonAscii: w,
+	  isNameStart: x,
+	  isName: function (e) {
+	    return x(e) || b(e) || 45 === e;
+	  },
+	  isNonPrintable: S,
+	  isNewline: C,
+	  isWhiteSpace: A,
+	  isValidEscape: T,
+	  isIdentifierStart: function (e, t, n) {
+	    return 45 === e ? x(t) || 45 === t || T(t, n) : !!x(e) || 92 === e && T(e, t);
+	  },
+	  isNumberStart: function (e, t, n) {
+	    return 43 === e || 45 === e ? b(t) ? 2 : 46 === t && b(n) ? 3 : 0 : 46 === e ? b(t) ? 2 : 0 : b(e) ? 1 : 0;
+	  },
+	  isBOM: function (e) {
+	    return 65279 === e || 65534 === e ? 1 : 0;
+	  },
+	  charCodeCategory: E
+	},
+	    O = L.isDigit,
+	    D = L.isHexDigit,
+	    N = L.isUppercaseLetter,
+	    R = L.isName,
+	    I = L.isWhiteSpace,
+	    B = L.isValidEscape;
+
+	function M(e, t) {
+	  return t < e.length ? e.charCodeAt(t) : 0;
+	}
+
+	function j(e, t, n) {
+	  return 13 === n && 10 === M(e, t + 1) ? 2 : 1;
+	}
+
+	function _(e, t, n) {
+	  var r = e.charCodeAt(t);
+	  return N(r) && (r |= 32), r === n;
+	}
+
+	function F(e, t) {
+	  for (; t < e.length && O(e.charCodeAt(t)); t++);
+
+	  return t;
+	}
+
+	function U(e, t) {
+	  if (D(M(e, (t += 2) - 1))) {
+	    for (var n = Math.min(e.length, t + 5); t < n && D(M(e, t)); t++);
+
+	    var r = M(e, t);
+	    I(r) && (t += j(e, t, r));
+	  }
+
+	  return t;
+	}
+
+	var q = {
+	  consumeEscaped: U,
+	  consumeName: function (e, t) {
+	    for (; t < e.length; t++) {
+	      var n = e.charCodeAt(t);
+
+	      if (!R(n)) {
+	        if (!B(n, M(e, t + 1))) break;
+	        t = U(e, t) - 1;
+	      }
+	    }
+
+	    return t;
+	  },
+	  consumeNumber: function (e, t) {
+	    var n = e.charCodeAt(t);
+
+	    if (43 !== n && 45 !== n || (n = e.charCodeAt(t += 1)), O(n) && (t = F(e, t + 1), n = e.charCodeAt(t)), 46 === n && O(e.charCodeAt(t + 1)) && (n = e.charCodeAt(t += 2), t = F(e, t)), _(e, t, 101)) {
+	      var r = 0;
+	      45 !== (n = e.charCodeAt(t + 1)) && 43 !== n || (r = 1, n = e.charCodeAt(t + 2)), O(n) && (t = F(e, t + 1 + r + 1));
+	    }
+
+	    return t;
+	  },
+	  consumeBadUrlRemnants: function (e, t) {
+	    for (; t < e.length; t++) {
+	      var n = e.charCodeAt(t);
+
+	      if (41 === n) {
+	        t++;
+	        break;
+	      }
+
+	      B(n, M(e, t + 1)) && (t = U(e, t));
+	    }
+
+	    return t;
+	  },
+	  cmpChar: _,
+	  cmpStr: function (e, t, n, r) {
+	    if (n - t !== r.length) return !1;
+	    if (t < 0 || n > e.length) return !1;
+
+	    for (var o = t; o < n; o++) {
+	      var a = e.charCodeAt(o),
+	          i = r.charCodeAt(o - t);
+	      if (N(a) && (a |= 32), a !== i) return !1;
+	    }
+
+	    return !0;
+	  },
+	  getNewlineLength: j,
+	  findWhiteSpaceStart: function (e, t) {
+	    for (; t >= 0 && I(e.charCodeAt(t)); t--);
+
+	    return t + 1;
+	  },
+	  findWhiteSpaceEnd: function (e, t) {
+	    for (; t < e.length && I(e.charCodeAt(t)); t++);
+
+	    return t;
+	  }
+	},
+	    W = g.TYPE,
+	    Y = g.NAME,
+	    V = q.cmpStr,
+	    H = W.EOF,
+	    $ = W.WhiteSpace,
+	    G = W.Comment,
+	    K = function () {
+	  this.offsetAndType = null, this.balance = null, this.reset();
+	};
+
+	K.prototype = {
+	  reset: function () {
+	    this.eof = !1, this.tokenIndex = -1, this.tokenType = 0, this.tokenStart = this.firstCharOffset, this.tokenEnd = this.firstCharOffset;
+	  },
+	  lookupType: function (e) {
+	    return (e += this.tokenIndex) < this.tokenCount ? this.offsetAndType[e] >> 24 : H;
+	  },
+	  lookupOffset: function (e) {
+	    return (e += this.tokenIndex) < this.tokenCount ? 16777215 & this.offsetAndType[e - 1] : this.source.length;
+	  },
+	  lookupValue: function (e, t) {
+	    return (e += this.tokenIndex) < this.tokenCount && V(this.source, 16777215 & this.offsetAndType[e - 1], 16777215 & this.offsetAndType[e], t);
+	  },
+	  getTokenStart: function (e) {
+	    return e === this.tokenIndex ? this.tokenStart : e > 0 ? e < this.tokenCount ? 16777215 & this.offsetAndType[e - 1] : 16777215 & this.offsetAndType[this.tokenCount] : this.firstCharOffset;
+	  },
+	  getRawLength: function (e, t) {
+	    var n,
+	        r = e,
+	        o = 16777215 & this.offsetAndType[Math.max(r - 1, 0)];
+
+	    e: for (; r < this.tokenCount && !((n = this.balance[r]) < e); r++) switch (t(this.offsetAndType[r] >> 24, this.source, o)) {
+	      case 1:
+	        break e;
+
+	      case 2:
+	        r++;
+	        break e;
+
+	      default:
+	        o = 16777215 & this.offsetAndType[r], this.balance[n] === r && (r = n);
+	    }
+
+	    return r - this.tokenIndex;
+	  },
+	  isBalanceEdge: function (e) {
+	    return this.balance[this.tokenIndex] < e;
+	  },
+	  isDelim: function (e, t) {
+	    return t ? this.lookupType(t) === W.Delim && this.source.charCodeAt(this.lookupOffset(t)) === e : this.tokenType === W.Delim && this.source.charCodeAt(this.tokenStart) === e;
+	  },
+	  getTokenValue: function () {
+	    return this.source.substring(this.tokenStart, this.tokenEnd);
+	  },
+	  getTokenLength: function () {
+	    return this.tokenEnd - this.tokenStart;
+	  },
+	  substrToCursor: function (e) {
+	    return this.source.substring(e, this.tokenStart);
+	  },
+	  skipWS: function () {
+	    for (var e = this.tokenIndex, t = 0; e < this.tokenCount && this.offsetAndType[e] >> 24 === $; e++, t++);
+
+	    t > 0 && this.skip(t);
+	  },
+	  skipSC: function () {
+	    for (; this.tokenType === $ || this.tokenType === G;) this.next();
+	  },
+	  skip: function (e) {
+	    var t = this.tokenIndex + e;
+	    t < this.tokenCount ? (this.tokenIndex = t, this.tokenStart = 16777215 & this.offsetAndType[t - 1], t = this.offsetAndType[t], this.tokenType = t >> 24, this.tokenEnd = 16777215 & t) : (this.tokenIndex = this.tokenCount, this.next());
+	  },
+	  next: function () {
+	    var e = this.tokenIndex + 1;
+	    e < this.tokenCount ? (this.tokenIndex = e, this.tokenStart = this.tokenEnd, e = this.offsetAndType[e], this.tokenType = e >> 24, this.tokenEnd = 16777215 & e) : (this.tokenIndex = this.tokenCount, this.eof = !0, this.tokenType = H, this.tokenStart = this.tokenEnd = this.source.length);
+	  },
+	  dump: function () {
+	    var e = this.firstCharOffset;
+	    return window.Array.prototype.slice.call(this.offsetAndType, 0, this.tokenCount).map(function (t, n) {
+	      var r = e,
+	          o = 16777215 & t;
+	      return e = o, {
+	        idx: n,
+	        type: Y[t >> 24],
+	        chunk: this.source.substring(r, o),
+	        balance: this.balance[n]
+	      };
+	    }, this);
+	  }
+	};
+	var X = K;
+
+	function Q(e) {
+	  return e;
+	}
+
+	function Z(e, t, n, r) {
+	  var o, a;
+
+	  switch (e.type) {
+	    case "Group":
+	      o = function (e, t, n, r) {
+	        var o = " " === e.combinator || r ? e.combinator : " " + e.combinator + " ",
+	            a = e.terms.map(function (e) {
+	          return Z(e, t, n, r);
+	        }).join(o);
+	        return (e.explicit || n) && (a = (r || "," === a[0] ? "[" : "[ ") + a + (r ? "]" : " ]")), a;
+	      }(e, t, n, r) + (e.disallowEmpty ? "!" : "");
+
+	      break;
+
+	    case "Multiplier":
+	      return Z(e.term, t, n, r) + t(0 === (a = e).min && 0 === a.max ? "*" : 0 === a.min && 1 === a.max ? "?" : 1 === a.min && 0 === a.max ? a.comma ? "#" : "+" : 1 === a.min && 1 === a.max ? "" : (a.comma ? "#" : "") + (a.min === a.max ? "{" + a.min + "}" : "{" + a.min + "," + (0 !== a.max ? a.max : "") + "}"), e);
+
+	    case "Type":
+	      o = "<" + e.name + (e.opts ? t(function (e) {
+	        switch (e.type) {
+	          case "Range":
+	            return " [" + (null === e.min ? "-∞" : e.min) + "," + (null === e.max ? "∞" : e.max) + "]";
+
+	          default:
+	            throw new Error("Unknown node type `" + e.type + "`");
+	        }
+	      }(e.opts), e.opts) : "") + ">";
+	      break;
+
+	    case "Property":
+	      o = "<'" + e.name + "'>";
+	      break;
+
+	    case "Keyword":
+	      o = e.name;
+	      break;
+
+	    case "AtKeyword":
+	      o = "@" + e.name;
+	      break;
+
+	    case "Function":
+	      o = e.name + "(";
+	      break;
+
+	    case "String":
+	    case "Token":
+	      o = e.value;
+	      break;
+
+	    case "Comma":
+	      o = ",";
+	      break;
+
+	    default:
+	      throw new Error("Unknown node type `" + e.type + "`");
+	  }
+
+	  return t(o, e);
+	}
+
+	var J = function (e, t) {
+	  var n = Q,
+	      r = !1,
+	      o = !1;
+	  return "function" == typeof t ? n = t : t && (r = Boolean(t.forceBraces), o = Boolean(t.compact), "function" == typeof t.decorate && (n = t.decorate)), Z(e, n, r, o);
+	};
+
+	function ee(e, t) {
+	  var n = e && e.loc && e.loc[t];
+	  return n ? {
+	    offset: n.offset,
+	    line: n.line,
+	    column: n.column
+	  } : null;
+	}
+
+	var te = function (e, t) {
+	  var n = h("SyntaxReferenceError", e + (t ? " `" + t + "`" : ""));
+	  return n.reference = t, n;
+	},
+	    ne = function (e, t, n, r) {
+	  var o = h("SyntaxMatchError", e),
+	      a = function (e) {
+	    for (var t = e.tokens, n = e.longestMatch, r = n < t.length ? t[n].node : null, o = -1, a = 0, i = "", s = 0; s < t.length; s++) s === n && (o = i.length), null !== r && t[s].node === r && (s <= n ? a++ : a = 0), i += t[s].value;
+
+	    return {
+	      node: r,
+	      css: i,
+	      mismatchOffset: -1 === o ? i.length : o,
+	      last: null === r || a > 1
+	    };
+	  }(r),
+	      i = a.mismatchOffset || 0,
+	      s = a.node || n,
+	      l = ee(s, "end"),
+	      c = a.last ? l : ee(s, "start"),
+	      u = a.css;
+
+	  return o.rawMessage = e, o.syntax = t ? J(t) : "<generic>", o.css = u, o.mismatchOffset = i, o.loc = {
+	    source: s && s.loc && s.loc.source || "<unknown>",
+	    start: c,
+	    end: l
+	  }, o.line = c ? c.line : void 0, o.column = c ? c.column : void 0, o.offset = c ? c.offset : void 0, o.message = e + "\n  syntax: " + o.syntax + "\n   value: " + (o.css || "<empty string>") + "\n  --------" + new window.Array(o.mismatchOffset + 1).join("-") + "^", o;
+	},
+	    re = window.Object.prototype.hasOwnProperty,
+	    oe = window.Object.create(null),
+	    ae = window.Object.create(null);
+
+	function ie(e, t) {
+	  return t = t || 0, e.length - t >= 2 && 45 === e.charCodeAt(t) && 45 === e.charCodeAt(t + 1);
+	}
+
+	function se(e, t) {
+	  if (t = t || 0, e.length - t >= 3 && 45 === e.charCodeAt(t) && 45 !== e.charCodeAt(t + 1)) {
+	    var n = e.indexOf("-", t + 2);
+	    if (-1 !== n) return e.substring(t, n + 1);
+	  }
+
+	  return "";
+	}
+
+	var le = {
+	  keyword: function (e) {
+	    if (re.call(oe, e)) return oe[e];
+	    var t = e.toLowerCase();
+	    if (re.call(oe, t)) return oe[e] = oe[t];
+	    var n = ie(t, 0),
+	        r = n ? "" : se(t, 0);
+	    return oe[e] = window.Object.freeze({
+	      basename: t.substr(r.length),
+	      name: t,
+	      vendor: r,
+	      prefix: r,
+	      custom: n
+	    });
+	  },
+	  property: function (e) {
+	    if (re.call(ae, e)) return ae[e];
+	    var t = e,
+	        n = e[0];
+	    "/" === n ? n = "/" === e[1] ? "//" : "/" : "_" !== n && "*" !== n && "$" !== n && "#" !== n && "+" !== n && "&" !== n && (n = "");
+	    var r = ie(t, n.length);
+	    if (!r && (t = t.toLowerCase(), re.call(ae, t))) return ae[e] = ae[t];
+	    var o = r ? "" : se(t, n.length),
+	        a = t.substr(0, n.length + o.length);
+	    return ae[e] = window.Object.freeze({
+	      basename: t.substr(a.length),
+	      name: t.substr(n.length),
+	      hack: n,
+	      vendor: o,
+	      prefix: a,
+	      custom: r
+	    });
+	  },
+	  isCustomProperty: ie,
+	  vendorPrefix: se
+	},
+	    ce = "undefined" != typeof Uint32Array ? Uint32Array : window.Array,
+	    ue = function (e, t) {
+	  return null === e || e.length < t ? new ce(Math.max(t + 1024, 16384)) : e;
+	},
+	    he = g.TYPE,
+	    de = L.isNewline,
+	    pe = L.isName,
+	    me = L.isValidEscape,
+	    fe = L.isNumberStart,
+	    ge = L.isIdentifierStart,
+	    be = L.charCodeCategory,
+	    ye = L.isBOM,
+	    ke = q.cmpStr,
+	    ve = q.getNewlineLength,
+	    we = q.findWhiteSpaceEnd,
+	    xe = q.consumeEscaped,
+	    Se = q.consumeName,
+	    Ce = q.consumeNumber,
+	    Ae = q.consumeBadUrlRemnants;
+
+	function Te(e, t) {
+	  function n(t) {
+	    return t < i ? e.charCodeAt(t) : 0;
+	  }
+
+	  function r() {
+	    return h = Ce(e, h), ge(n(h), n(h + 1), n(h + 2)) ? (g = he.Dimension, void (h = Se(e, h))) : 37 === n(h) ? (g = he.Percentage, void h++) : void (g = he.Number);
+	  }
+
+	  function o() {
+	    const t = h;
+	    return h = Se(e, h), ke(e, t, h, "url") && 40 === n(h) ? 34 === n(h = we(e, h + 1)) || 39 === n(h) ? (g = he.Function, void (h = t + 4)) : void function () {
+	      for (g = he.Url, h = we(e, h); h < e.length; h++) {
+	        var t = e.charCodeAt(h);
+
+	        switch (be(t)) {
+	          case 41:
+	            return void h++;
+
+	          case be.Eof:
+	            return;
+
+	          case be.WhiteSpace:
+	            return 41 === n(h = we(e, h)) || h >= e.length ? void (h < e.length && h++) : (h = Ae(e, h), void (g = he.BadUrl));
+
+	          case 34:
+	          case 39:
+	          case 40:
+	          case be.NonPrintable:
+	            return h = Ae(e, h), void (g = he.BadUrl);
+
+	          case 92:
+	            if (me(t, n(h + 1))) {
+	              h = xe(e, h) - 1;
+	              break;
+	            }
+
+	            return h = Ae(e, h), void (g = he.BadUrl);
+	        }
+	      }
+	    }() : 40 === n(h) ? (g = he.Function, void h++) : void (g = he.Ident);
+	  }
+
+	  function a(t) {
+	    for (t || (t = n(h++)), g = he.String; h < e.length; h++) {
+	      var r = e.charCodeAt(h);
+
+	      switch (be(r)) {
+	        case t:
+	          return void h++;
+
+	        case be.Eof:
+	          return;
+
+	        case be.WhiteSpace:
+	          if (de(r)) return h += ve(e, h, r), void (g = he.BadString);
+	          break;
+
+	        case 92:
+	          if (h === e.length - 1) break;
+	          var o = n(h + 1);
+	          de(o) ? h += ve(e, h + 1, o) : me(r, o) && (h = xe(e, h) - 1);
+	      }
+	    }
+	  }
+
+	  t || (t = new X());
+
+	  for (var i = (e = String(e || "")).length, s = ue(t.offsetAndType, i + 1), l = ue(t.balance, i + 1), c = 0, u = ye(n(0)), h = u, d = 0, p = 0, m = 0; h < i;) {
+	    var f = e.charCodeAt(h),
+	        g = 0;
+
+	    switch (l[c] = i, be(f)) {
+	      case be.WhiteSpace:
+	        g = he.WhiteSpace, h = we(e, h + 1);
+	        break;
+
+	      case 34:
+	        a();
+	        break;
+
+	      case 35:
+	        pe(n(h + 1)) || me(n(h + 1), n(h + 2)) ? (g = he.Hash, h = Se(e, h + 1)) : (g = he.Delim, h++);
+	        break;
+
+	      case 39:
+	        a();
+	        break;
+
+	      case 40:
+	        g = he.LeftParenthesis, h++;
+	        break;
+
+	      case 41:
+	        g = he.RightParenthesis, h++;
+	        break;
+
+	      case 43:
+	        fe(f, n(h + 1), n(h + 2)) ? r() : (g = he.Delim, h++);
+	        break;
+
+	      case 44:
+	        g = he.Comma, h++;
+	        break;
+
+	      case 45:
+	        fe(f, n(h + 1), n(h + 2)) ? r() : 45 === n(h + 1) && 62 === n(h + 2) ? (g = he.CDC, h += 3) : ge(f, n(h + 1), n(h + 2)) ? o() : (g = he.Delim, h++);
+	        break;
+
+	      case 46:
+	        fe(f, n(h + 1), n(h + 2)) ? r() : (g = he.Delim, h++);
+	        break;
+
+	      case 47:
+	        42 === n(h + 1) ? (g = he.Comment, 1 === (h = e.indexOf("*/", h + 2) + 2) && (h = e.length)) : (g = he.Delim, h++);
+	        break;
+
+	      case 58:
+	        g = he.Colon, h++;
+	        break;
+
+	      case 59:
+	        g = he.Semicolon, h++;
+	        break;
+
+	      case 60:
+	        33 === n(h + 1) && 45 === n(h + 2) && 45 === n(h + 3) ? (g = he.CDO, h += 4) : (g = he.Delim, h++);
+	        break;
+
+	      case 64:
+	        ge(n(h + 1), n(h + 2), n(h + 3)) ? (g = he.AtKeyword, h = Se(e, h + 1)) : (g = he.Delim, h++);
+	        break;
+
+	      case 91:
+	        g = he.LeftSquareBracket, h++;
+	        break;
+
+	      case 92:
+	        me(f, n(h + 1)) ? o() : (g = he.Delim, h++);
+	        break;
+
+	      case 93:
+	        g = he.RightSquareBracket, h++;
+	        break;
+
+	      case 123:
+	        g = he.LeftCurlyBracket, h++;
+	        break;
+
+	      case 125:
+	        g = he.RightCurlyBracket, h++;
+	        break;
+
+	      case be.Digit:
+	        r();
+	        break;
+
+	      case be.NameStart:
+	        o();
+	        break;
+
+	      case be.Eof:
+	        break;
+
+	      default:
+	        g = he.Delim, h++;
+	    }
+
+	    switch (g) {
+	      case d:
+	        for (d = (p = l[m = 16777215 & p]) >> 24, l[c] = m, l[m++] = c; m < c; m++) l[m] === i && (l[m] = c);
+
+	        break;
+
+	      case he.LeftParenthesis:
+	      case he.Function:
+	        l[c] = p, p = (d = he.RightParenthesis) << 24 | c;
+	        break;
+
+	      case he.LeftSquareBracket:
+	        l[c] = p, p = (d = he.RightSquareBracket) << 24 | c;
+	        break;
+
+	      case he.LeftCurlyBracket:
+	        l[c] = p, p = (d = he.RightCurlyBracket) << 24 | c;
+	    }
+
+	    s[c++] = g << 24 | h;
+	  }
+
+	  for (s[c] = he.EOF << 24 | h, l[c] = i, l[i] = i; 0 !== p;) p = l[m = 16777215 & p], l[m] = i;
+
+	  return t.source = e, t.firstCharOffset = u, t.offsetAndType = s, t.tokenCount = c, t.balance = l, t.reset(), t.next(), t;
+	}
+
+	Object.keys(g).forEach(function (e) {
+	  Te[e] = g[e];
+	}), window.Object.keys(L).forEach(function (e) {
+	  Te[e] = L[e];
+	}), window.Object.keys(q).forEach(function (e) {
+	  Te[e] = q[e];
+	});
+	var ze = Te,
+	    Pe = ze.isDigit,
+	    Ee = ze.cmpChar,
+	    Le = ze.TYPE,
+	    Oe = Le.Delim,
+	    De = Le.WhiteSpace,
+	    Ne = Le.Comment,
+	    Re = Le.Ident,
+	    Ie = Le.Number,
+	    Be = Le.Dimension;
+
+	function Me(e, t) {
+	  return null !== e && e.type === Oe && e.value.charCodeAt(0) === t;
+	}
+
+	function je(e, t, n) {
+	  for (; null !== e && (e.type === De || e.type === Ne);) e = n(++t);
+
+	  return t;
+	}
+
+	function _e(e, t, n, r) {
+	  if (!e) return 0;
+	  var o = e.value.charCodeAt(t);
+
+	  if (43 === o || 45 === o) {
+	    if (n) return 0;
+	    t++;
+	  }
+
+	  for (; t < e.value.length; t++) if (!Pe(e.value.charCodeAt(t))) return 0;
+
+	  return r + 1;
+	}
+
+	function Fe(e, t, n) {
+	  var r = !1,
+	      o = je(e, t, n);
+	  if (null === (e = n(o))) return t;
+
+	  if (e.type !== Ie) {
+	    if (!Me(e, 43) && !Me(e, 45)) return t;
+	    if (r = !0, o = je(n(++o), o, n), null === (e = n(o)) && e.type !== Ie) return 0;
+	  }
+
+	  if (!r) {
+	    var a = e.value.charCodeAt(0);
+	    if (43 !== a && 45 !== a) return 0;
+	  }
+
+	  return _e(e, r ? 0 : 1, r, o);
+	}
+
+	var Ue = ze.isHexDigit,
+	    qe = ze.cmpChar,
+	    We = ze.TYPE,
+	    Ye = We.Ident,
+	    Ve = We.Delim,
+	    He = We.Number,
+	    $e = We.Dimension;
+
+	function Ge(e, t) {
+	  return null !== e && e.type === Ve && e.value.charCodeAt(0) === t;
+	}
+
+	function Ke(e, t) {
+	  return e.value.charCodeAt(0) === t;
+	}
+
+	function Xe(e, t, n) {
+	  for (var r = t, o = 0; r < e.value.length; r++) {
+	    var a = e.value.charCodeAt(r);
+	    if (45 === a && n && 0 !== o) return Xe(e, t + o + 1, !1) > 0 ? 6 : 0;
+	    if (!Ue(a)) return 0;
+	    if (++o > 6) return 0;
+	  }
+
+	  return o;
+	}
+
+	function Qe(e, t, n) {
+	  if (!e) return 0;
+
+	  for (; Ge(n(t), 63);) {
+	    if (++e > 6) return 0;
+	    t++;
+	  }
+
+	  return t;
+	}
+
+	var Ze = ze.isIdentifierStart,
+	    Je = ze.isHexDigit,
+	    et = ze.isDigit,
+	    tt = ze.cmpStr,
+	    nt = ze.consumeNumber,
+	    rt = ze.TYPE,
+	    ot = ["unset", "initial", "inherit"],
+	    at = ["calc(", "-moz-calc(", "-webkit-calc("];
+
+	function it(e, t) {
+	  return t < e.length ? e.charCodeAt(t) : 0;
+	}
+
+	function st(e, t) {
+	  return tt(e, 0, e.length, t);
+	}
+
+	function lt(e, t) {
+	  for (var n = 0; n < t.length; n++) if (st(e, t[n])) return !0;
+
+	  return !1;
+	}
+
+	function ct(e, t) {
+	  return t === e.length - 2 && 92 === e.charCodeAt(t) && et(e.charCodeAt(t + 1));
+	}
+
+	function ut(e, t, n) {
+	  if (e && "Range" === e.type) {
+	    var r = Number(void 0 !== n && n !== t.length ? t.substr(0, n) : t);
+	    if (isNaN(r)) return !0;
+	    if (null !== e.min && r < e.min) return !0;
+	    if (null !== e.max && r > e.max) return !0;
+	  }
+
+	  return !1;
+	}
+
+	function ht(e, t) {
+	  var n = e.index,
+	      r = 0;
+
+	  do {
+	    if (r++, e.balance <= n) break;
+	  } while (e = t(r));
+
+	  return r;
+	}
+
+	function dt(e) {
+	  return function (t, n, r) {
+	    return null === t ? 0 : t.type === rt.Function && lt(t.value, at) ? ht(t, n) : e(t, n, r);
+	  };
+	}
+
+	function pt(e) {
+	  return function (t) {
+	    return null === t || t.type !== e ? 0 : 1;
+	  };
+	}
+
+	function mt(e) {
+	  return function (t, n, r) {
+	    if (null === t || t.type !== rt.Dimension) return 0;
+	    var o = nt(t.value, 0);
+
+	    if (null !== e) {
+	      var a = t.value.indexOf("\\", o),
+	          i = -1 !== a && ct(t.value, a) ? t.value.substring(o, a) : t.value.substr(o);
+	      if (!1 === e.hasOwnProperty(i.toLowerCase())) return 0;
+	    }
+
+	    return ut(r, t.value, o) ? 0 : 1;
+	  };
+	}
+
+	function ft(e) {
+	  return "function" != typeof e && (e = function () {
+	    return 0;
+	  }), function (t, n, r) {
+	    return null !== t && t.type === rt.Number && 0 === Number(t.value) ? 1 : e(t, n, r);
+	  };
+	}
+
+	var gt,
+	    bt = {
+	  "ident-token": pt(rt.Ident),
+	  "function-token": pt(rt.Function),
+	  "at-keyword-token": pt(rt.AtKeyword),
+	  "hash-token": pt(rt.Hash),
+	  "string-token": pt(rt.String),
+	  "bad-string-token": pt(rt.BadString),
+	  "url-token": pt(rt.Url),
+	  "bad-url-token": pt(rt.BadUrl),
+	  "delim-token": pt(rt.Delim),
+	  "number-token": pt(rt.Number),
+	  "percentage-token": pt(rt.Percentage),
+	  "dimension-token": pt(rt.Dimension),
+	  "whitespace-token": pt(rt.WhiteSpace),
+	  "CDO-token": pt(rt.CDO),
+	  "CDC-token": pt(rt.CDC),
+	  "colon-token": pt(rt.Colon),
+	  "semicolon-token": pt(rt.Semicolon),
+	  "comma-token": pt(rt.Comma),
+	  "[-token": pt(rt.LeftSquareBracket),
+	  "]-token": pt(rt.RightSquareBracket),
+	  "(-token": pt(rt.LeftParenthesis),
+	  ")-token": pt(rt.RightParenthesis),
+	  "{-token": pt(rt.LeftCurlyBracket),
+	  "}-token": pt(rt.RightCurlyBracket),
+	  string: pt(rt.String),
+	  ident: pt(rt.Ident),
+	  "custom-ident": function (e) {
+	    if (null === e || e.type !== rt.Ident) return 0;
+	    var t = e.value.toLowerCase();
+	    return lt(t, ot) || st(t, "default") ? 0 : 1;
+	  },
+	  "custom-property-name": function (e) {
+	    return null === e || e.type !== rt.Ident || 45 !== it(e.value, 0) || 45 !== it(e.value, 1) ? 0 : 1;
+	  },
+	  "hex-color": function (e) {
+	    if (null === e || e.type !== rt.Hash) return 0;
+	    var t = e.value.length;
+	    if (4 !== t && 5 !== t && 7 !== t && 9 !== t) return 0;
+
+	    for (var n = 1; n < t; n++) if (!Je(e.value.charCodeAt(n))) return 0;
+
+	    return 1;
+	  },
+	  "id-selector": function (e) {
+	    return null === e || e.type !== rt.Hash ? 0 : Ze(it(e.value, 1), it(e.value, 2), it(e.value, 3)) ? 1 : 0;
+	  },
+	  "an-plus-b": function (e, t) {
+	    var n = 0;
+	    if (!e) return 0;
+	    if (e.type === Ie) return _e(e, 0, !1, n);
+
+	    if (e.type === Re && 45 === e.value.charCodeAt(0)) {
+	      if (!Ee(e.value, 1, 110)) return 0;
+
+	      switch (e.value.length) {
+	        case 2:
+	          return Fe(t(++n), n, t);
+
+	        case 3:
+	          return 45 !== e.value.charCodeAt(2) ? 0 : (n = je(t(++n), n, t), _e(e = t(n), 0, !0, n));
+
+	        default:
+	          return 45 !== e.value.charCodeAt(2) ? 0 : _e(e, 3, !0, n);
+	      }
+	    } else if (e.type === Re || Me(e, 43) && t(n + 1).type === Re) {
+	      if (e.type !== Re && (e = t(++n)), null === e || !Ee(e.value, 0, 110)) return 0;
+
+	      switch (e.value.length) {
+	        case 1:
+	          return Fe(t(++n), n, t);
+
+	        case 2:
+	          return 45 !== e.value.charCodeAt(1) ? 0 : (n = je(t(++n), n, t), _e(e = t(n), 0, !0, n));
+
+	        default:
+	          return 45 !== e.value.charCodeAt(1) ? 0 : _e(e, 2, !0, n);
+	      }
+	    } else if (e.type === Be) {
+	      for (var r = e.value.charCodeAt(0), o = 43 === r || 45 === r ? 1 : 0, a = o; a < e.value.length && Pe(e.value.charCodeAt(a)); a++);
+
+	      return a === o ? 0 : Ee(e.value, a, 110) ? a + 1 === e.value.length ? Fe(t(++n), n, t) : 45 !== e.value.charCodeAt(a + 1) ? 0 : a + 2 === e.value.length ? (n = je(t(++n), n, t), _e(e = t(n), 0, !0, n)) : _e(e, a + 2, !0, n) : 0;
+	    }
+
+	    return 0;
+	  },
+	  urange: function (e, t) {
+	    var n = 0;
+	    if (null === e || e.type !== Ye || !qe(e.value, 0, 117)) return 0;
+	    if (null === (e = t(++n))) return 0;
+	    if (Ge(e, 43)) return null === (e = t(++n)) ? 0 : e.type === Ye ? Qe(Xe(e, 0, !0), ++n, t) : Ge(e, 63) ? Qe(1, ++n, t) : 0;
+
+	    if (e.type === He) {
+	      if (!Ke(e, 43)) return 0;
+	      var r = Xe(e, 1, !0);
+	      return 0 === r ? 0 : null === (e = t(++n)) ? n : e.type === $e || e.type === He ? Ke(e, 45) && Xe(e, 1, !1) ? n + 1 : 0 : Qe(r, n, t);
+	    }
+
+	    return e.type === $e && Ke(e, 43) ? Qe(Xe(e, 1, !0), ++n, t) : 0;
+	  },
+	  "declaration-value": function (e, t) {
+	    if (!e) return 0;
+	    var n = 0,
+	        r = 0,
+	        o = e.index;
+
+	    e: do {
+	      switch (e.type) {
+	        case rt.BadString:
+	        case rt.BadUrl:
+	          break e;
+
+	        case rt.RightCurlyBracket:
+	        case rt.RightParenthesis:
+	        case rt.RightSquareBracket:
+	          if (e.balance > e.index || e.balance < o) break e;
+	          r--;
+	          break;
+
+	        case rt.Semicolon:
+	          if (0 === r) break e;
+	          break;
+
+	        case rt.Delim:
+	          if ("!" === e.value && 0 === r) break e;
+	          break;
+
+	        case rt.Function:
+	        case rt.LeftParenthesis:
+	        case rt.LeftSquareBracket:
+	        case rt.LeftCurlyBracket:
+	          r++;
+	      }
+
+	      if (n++, e.balance <= o) break;
+	    } while (e = t(n));
+
+	    return n;
+	  },
+	  "any-value": function (e, t) {
+	    if (!e) return 0;
+	    var n = e.index,
+	        r = 0;
+
+	    e: do {
+	      switch (e.type) {
+	        case rt.BadString:
+	        case rt.BadUrl:
+	          break e;
+
+	        case rt.RightCurlyBracket:
+	        case rt.RightParenthesis:
+	        case rt.RightSquareBracket:
+	          if (e.balance > e.index || e.balance < n) break e;
+	      }
+
+	      if (r++, e.balance <= n) break;
+	    } while (e = t(r));
+
+	    return r;
+	  },
+	  dimension: dt(mt(null)),
+	  angle: dt(mt({
+	    deg: !0,
+	    grad: !0,
+	    rad: !0,
+	    turn: !0
+	  })),
+	  decibel: dt(mt({
+	    db: !0
+	  })),
+	  frequency: dt(mt({
+	    hz: !0,
+	    khz: !0
+	  })),
+	  flex: dt(mt({
+	    fr: !0
+	  })),
+	  length: dt(ft(mt({
+	    px: !0,
+	    mm: !0,
+	    cm: !0,
+	    in: !0,
+	    pt: !0,
+	    pc: !0,
+	    q: !0,
+	    em: !0,
+	    ex: !0,
+	    ch: !0,
+	    rem: !0,
+	    vh: !0,
+	    vw: !0,
+	    vmin: !0,
+	    vmax: !0,
+	    vm: !0
+	  }))),
+	  resolution: dt(mt({
+	    dpi: !0,
+	    dpcm: !0,
+	    dppx: !0,
+	    x: !0
+	  })),
+	  semitones: dt(mt({
+	    st: !0
+	  })),
+	  time: dt(mt({
+	    s: !0,
+	    ms: !0
+	  })),
+	  percentage: dt(function (e, t, n) {
+	    return null === e || e.type !== rt.Percentage || ut(n, e.value, e.value.length - 1) ? 0 : 1;
+	  }),
+	  zero: ft(),
+	  number: dt(function (e, t, n) {
+	    if (null === e) return 0;
+	    var r = nt(e.value, 0);
+	    return r === e.value.length || ct(e.value, r) ? ut(n, e.value, r) ? 0 : 1 : 0;
+	  }),
+	  integer: dt(function (e, t, n) {
+	    if (null === e || e.type !== rt.Number) return 0;
+
+	    for (var r = 43 === e.value.charCodeAt(0) || 45 === e.value.charCodeAt(0) ? 1 : 0; r < e.value.length; r++) if (!et(e.value.charCodeAt(r))) return 0;
+
+	    return ut(n, e.value, r) ? 0 : 1;
+	  }),
+	  "-ms-legacy-expression": (gt = "expression", gt += "(", function (e, t) {
+	    return null !== e && st(e.value, gt) ? ht(e, t) : 0;
+	  })
+	},
+	    yt = function (e, t, n) {
+	  var r = h("SyntaxError", e);
+	  return r.input = t, r.offset = n, r.rawMessage = e, r.message = r.rawMessage + "\n  " + r.input + "\n--" + new window.Array((r.offset || r.input.length) + 1).join("-") + "^", r;
+	},
+	    kt = function (e) {
+	  this.str = e, this.pos = 0;
+	};
+
+	kt.prototype = {
+	  charCodeAt: function (e) {
+	    return e < this.str.length ? this.str.charCodeAt(e) : 0;
+	  },
+	  charCode: function () {
+	    return this.charCodeAt(this.pos);
+	  },
+	  nextCharCode: function () {
+	    return this.charCodeAt(this.pos + 1);
+	  },
+	  nextNonWsCode: function (e) {
+	    return this.charCodeAt(this.findWsEnd(e));
+	  },
+	  findWsEnd: function (e) {
+	    for (; e < this.str.length; e++) {
+	      var t = this.str.charCodeAt(e);
+	      if (13 !== t && 10 !== t && 12 !== t && 32 !== t && 9 !== t) break;
+	    }
+
+	    return e;
+	  },
+	  substringToPos: function (e) {
+	    return this.str.substring(this.pos, this.pos = e);
+	  },
+	  eat: function (e) {
+	    this.charCode() !== e && this.error("Expect `" + String.fromCharCode(e) + "`"), this.pos++;
+	  },
+	  peek: function () {
+	    return this.pos < this.str.length ? this.str.charAt(this.pos++) : "";
+	  },
+	  error: function (e) {
+	    throw new yt(e, this.str, this.pos);
+	  }
+	};
+
+	var vt = kt,
+	    wt = function (e) {
+	  for (var t = "function" == typeof Uint32Array ? new Uint32Array(128) : new window.Array(128), n = 0; n < 128; n++) t[n] = e(String.fromCharCode(n)) ? 1 : 0;
+
+	  return t;
+	}(function (e) {
+	  return /[a-zA-Z0-9\-]/.test(e);
+	}),
+	    xt = {
+	  " ": 1,
+	  "&&": 2,
+	  "||": 3,
+	  "|": 4
+	};
+
+	function St(e) {
+	  return e.substringToPos(e.findWsEnd(e.pos));
+	}
+
+	function Ct(e) {
+	  for (var t = e.pos; t < e.str.length; t++) {
+	    var n = e.str.charCodeAt(t);
+	    if (n >= 128 || 0 === wt[n]) break;
+	  }
+
+	  return e.pos === t && e.error("Expect a keyword"), e.substringToPos(t);
+	}
+
+	function At(e) {
+	  for (var t = e.pos; t < e.str.length; t++) {
+	    var n = e.str.charCodeAt(t);
+	    if (n < 48 || n > 57) break;
+	  }
+
+	  return e.pos === t && e.error("Expect a number"), e.substringToPos(t);
+	}
+
+	function Tt(e) {
+	  var t = e.str.indexOf("'", e.pos + 1);
+	  return -1 === t && (e.pos = e.str.length, e.error("Expect an apostrophe")), e.substringToPos(t + 1);
+	}
+
+	function zt(e) {
+	  var t,
+	      n = null;
+	  return e.eat(123), t = At(e), 44 === e.charCode() ? (e.pos++, 125 !== e.charCode() && (n = At(e))) : n = t, e.eat(125), {
+	    min: Number(t),
+	    max: n ? Number(n) : 0
+	  };
+	}
+
+	function Pt(e, t) {
+	  var n = function (e) {
+	    var t = null,
+	        n = !1;
+
+	    switch (e.charCode()) {
+	      case 42:
+	        e.pos++, t = {
+	          min: 0,
+	          max: 0
+	        };
+	        break;
+
+	      case 43:
+	        e.pos++, t = {
+	          min: 1,
+	          max: 0
+	        };
+	        break;
+
+	      case 63:
+	        e.pos++, t = {
+	          min: 0,
+	          max: 1
+	        };
+	        break;
+
+	      case 35:
+	        e.pos++, n = !0, t = 123 === e.charCode() ? zt(e) : {
+	          min: 1,
+	          max: 0
+	        };
+	        break;
+
+	      case 123:
+	        t = zt(e);
+	        break;
+
+	      default:
+	        return null;
+	    }
+
+	    return {
+	      type: "Multiplier",
+	      comma: n,
+	      min: t.min,
+	      max: t.max,
+	      term: null
+	    };
+	  }(e);
+
+	  return null !== n ? (n.term = t, n) : t;
+	}
+
+	function Et(e) {
+	  var t = e.peek();
+	  return "" === t ? null : {
+	    type: "Token",
+	    value: t
+	  };
+	}
+
+	function Lt(e) {
+	  var t,
+	      n = null;
+	  return e.eat(60), t = Ct(e), 40 === e.charCode() && 41 === e.nextCharCode() && (e.pos += 2, t += "()"), 91 === e.charCodeAt(e.findWsEnd(e.pos)) && (St(e), n = function (e) {
+	    var t = null,
+	        n = null,
+	        r = 1;
+	    return e.eat(91), 45 === e.charCode() && (e.peek(), r = -1), -1 == r && 8734 === e.charCode() ? e.peek() : t = r * Number(At(e)), St(e), e.eat(44), St(e), 8734 === e.charCode() ? e.peek() : (r = 1, 45 === e.charCode() && (e.peek(), r = -1), n = r * Number(At(e))), e.eat(93), null === t && null === n ? null : {
+	      type: "Range",
+	      min: t,
+	      max: n
+	    };
+	  }(e)), e.eat(62), Pt(e, {
+	    type: "Type",
+	    name: t,
+	    opts: n
+	  });
+	}
+
+	function Ot(e, t) {
+	  function n(e, t) {
+	    return {
+	      type: "Group",
+	      terms: e,
+	      combinator: t,
+	      disallowEmpty: !1,
+	      explicit: !1
+	    };
+	  }
+
+	  for (t = window.Object.keys(t).sort(function (e, t) {
+	    return xt[e] - xt[t];
+	  }); t.length > 0;) {
+	    for (var r = t.shift(), o = 0, a = 0; o < e.length; o++) {
+	      var i = e[o];
+	      "Combinator" === i.type && (i.value === r ? (-1 === a && (a = o - 1), e.splice(o, 1), o--) : (-1 !== a && o - a > 1 && (e.splice(a, o - a, n(e.slice(a, o), r)), o = a + 1), a = -1));
+	    }
+
+	    -1 !== a && t.length && e.splice(a, o - a, n(e.slice(a, o), r));
+	  }
+
+	  return r;
+	}
+
+	function Dt(e) {
+	  for (var t, n = [], r = {}, o = null, a = e.pos; t = Nt(e);) "Spaces" !== t.type && ("Combinator" === t.type ? (null !== o && "Combinator" !== o.type || (e.pos = a, e.error("Unexpected combinator")), r[t.value] = !0) : null !== o && "Combinator" !== o.type && (r[" "] = !0, n.push({
+	    type: "Combinator",
+	    value: " "
+	  })), n.push(t), o = t, a = e.pos);
+
+	  return null !== o && "Combinator" === o.type && (e.pos -= a, e.error("Unexpected combinator")), {
+	    type: "Group",
+	    terms: n,
+	    combinator: Ot(n, r) || " ",
+	    disallowEmpty: !1,
+	    explicit: !1
+	  };
+	}
+
+	function Nt(e) {
+	  var t = e.charCode();
+	  if (t < 128 && 1 === wt[t]) return function (e) {
+	    var t;
+	    return t = Ct(e), 40 === e.charCode() ? (e.pos++, {
+	      type: "Function",
+	      name: t
+	    }) : Pt(e, {
+	      type: "Keyword",
+	      name: t
+	    });
+	  }(e);
+
+	  switch (t) {
+	    case 93:
+	      break;
+
+	    case 91:
+	      return Pt(e, function (e) {
+	        var t;
+	        return e.eat(91), t = Dt(e), e.eat(93), t.explicit = !0, 33 === e.charCode() && (e.pos++, t.disallowEmpty = !0), t;
+	      }(e));
+
+	    case 60:
+	      return 39 === e.nextCharCode() ? function (e) {
+	        var t;
+	        return e.eat(60), e.eat(39), t = Ct(e), e.eat(39), e.eat(62), Pt(e, {
+	          type: "Property",
+	          name: t
+	        });
+	      }(e) : Lt(e);
+
+	    case 124:
+	      return {
+	        type: "Combinator",
+	        value: e.substringToPos(124 === e.nextCharCode() ? e.pos + 2 : e.pos + 1)
+	      };
+
+	    case 38:
+	      return e.pos++, e.eat(38), {
+	        type: "Combinator",
+	        value: "&&"
+	      };
+
+	    case 44:
+	      return e.pos++, {
+	        type: "Comma"
+	      };
+
+	    case 39:
+	      return Pt(e, {
+	        type: "String",
+	        value: Tt(e)
+	      });
+
+	    case 32:
+	    case 9:
+	    case 10:
+	    case 13:
+	    case 12:
+	      return {
+	        type: "Spaces",
+	        value: St(e)
+	      };
+
+	    case 64:
+	      return (t = e.nextCharCode()) < 128 && 1 === wt[t] ? (e.pos++, {
+	        type: "AtKeyword",
+	        name: Ct(e)
+	      }) : Et(e);
+
+	    case 42:
+	    case 43:
+	    case 63:
+	    case 35:
+	    case 33:
+	      break;
+
+	    case 123:
+	      if ((t = e.nextCharCode()) < 48 || t > 57) return Et(e);
+	      break;
+
+	    default:
+	      return Et(e);
+	  }
+	}
+
+	function Rt(e) {
+	  var t = new vt(e),
+	      n = Dt(t);
+	  return t.pos !== e.length && t.error("Unexpected input"), 1 === n.terms.length && "Group" === n.terms[0].type && (n = n.terms[0]), n;
+	}
+
+	Rt("[a&&<b>#|<'c'>*||e() f{2} /,(% g#{1,2} h{2,})]!");
+
+	var It = Rt,
+	    Bt = function () {};
+
+	function Mt(e) {
+	  return "function" == typeof e ? e : Bt;
+	}
+
+	var jt = function (e, t, n) {
+	  var r = Bt,
+	      o = Bt;
+	  if ("function" == typeof t ? r = t : t && (r = Mt(t.enter), o = Mt(t.leave)), r === Bt && o === Bt) throw new Error("Neither `enter` nor `leave` walker handler is set or both aren't a function");
+	  !function e(t) {
+	    switch (r.call(n, t), t.type) {
+	      case "Group":
+	        t.terms.forEach(e);
+	        break;
+
+	      case "Multiplier":
+	        e(t.term);
+	        break;
+
+	      case "Type":
+	      case "Property":
+	      case "Keyword":
+	      case "AtKeyword":
+	      case "Function":
+	      case "String":
+	      case "Token":
+	      case "Comma":
+	        break;
+
+	      default:
+	        throw new Error("Unknown type: " + t.type);
+	    }
+
+	    o.call(n, t);
+	  }(e);
+	},
+	    _t = new X(),
+	    Ft = {
+	  decorator: function (e) {
+	    var t = null,
+	        n = {
+	      len: 0,
+	      node: null
+	    },
+	        r = [n],
+	        o = "";
+	    return {
+	      children: e.children,
+	      node: function (n) {
+	        var r = t;
+	        t = n, e.node.call(this, n), t = r;
+	      },
+	      chunk: function (e) {
+	        o += e, n.node !== t ? r.push({
+	          len: e.length,
+	          node: t
+	        }) : n.len += e.length;
+	      },
+	      result: function () {
+	        return Ut(o, r);
+	      }
+	    };
+	  }
+	};
+
+	function Ut(e, t) {
+	  var n = [],
+	      r = 0,
+	      o = 0,
+	      a = t ? t[o].node : null;
+
+	  for (ze(e, _t); !_t.eof;) {
+	    if (t) for (; o < t.length && r + t[o].len <= _t.tokenStart;) r += t[o++].len, a = t[o].node;
+	    n.push({
+	      type: _t.tokenType,
+	      value: _t.getTokenValue(),
+	      index: _t.tokenIndex,
+	      balance: _t.balance[_t.tokenIndex],
+	      node: a
+	    }), _t.next();
+	  }
+
+	  return n;
+	}
+
+	var qt = {
+	  type: "Match"
+	},
+	    Wt = {
+	  type: "Mismatch"
+	},
+	    Yt = {
+	  type: "DisallowEmpty"
+	};
+
+	function Vt(e, t, n) {
+	  return t === qt && n === Wt || e === qt && t === qt && n === qt ? e : ("If" === e.type && e.else === Wt && t === qt && (t = e.then, e = e.match), {
+	    type: "If",
+	    match: e,
+	    then: t,
+	    else: n
+	  });
+	}
+
+	function Ht(e) {
+	  return e.length > 2 && 40 === e.charCodeAt(e.length - 2) && 41 === e.charCodeAt(e.length - 1);
+	}
+
+	function $t(e) {
+	  return "Keyword" === e.type || "AtKeyword" === e.type || "Function" === e.type || "Type" === e.type && Ht(e.name);
+	}
+
+	function Gt(e) {
+	  if ("function" == typeof e) return {
+	    type: "Generic",
+	    fn: e
+	  };
+
+	  switch (e.type) {
+	    case "Group":
+	      var t = function e(t, n, r) {
+	        switch (t) {
+	          case " ":
+	            for (var o = qt, a = n.length - 1; a >= 0; a--) {
+	              o = Vt(l = n[a], o, Wt);
+	            }
+
+	            return o;
+
+	          case "|":
+	            o = Wt;
+	            var i = null;
+
+	            for (a = n.length - 1; a >= 0; a--) {
+	              if ($t(l = n[a]) && (null === i && a > 0 && $t(n[a - 1]) && (o = Vt({
+	                type: "Enum",
+	                map: i = window.Object.create(null)
+	              }, qt, o)), null !== i)) {
+	                var s = (Ht(l.name) ? l.name.slice(0, -1) : l.name).toLowerCase();
+
+	                if (s in i == !1) {
+	                  i[s] = l;
+	                  continue;
+	                }
+	              }
+
+	              i = null, o = Vt(l, qt, o);
+	            }
+
+	            return o;
+
+	          case "&&":
+	            if (n.length > 5) return {
+	              type: "MatchOnce",
+	              terms: n,
+	              all: !0
+	            };
+
+	            for (o = Wt, a = n.length - 1; a >= 0; a--) {
+	              var l = n[a];
+	              c = n.length > 1 ? e(t, n.filter(function (e) {
+	                return e !== l;
+	              }), !1) : qt, o = Vt(l, c, o);
+	            }
+
+	            return o;
+
+	          case "||":
+	            if (n.length > 5) return {
+	              type: "MatchOnce",
+	              terms: n,
+	              all: !1
+	            };
+
+	            for (o = r ? qt : Wt, a = n.length - 1; a >= 0; a--) {
+	              var c;
+	              l = n[a];
+	              c = n.length > 1 ? e(t, n.filter(function (e) {
+	                return e !== l;
+	              }), !0) : qt, o = Vt(l, c, o);
+	            }
+
+	            return o;
+	        }
+	      }(e.combinator, e.terms.map(Gt), !1);
+
+	      return e.disallowEmpty && (t = Vt(t, Yt, Wt)), t;
+
+	    case "Multiplier":
+	      return function (e) {
+	        var t = qt,
+	            n = Gt(e.term);
+	        if (0 === e.max) n = Vt(n, Yt, Wt), (t = Vt(n, null, Wt)).then = Vt(qt, qt, t), e.comma && (t.then.else = Vt({
+	          type: "Comma",
+	          syntax: e
+	        }, t, Wt));else for (var r = e.min || 1; r <= e.max; r++) e.comma && t !== qt && (t = Vt({
+	          type: "Comma",
+	          syntax: e
+	        }, t, Wt)), t = Vt(n, Vt(qt, qt, t), Wt);
+	        if (0 === e.min) t = Vt(qt, qt, t);else for (r = 0; r < e.min - 1; r++) e.comma && t !== qt && (t = Vt({
+	          type: "Comma",
+	          syntax: e
+	        }, t, Wt)), t = Vt(n, t, Wt);
+	        return t;
+	      }(e);
+
+	    case "Type":
+	    case "Property":
+	      return {
+	        type: e.type,
+	        name: e.name,
+	        syntax: e
+	      };
+
+	    case "Keyword":
+	      return {
+	        type: e.type,
+	        name: e.name.toLowerCase(),
+	        syntax: e
+	      };
+
+	    case "AtKeyword":
+	      return {
+	        type: e.type,
+	        name: "@" + e.name.toLowerCase(),
+	        syntax: e
+	      };
+
+	    case "Function":
+	      return {
+	        type: e.type,
+	        name: e.name.toLowerCase() + "(",
+	        syntax: e
+	      };
+
+	    case "String":
+	      return 3 === e.value.length ? {
+	        type: "Token",
+	        value: e.value.charAt(1),
+	        syntax: e
+	      } : {
+	        type: e.type,
+	        value: e.value.substr(1, e.value.length - 2).replace(/\\'/g, "'"),
+	        syntax: e
+	      };
+
+	    case "Token":
+	      return {
+	        type: e.type,
+	        value: e.value,
+	        syntax: e
+	      };
+
+	    case "Comma":
+	      return {
+	        type: e.type,
+	        syntax: e
+	      };
+
+	    default:
+	      throw new Error("Unknown node type:", e.type);
+	  }
+	}
+
+	var Kt = qt,
+	    Xt = Wt,
+	    Qt = Yt,
+	    Zt = function (e, t) {
+	  return "string" == typeof e && (e = It(e)), {
+	    type: "MatchGraph",
+	    match: Gt(e),
+	    syntax: t || null,
+	    source: e
+	  };
+	},
+	    Jt = window.Object.prototype.hasOwnProperty,
+	    en = Kt,
+	    tn = Xt,
+	    nn = Qt,
+	    rn = g.TYPE;
+
+	function on(e) {
+	  for (var t = null, n = null, r = e; null !== r;) n = r.prev, r.prev = t, t = r, r = n;
+
+	  return t;
+	}
+
+	function an(e, t) {
+	  if (e.length !== t.length) return !1;
+
+	  for (var n = 0; n < e.length; n++) {
+	    var r = e.charCodeAt(n);
+	    if (r >= 65 && r <= 90 && (r |= 32), r !== t.charCodeAt(n)) return !1;
+	  }
+
+	  return !0;
+	}
+
+	function sn(e) {
+	  return null === e || e.type === rn.Comma || e.type === rn.Function || e.type === rn.LeftParenthesis || e.type === rn.LeftSquareBracket || e.type === rn.LeftCurlyBracket || e.type === rn.Delim;
+	}
+
+	function ln(e) {
+	  return null === e || e.type === rn.RightParenthesis || e.type === rn.RightSquareBracket || e.type === rn.RightCurlyBracket || e.type === rn.Delim;
+	}
+
+	function cn(e, t, n) {
+	  function r() {
+	    do {
+	      b++, g = b < e.length ? e[b] : null;
+	    } while (null !== g && (g.type === rn.WhiteSpace || g.type === rn.Comment));
+	  }
+
+	  function o(t) {
+	    var n = b + t;
+	    return n < e.length ? e[n] : null;
+	  }
+
+	  function a(e, t) {
+	    return {
+	      nextState: e,
+	      matchStack: k,
+	      syntaxStack: u,
+	      thenStack: h,
+	      tokenIndex: b,
+	      prev: t
+	    };
+	  }
+
+	  function i(e) {
+	    h = {
+	      nextState: e,
+	      matchStack: k,
+	      syntaxStack: u,
+	      prev: h
+	    };
+	  }
+
+	  function s(e) {
+	    d = a(e, d);
+	  }
+
+	  function l() {
+	    k = {
+	      type: 1,
+	      syntax: t.syntax,
+	      token: g,
+	      prev: k
+	    }, r(), p = null, b > y && (y = b);
+	  }
+
+	  function c() {
+	    k = 2 === k.type ? k.prev : {
+	      type: 3,
+	      syntax: u.syntax,
+	      token: k.token,
+	      prev: k
+	    }, u = u.prev;
+	  }
+
+	  var u = null,
+	      h = null,
+	      d = null,
+	      p = null,
+	      m = 0,
+	      f = null,
+	      g = null,
+	      b = -1,
+	      y = 0,
+	      k = {
+	    type: 0,
+	    syntax: null,
+	    token: null,
+	    prev: null
+	  };
+
+	  for (r(); null === f && ++m < 15e3;) switch (t.type) {
+	    case "Match":
+	      if (null === h) {
+	        if (null !== g && (b !== e.length - 1 || "\\0" !== g.value && "\\9" !== g.value)) {
+	          t = tn;
+	          break;
+	        }
+
+	        f = "Match";
+	        break;
+	      }
+
+	      if ((t = h.nextState) === nn) {
+	        if (h.matchStack === k) {
+	          t = tn;
+	          break;
+	        }
+
+	        t = en;
+	      }
+
+	      for (; h.syntaxStack !== u;) c();
+
+	      h = h.prev;
+	      break;
+
+	    case "Mismatch":
+	      if (null !== p && !1 !== p) (null === d || b > d.tokenIndex) && (d = p, p = !1);else if (null === d) {
+	        f = "Mismatch";
+	        break;
+	      }
+	      t = d.nextState, h = d.thenStack, u = d.syntaxStack, k = d.matchStack, b = d.tokenIndex, g = b < e.length ? e[b] : null, d = d.prev;
+	      break;
+
+	    case "MatchGraph":
+	      t = t.match;
+	      break;
+
+	    case "If":
+	      t.else !== tn && s(t.else), t.then !== en && i(t.then), t = t.match;
+	      break;
+
+	    case "MatchOnce":
+	      t = {
+	        type: "MatchOnceBuffer",
+	        syntax: t,
+	        index: 0,
+	        mask: 0
+	      };
+	      break;
+
+	    case "MatchOnceBuffer":
+	      var v = t.syntax.terms;
+
+	      if (t.index === v.length) {
+	        if (0 === t.mask || t.syntax.all) {
+	          t = tn;
+	          break;
+	        }
+
+	        t = en;
+	        break;
+	      }
+
+	      if (t.mask === (1 << v.length) - 1) {
+	        t = en;
+	        break;
+	      }
+
+	      for (; t.index < v.length; t.index++) {
+	        var w = 1 << t.index;
+
+	        if (0 == (t.mask & w)) {
+	          s(t), i({
+	            type: "AddMatchOnce",
+	            syntax: t.syntax,
+	            mask: t.mask | w
+	          }), t = v[t.index++];
+	          break;
+	        }
+	      }
+
+	      break;
+
+	    case "AddMatchOnce":
+	      t = {
+	        type: "MatchOnceBuffer",
+	        syntax: t.syntax,
+	        index: 0,
+	        mask: t.mask
+	      };
+	      break;
+
+	    case "Enum":
+	      if (null !== g) if (-1 !== (T = g.value.toLowerCase()).indexOf("\\") && (T = T.replace(/\\[09].*$/, "")), Jt.call(t.map, T)) {
+	        t = t.map[T];
+	        break;
+	      }
+	      t = tn;
+	      break;
+
+	    case "Generic":
+	      var x = null !== u ? u.opts : null,
+	          S = b + Math.floor(t.fn(g, o, x));
+
+	      if (!isNaN(S) && S > b) {
+	        for (; b < S;) l();
+
+	        t = en;
+	      } else t = tn;
+
+	      break;
+
+	    case "Type":
+	    case "Property":
+	      var C = "Type" === t.type ? "types" : "properties",
+	          A = Jt.call(n, C) ? n[C][t.name] : null;
+	      if (!A || !A.match) throw new Error("Bad syntax reference: " + ("Type" === t.type ? "<" + t.name + ">" : "<'" + t.name + "'>"));
+	      if (!1 !== p && null !== g && "Type" === t.type) if ("custom-ident" === t.name && g.type === rn.Ident || "length" === t.name && "0" === g.value) {
+	        null === p && (p = a(t, d)), t = tn;
+	        break;
+	      }
+	      u = {
+	        syntax: t.syntax,
+	        opts: t.syntax.opts || null !== u && u.opts || null,
+	        prev: u
+	      }, k = {
+	        type: 2,
+	        syntax: t.syntax,
+	        token: k.token,
+	        prev: k
+	      }, t = A.match;
+	      break;
+
+	    case "Keyword":
+	      var T = t.name;
+
+	      if (null !== g) {
+	        var z = g.value;
+
+	        if (-1 !== z.indexOf("\\") && (z = z.replace(/\\[09].*$/, "")), an(z, T)) {
+	          l(), t = en;
+	          break;
+	        }
+	      }
+
+	      t = tn;
+	      break;
+
+	    case "AtKeyword":
+	    case "Function":
+	      if (null !== g && an(g.value, t.name)) {
+	        l(), t = en;
+	        break;
+	      }
+
+	      t = tn;
+	      break;
+
+	    case "Token":
+	      if (null !== g && g.value === t.value) {
+	        l(), t = en;
+	        break;
+	      }
+
+	      t = tn;
+	      break;
+
+	    case "Comma":
+	      null !== g && g.type === rn.Comma ? sn(k.token) ? t = tn : (l(), t = ln(g) ? tn : en) : t = sn(k.token) || ln(g) ? en : tn;
+	      break;
+
+	    case "String":
+	      var P = "";
+
+	      for (S = b; S < e.length && P.length < t.value.length; S++) P += e[S].value;
+
+	      if (an(P, t.value)) {
+	        for (; b < S;) l();
+
+	        t = en;
+	      } else t = tn;
+
+	      break;
+
+	    default:
+	      throw new Error("Unknown node type: " + t.type);
+	  }
+
+	  switch (f) {
+	    case null:
+	      console.warn("[csstree-match] BREAK after 15000 iterations"), f = "Maximum iteration number exceeded (please fill an issue on https://github.com/csstree/csstree/issues)", k = null;
+	      break;
+
+	    case "Match":
+	      for (; null !== u;) c();
+
+	      break;
+
+	    default:
+	      k = null;
+	  }
+
+	  return {
+	    tokens: e,
+	    reason: f,
+	    iterations: m,
+	    match: k,
+	    longestMatch: y
+	  };
+	}
+
+	var un = function (e, t, n) {
+	  var r = cn(e, t, n || {});
+	  if (null === r.match) return r;
+	  var o = r.match,
+	      a = r.match = {
+	    syntax: t.syntax || null,
+	    match: []
+	  },
+	      i = [a];
+
+	  for (o = on(o).prev; null !== o;) {
+	    switch (o.type) {
+	      case 2:
+	        a.match.push(a = {
+	          syntax: o.syntax,
+	          match: []
+	        }), i.push(a);
+	        break;
+
+	      case 3:
+	        i.pop(), a = i[i.length - 1];
+	        break;
+
+	      default:
+	        a.match.push({
+	          syntax: o.syntax || null,
+	          token: o.token.value,
+	          node: o.token.node
+	        });
+	    }
+
+	    o = o.prev;
+	  }
+
+	  return r;
+	};
+
+	function hn(e) {
+	  function t(e) {
+	    return null !== e && ("Type" === e.type || "Property" === e.type || "Keyword" === e.type);
+	  }
+
+	  var n = null;
+	  return null !== this.matched && function r(o) {
+	    if (window.Array.isArray(o.match)) {
+	      for (var a = 0; a < o.match.length; a++) if (r(o.match[a])) return t(o.syntax) && n.unshift(o.syntax), !0;
+	    } else if (o.node === e) return n = t(o.syntax) ? [o.syntax] : [], !0;
+
+	    return !1;
+	  }(this.matched), n;
+	}
+
+	function dn(e, t, n) {
+	  var r = hn.call(e, t);
+	  return null !== r && r.some(n);
+	}
+
+	var pn = {
+	  getTrace: hn,
+	  isType: function (e, t) {
+	    return dn(this, e, function (e) {
+	      return "Type" === e.type && e.name === t;
+	    });
+	  },
+	  isProperty: function (e, t) {
+	    return dn(this, e, function (e) {
+	      return "Property" === e.type && e.name === t;
+	    });
+	  },
+	  isKeyword: function (e) {
+	    return dn(this, e, function (e) {
+	      return "Keyword" === e.type;
+	    });
+	  }
+	};
+	var mn = {
+	  matchFragments: function (e, t, n, r, o) {
+	    var a = [];
+	    return null !== n.matched && function n(i) {
+	      if (null !== i.syntax && i.syntax.type === r && i.syntax.name === o) {
+	        var s = function e(t) {
+	          return "node" in t ? t.node : e(t.match[0]);
+	        }(i),
+	            l = function e(t) {
+	          return "node" in t ? t.node : e(t.match[t.match.length - 1]);
+	        }(i);
+
+	        e.syntax.walk(t, function (e, t, n) {
+	          if (e === s) {
+	            var r = new u();
+
+	            do {
+	              if (r.appendData(t.data), t.data === l) break;
+	              t = t.next;
+	            } while (null !== t);
+
+	            a.push({
+	              parent: n,
+	              nodes: r
+	            });
+	          }
+	        });
+	      }
+
+	      window.Array.isArray(i.match) && i.match.forEach(n);
+	    }(n.matched), a;
+	  }
+	},
+	    fn = window.Object.prototype.hasOwnProperty;
+
+	function gn(e) {
+	  return "number" == typeof e && isFinite(e) && Math.floor(e) === e && e >= 0;
+	}
+
+	function bn(e) {
+	  return Boolean(e) && gn(e.offset) && gn(e.line) && gn(e.column);
+	}
+
+	function yn(e, t) {
+	  return function (n, r) {
+	    if (!n || n.constructor !== window.Object) return r(n, "Type of node should be an window.Object");
+
+	    for (var o in n) {
+	      var a = !0;
+
+	      if (!1 !== fn.call(n, o)) {
+	        if ("type" === o) n.type !== e && r(n, "Wrong node type `" + n.type + "`, expected `" + e + "`");else if ("loc" === o) {
+	          if (null === n.loc) continue;
+	          if (n.loc && n.loc.constructor === window.Object) if ("string" != typeof n.loc.source) o += ".source";else if (bn(n.loc.start)) {
+	            if (bn(n.loc.end)) continue;
+	            o += ".end";
+	          } else o += ".start";
+	          a = !1;
+	        } else if (t.hasOwnProperty(o)) {
+	          var i = 0;
+
+	          for (a = !1; !a && i < t[o].length; i++) {
+	            var s = t[o][i];
+
+	            switch (s) {
+	              case String:
+	                a = "string" == typeof n[o];
+	                break;
+
+	              case Boolean:
+	                a = "boolean" == typeof n[o];
+	                break;
+
+	              case null:
+	                a = null === n[o];
+	                break;
+
+	              default:
+	                "string" == typeof s ? a = n[o] && n[o].type === s : window.Array.isArray(s) && (a = n[o] instanceof u);
+	            }
+	          }
+	        } else r(n, "Unknown field `" + o + "` for " + e + " node type");
+	        a || r(n, "Bad value for `" + e + "." + o + "`");
+	      }
+	    }
+
+	    for (var o in t) fn.call(t, o) && !1 === fn.call(n, o) && r(n, "Field `" + e + "." + o + "` is missed");
+	  };
+	}
+
+	function kn(e, t) {
+	  var n = t.structure,
+	      r = {
+	    type: String,
+	    loc: !0
+	  },
+	      o = {
+	    type: '"' + e + '"'
+	  };
+
+	  for (var a in n) if (!1 !== fn.call(n, a)) {
+	    for (var i = [], s = r[a] = window.Array.isArray(n[a]) ? n[a].slice() : [n[a]], l = 0; l < s.length; l++) {
+	      var c = s[l];
+	      if (c === String || c === Boolean) i.push(c.name);else if (null === c) i.push("null");else if ("string" == typeof c) i.push("<" + c + ">");else {
+	        if (!Array.isArray(c)) throw new Error("Wrong value `" + c + "` in `" + e + "." + a + "` structure definition");
+	        i.push("List");
+	      }
+	    }
+
+	    o[a] = i.join(" | ");
+	  }
+
+	  return {
+	    docs: o,
+	    check: yn(e, r)
+	  };
+	}
+
+	var vn = te,
+	    wn = ne,
+	    xn = Zt,
+	    Sn = un,
+	    Cn = function (e) {
+	  var t = {};
+	  if (e.node) for (var n in e.node) if (fn.call(e.node, n)) {
+	    var r = e.node[n];
+	    if (!r.structure) throw new Error("Missed `structure` field in `" + n + "` node type definition");
+	    t[n] = kn(n, r);
+	  }
+	  return t;
+	},
+	    An = xn("inherit | initial | unset"),
+	    Tn = xn("inherit | initial | unset | <-ms-legacy-expression>");
+
+	function zn(e, t, n) {
+	  var r = {};
+
+	  for (var o in e) e[o].syntax && (r[o] = n ? e[o].syntax : J(e[o].syntax, {
+	    compact: t
+	  }));
+
+	  return r;
+	}
+
+	function Pn(e, t, n) {
+	  return {
+	    matched: e,
+	    iterations: n,
+	    error: t,
+	    getTrace: pn.getTrace,
+	    isType: pn.isType,
+	    isProperty: pn.isProperty,
+	    isKeyword: pn.isKeyword
+	  };
+	}
+
+	function En(e, t, n, r) {
+	  var o,
+	      a = function (e, t) {
+	    return "string" == typeof e ? Ut(e, null) : t.generate(e, Ft);
+	  }(n, e.syntax);
+
+	  return function (e) {
+	    for (var t = 0; t < e.length; t++) if ("var(" === e[t].value.toLowerCase()) return !0;
+
+	    return !1;
+	  }(a) ? Pn(null, new Error("Matching for a tree with var() is not supported")) : (r && (o = Sn(a, e.valueCommonSyntax, e)), r && o.match || (o = Sn(a, t.match, e)).match ? Pn(o.match, null, o.iterations) : Pn(null, new wn(o.reason, t.syntax, n, o), o.iterations));
+	}
+
+	var Ln = function (e, t, n) {
+	  if (this.valueCommonSyntax = An, this.syntax = t, this.generic = !1, this.atrules = {}, this.properties = {}, this.types = {}, this.structure = n || Cn(e), e) {
+	    if (e.types) for (var r in e.types) this.addType_(r, e.types[r]);
+	    if (e.generic) for (var r in this.generic = !0, bt) this.addType_(r, bt[r]);
+	    if (e.atrules) for (var r in e.atrules) this.addAtrule_(r, e.atrules[r]);
+	    if (e.properties) for (var r in e.properties) this.addProperty_(r, e.properties[r]);
+	  }
+	};
+
+	Ln.prototype = {
+	  structure: {},
+	  checkStructure: function (e) {
+	    function t(e, t) {
+	      r.push({
+	        node: e,
+	        message: t
+	      });
+	    }
+
+	    var n = this.structure,
+	        r = [];
+	    return this.syntax.walk(e, function (e) {
+	      n.hasOwnProperty(e.type) ? n[e.type].check(e, t) : t(e, "Unknown node type `" + e.type + "`");
+	    }), !!r.length && r;
+	  },
+	  createDescriptor: function (e, t, n) {
+	    var r = {
+	      type: t,
+	      name: n
+	    },
+	        o = {
+	      type: t,
+	      name: n,
+	      syntax: null,
+	      match: null
+	    };
+	    return "function" == typeof e ? o.match = xn(e, r) : ("string" == typeof e ? window.Object.defineProperty(o, "syntax", {
+	      get: function () {
+	        return window.Object.defineProperty(o, "syntax", {
+	          value: It(e)
+	        }), o.syntax;
+	      }
+	    }) : o.syntax = e, window.Object.defineProperty(o, "match", {
+	      get: function () {
+	        return window.Object.defineProperty(o, "match", {
+	          value: xn(o.syntax, r)
+	        }), o.match;
+	      }
+	    })), o;
+	  },
+	  addAtrule_: function (e, t) {
+	    this.atrules[e] = {
+	      prelude: t.prelude ? this.createDescriptor(t.prelude, "AtrulePrelude", e) : null,
+	      descriptors: t.descriptors ? window.Object.keys(t.descriptors).reduce((e, n) => (e[n] = this.createDescriptor(t.descriptors[n], "AtruleDescriptor", n), e), {}) : null
+	    };
+	  },
+	  addProperty_: function (e, t) {
+	    this.properties[e] = this.createDescriptor(t, "Property", e);
+	  },
+	  addType_: function (e, t) {
+	    this.types[e] = this.createDescriptor(t, "Type", e), t === bt["-ms-legacy-expression"] && (this.valueCommonSyntax = Tn);
+	  },
+	  matchAtrulePrelude: function (e, t) {
+	    var n = le.keyword(e),
+	        r = n.vendor ? this.getAtrulePrelude(n.name) || this.getAtrulePrelude(n.basename) : this.getAtrulePrelude(n.name);
+	    return r ? En(this, r, t, !0) : n.basename in this.atrules ? Pn(null, new Error("At-rule `" + e + "` should not contain a prelude")) : Pn(null, new vn("Unknown at-rule", e));
+	  },
+	  matchAtruleDescriptor: function (e, t, n) {
+	    var r = le.keyword(e),
+	        o = le.keyword(t),
+	        a = r.vendor ? this.atrules[r.name] || this.atrules[r.basename] : this.atrules[r.name];
+	    if (!a) return Pn(null, new vn("Unknown at-rule", e));
+	    if (!a.descriptors) return Pn(null, new Error("At-rule `" + e + "` has no known descriptors"));
+	    var i = o.vendor ? a.descriptors[o.name] || a.descriptors[o.basename] : a.descriptors[o.name];
+	    return i ? En(this, i, n, !0) : Pn(null, new vn("Unknown at-rule descriptor", t));
+	  },
+	  matchDeclaration: function (e) {
+	    return "Declaration" !== e.type ? Pn(null, new Error("Not a Declaration node")) : this.matchProperty(e.property, e.value);
+	  },
+	  matchProperty: function (e, t) {
+	    var n = le.property(e);
+	    if (n.custom) return Pn(null, new Error("Lexer matching doesn't applicable for custom properties"));
+	    var r = n.vendor ? this.getProperty(n.name) || this.getProperty(n.basename) : this.getProperty(n.name);
+	    return r ? En(this, r, t, !0) : Pn(null, new vn("Unknown property", e));
+	  },
+	  matchType: function (e, t) {
+	    var n = this.getType(e);
+	    return n ? En(this, n, t, !1) : Pn(null, new vn("Unknown type", e));
+	  },
+	  match: function (e, t) {
+	    return "string" == typeof e || e && e.type ? ("string" != typeof e && e.match || (e = this.createDescriptor(e, "Type", "anonymous")), En(this, e, t, !1)) : Pn(null, new vn("Bad syntax"));
+	  },
+	  findValueFragments: function (e, t, n, r) {
+	    return mn.matchFragments(this, t, this.matchProperty(e, t), n, r);
+	  },
+	  findDeclarationValueFragments: function (e, t, n) {
+	    return mn.matchFragments(this, e.value, this.matchDeclaration(e), t, n);
+	  },
+	  findAllFragments: function (e, t, n) {
+	    var r = [];
+	    return this.syntax.walk(e, {
+	      visit: "Declaration",
+	      enter: function (e) {
+	        r.push.apply(r, this.findDeclarationValueFragments(e, t, n));
+	      }.bind(this)
+	    }), r;
+	  },
+	  getAtrulePrelude: function (e) {
+	    return this.atrules.hasOwnProperty(e) ? this.atrules[e].prelude : null;
+	  },
+	  getAtruleDescriptor: function (e, t) {
+	    return this.atrules.hasOwnProperty(e) && this.atrules.declarators && this.atrules[e].declarators[t] || null;
+	  },
+	  getProperty: function (e) {
+	    return this.properties.hasOwnProperty(e) ? this.properties[e] : null;
+	  },
+	  getType: function (e) {
+	    return this.types.hasOwnProperty(e) ? this.types[e] : null;
+	  },
+	  validate: function () {
+	    function e(r, o, a, i) {
+	      if (a.hasOwnProperty(o)) return a[o];
+	      a[o] = !1, null !== i.syntax && jt(i.syntax, function (i) {
+	        if ("Type" === i.type || "Property" === i.type) {
+	          var s = "Type" === i.type ? r.types : r.properties,
+	              l = "Type" === i.type ? t : n;
+	          s.hasOwnProperty(i.name) && !e(r, i.name, l, s[i.name]) || (a[o] = !0);
+	        }
+	      }, this);
+	    }
+
+	    var t = {},
+	        n = {};
+
+	    for (var r in this.types) e(this, r, t, this.types[r]);
+
+	    for (var r in this.properties) e(this, r, n, this.properties[r]);
+
+	    return t = window.Object.keys(t).filter(function (e) {
+	      return t[e];
+	    }), n = window.Object.keys(n).filter(function (e) {
+	      return n[e];
+	    }), t.length || n.length ? {
+	      types: t,
+	      properties: n
+	    } : null;
+	  },
+	  dump: function (e, t) {
+	    return {
+	      generic: this.generic,
+	      types: zn(this.types, !t, e),
+	      properties: zn(this.properties, !t, e)
+	    };
+	  },
+	  toString: function () {
+	    return JSON.stringify(this.dump());
+	  }
+	};
+	var On = Ln,
+	    Dn = {
+	  SyntaxError: yt,
+	  parse: It,
+	  generate: J,
+	  walk: jt
+	},
+	    Nn = ze.isBOM;
+
+	var Rn = function () {
+	  this.lines = null, this.columns = null, this.linesAndColumnsComputed = !1;
+	};
+
+	Rn.prototype = {
+	  setSource: function (e, t, n, r) {
+	    this.source = e, this.startOffset = void 0 === t ? 0 : t, this.startLine = void 0 === n ? 1 : n, this.startColumn = void 0 === r ? 1 : r, this.linesAndColumnsComputed = !1;
+	  },
+	  ensureLinesAndColumnsComputed: function () {
+	    this.linesAndColumnsComputed || (!function (e, t) {
+	      for (var n = t.length, r = ue(e.lines, n), o = e.startLine, a = ue(e.columns, n), i = e.startColumn, s = t.length > 0 ? Nn(t.charCodeAt(0)) : 0; s < n; s++) {
+	        var l = t.charCodeAt(s);
+	        r[s] = o, a[s] = i++, 10 !== l && 13 !== l && 12 !== l || (13 === l && s + 1 < n && 10 === t.charCodeAt(s + 1) && (r[++s] = o, a[s] = i), o++, i = 1);
+	      }
+
+	      r[s] = o, a[s] = i, e.lines = r, e.columns = a;
+	    }(this, this.source), this.linesAndColumnsComputed = !0);
+	  },
+	  getLocation: function (e, t) {
+	    return this.ensureLinesAndColumnsComputed(), {
+	      source: t,
+	      offset: this.startOffset + e,
+	      line: this.lines[e],
+	      column: this.columns[e]
+	    };
+	  },
+	  getLocationRange: function (e, t, n) {
+	    return this.ensureLinesAndColumnsComputed(), {
+	      source: n,
+	      start: {
+	        offset: this.startOffset + e,
+	        line: this.lines[e],
+	        column: this.columns[e]
+	      },
+	      end: {
+	        offset: this.startOffset + t,
+	        line: this.lines[t],
+	        column: this.columns[t]
+	      }
+	    };
+	  }
+	};
+
+	var In = Rn,
+	    Bn = ze.TYPE,
+	    Mn = Bn.WhiteSpace,
+	    jn = Bn.Comment,
+	    _n = function (e) {
+	  var t = this.createList(),
+	      n = null,
+	      r = {
+	    recognizer: e,
+	    space: null,
+	    ignoreWS: !1,
+	    ignoreWSAfter: !1
+	  };
+
+	  for (this.scanner.skipSC(); !this.scanner.eof;) {
+	    switch (this.scanner.tokenType) {
+	      case jn:
+	        this.scanner.next();
+	        continue;
+
+	      case Mn:
+	        r.ignoreWS ? this.scanner.next() : r.space = this.WhiteSpace();
+	        continue;
+	    }
+
+	    if (void 0 === (n = e.getNode.call(this, r))) break;
+	    null !== r.space && (t.push(r.space), r.space = null), t.push(n), r.ignoreWSAfter ? (r.ignoreWSAfter = !1, r.ignoreWS = !0) : r.ignoreWS = !1;
+	  }
+
+	  return t;
+	},
+	    Fn = q.findWhiteSpaceStart,
+	    Un = function () {},
+	    qn = g.TYPE,
+	    Wn = g.NAME,
+	    Yn = qn.WhiteSpace,
+	    Vn = qn.Ident,
+	    Hn = qn.Function,
+	    $n = qn.Url,
+	    Gn = qn.Hash,
+	    Kn = qn.Percentage,
+	    Xn = qn.Number;
+
+	function Qn(e) {
+	  return function () {
+	    return this[e]();
+	  };
+	}
+
+	var Zn = function (e) {
+	  var t = {
+	    scanner: new X(),
+	    locationMap: new In(),
+	    filename: "<unknown>",
+	    needPositions: !1,
+	    onParseError: Un,
+	    onParseErrorThrow: !1,
+	    parseAtrulePrelude: !0,
+	    parseRulePrelude: !0,
+	    parseValue: !0,
+	    parseCustomProperty: !1,
+	    readSequence: _n,
+	    createList: function () {
+	      return new u();
+	    },
+	    createSingleNodeList: function (e) {
+	      return new u().appendData(e);
+	    },
+	    getFirstListNode: function (e) {
+	      return e && e.first();
+	    },
+	    getLastListNode: function (e) {
+	      return e.last();
+	    },
+	    parseWithFallback: function (e, t) {
+	      var n = this.scanner.tokenIndex;
+
+	      try {
+	        return e.call(this);
+	      } catch (e) {
+	        if (this.onParseErrorThrow) throw e;
+	        var r = t.call(this, n);
+	        return this.onParseErrorThrow = !0, this.onParseError(e, r), this.onParseErrorThrow = !1, r;
+	      }
+	    },
+	    lookupNonWSType: function (e) {
+	      do {
+	        var t = this.scanner.lookupType(e++);
+	        if (t !== Yn) return t;
+	      } while (0 !== t);
+
+	      return 0;
+	    },
+	    eat: function (e) {
+	      if (this.scanner.tokenType !== e) {
+	        var t = this.scanner.tokenStart,
+	            n = Wn[e] + " is expected";
+
+	        switch (e) {
+	          case Vn:
+	            this.scanner.tokenType === Hn || this.scanner.tokenType === $n ? (t = this.scanner.tokenEnd - 1, n = "Identifier is expected but function found") : n = "Identifier is expected";
+	            break;
+
+	          case Gn:
+	            this.scanner.isDelim(35) && (this.scanner.next(), t++, n = "Name is expected");
+	            break;
+
+	          case Kn:
+	            this.scanner.tokenType === Xn && (t = this.scanner.tokenEnd, n = "Percent sign is expected");
+	            break;
+
+	          default:
+	            this.scanner.source.charCodeAt(this.scanner.tokenStart) === e && (t += 1);
+	        }
+
+	        this.error(n, t);
+	      }
+
+	      this.scanner.next();
+	    },
+	    consume: function (e) {
+	      var t = this.scanner.getTokenValue();
+	      return this.eat(e), t;
+	    },
+	    consumeFunctionName: function () {
+	      var e = this.scanner.source.substring(this.scanner.tokenStart, this.scanner.tokenEnd - 1);
+	      return this.eat(Hn), e;
+	    },
+	    getLocation: function (e, t) {
+	      return this.needPositions ? this.locationMap.getLocationRange(e, t, this.filename) : null;
+	    },
+	    getLocationFromList: function (e) {
+	      if (this.needPositions) {
+	        var t = this.getFirstListNode(e),
+	            n = this.getLastListNode(e);
+	        return this.locationMap.getLocationRange(null !== t ? t.loc.start.offset - this.locationMap.startOffset : this.scanner.tokenStart, null !== n ? n.loc.end.offset - this.locationMap.startOffset : this.scanner.tokenStart, this.filename);
+	      }
+
+	      return null;
+	    },
+	    error: function (e, t) {
+	      var n = void 0 !== t && t < this.scanner.source.length ? this.locationMap.getLocation(t) : this.scanner.eof ? this.locationMap.getLocation(Fn(this.scanner.source, this.scanner.source.length - 1)) : this.locationMap.getLocation(this.scanner.tokenStart);
+	      throw new p(e || "Unexpected input", this.scanner.source, n.offset, n.line, n.column);
+	    }
+	  };
+
+	  for (var n in e = function (e) {
+	    var t = {
+	      context: {},
+	      scope: {},
+	      atrule: {},
+	      pseudo: {}
+	    };
+	    if (e.parseContext) for (var n in e.parseContext) switch (typeof e.parseContext[n]) {
+	      case "function":
+	        t.context[n] = e.parseContext[n];
+	        break;
+
+	      case "string":
+	        t.context[n] = Qn(e.parseContext[n]);
+	    }
+	    if (e.scope) for (var n in e.scope) t.scope[n] = e.scope[n];
+	    if (e.atrule) for (var n in e.atrule) {
+	      var r = e.atrule[n];
+	      r.parse && (t.atrule[n] = r.parse);
+	    }
+	    if (e.pseudo) for (var n in e.pseudo) {
+	      var o = e.pseudo[n];
+	      o.parse && (t.pseudo[n] = o.parse);
+	    }
+	    if (e.node) for (var n in e.node) t[n] = e.node[n].parse;
+	    return t;
+	  }(e || {})) t[n] = e[n];
+
+	  return function (e, n) {
+	    var r,
+	        o = (n = n || {}).context || "default";
+	    if (ze(e, t.scanner), t.locationMap.setSource(e, n.offset, n.line, n.column), t.filename = n.filename || "<unknown>", t.needPositions = Boolean(n.positions), t.onParseError = "function" == typeof n.onParseError ? n.onParseError : Un, t.onParseErrorThrow = !1, t.parseAtrulePrelude = !("parseAtrulePrelude" in n) || Boolean(n.parseAtrulePrelude), t.parseRulePrelude = !("parseRulePrelude" in n) || Boolean(n.parseRulePrelude), t.parseValue = !("parseValue" in n) || Boolean(n.parseValue), t.parseCustomProperty = "parseCustomProperty" in n && Boolean(n.parseCustomProperty), !t.context.hasOwnProperty(o)) throw new Error("Unknown context `" + o + "`");
+	    return r = t.context[o].call(t, n), t.scanner.eof || t.error(), r;
+	  };
+	},
+	    Jn = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".split(""),
+	    er = function (e) {
+	  if (0 <= e && e < Jn.length) return Jn[e];
+	  throw new TypeError("Must be between 0 and 63: " + e);
+	};
+
+	var tr = function (e) {
+	  var t,
+	      n = "",
+	      r = function (e) {
+	    return e < 0 ? 1 + (-e << 1) : 0 + (e << 1);
+	  }(e);
+
+	  do {
+	    t = 31 & r, (r >>>= 5) > 0 && (t |= 32), n += er(t);
+	  } while (r > 0);
+
+	  return n;
+	};
+
+	var nr = function (e, t) {
+	  return e(t = {
+	    exports: {}
+	  }, t.exports), t.exports;
+	}(function (e, t) {
+	  t.getArg = function (e, t, n) {
+	    if (t in e) return e[t];
+	    if (3 === arguments.length) return n;
+	    throw new Error('"' + t + '" is a required argument.');
+	  };
+
+	  var n = /^(?:([\w+\-.]+):)?\/\/(?:(\w+:\w+)@)?([\w.-]*)(?::(\d+))?(.*)$/,
+	      r = /^data:.+\,.+$/;
+
+	  function o(e) {
+	    var t = e.match(n);
+	    return t ? {
+	      scheme: t[1],
+	      auth: t[2],
+	      host: t[3],
+	      port: t[4],
+	      path: t[5]
+	    } : null;
+	  }
+
+	  function a(e) {
+	    var t = "";
+	    return e.scheme && (t += e.scheme + ":"), t += "//", e.auth && (t += e.auth + "@"), e.host && (t += e.host), e.port && (t += ":" + e.port), e.path && (t += e.path), t;
+	  }
+
+	  function i(e) {
+	    var n = e,
+	        r = o(e);
+
+	    if (r) {
+	      if (!r.path) return e;
+	      n = r.path;
+	    }
+
+	    for (var i, s = t.isAbsolute(n), l = n.split(/\/+/), c = 0, u = l.length - 1; u >= 0; u--) "." === (i = l[u]) ? l.splice(u, 1) : ".." === i ? c++ : c > 0 && ("" === i ? (l.splice(u + 1, c), c = 0) : (l.splice(u, 2), c--));
+
+	    return "" === (n = l.join("/")) && (n = s ? "/" : "."), r ? (r.path = n, a(r)) : n;
+	  }
+
+	  function s(e, t) {
+	    "" === e && (e = "."), "" === t && (t = ".");
+	    var n = o(t),
+	        s = o(e);
+	    if (s && (e = s.path || "/"), n && !n.scheme) return s && (n.scheme = s.scheme), a(n);
+	    if (n || t.match(r)) return t;
+	    if (s && !s.host && !s.path) return s.host = t, a(s);
+	    var l = "/" === t.charAt(0) ? t : i(e.replace(/\/+$/, "") + "/" + t);
+	    return s ? (s.path = l, a(s)) : l;
+	  }
+
+	  t.urlParse = o, t.urlGenerate = a, t.normalize = i, t.join = s, t.isAbsolute = function (e) {
+	    return "/" === e.charAt(0) || n.test(e);
+	  }, t.relative = function (e, t) {
+	    "" === e && (e = "."), e = e.replace(/\/$/, "");
+
+	    for (var n = 0; 0 !== t.indexOf(e + "/");) {
+	      var r = e.lastIndexOf("/");
+	      if (r < 0) return t;
+	      if ((e = e.slice(0, r)).match(/^([^\/]+:\/)?\/*$/)) return t;
+	      ++n;
+	    }
+
+	    return window.Array(n + 1).join("../") + t.substr(e.length + 1);
+	  };
+	  var l = !("__proto__" in window.Object.create(null));
+
+	  function c(e) {
+	    return e;
+	  }
+
+	  function u(e) {
+	    if (!e) return !1;
+	    var t = e.length;
+	    if (t < 9) return !1;
+	    if (95 !== e.charCodeAt(t - 1) || 95 !== e.charCodeAt(t - 2) || 111 !== e.charCodeAt(t - 3) || 116 !== e.charCodeAt(t - 4) || 111 !== e.charCodeAt(t - 5) || 114 !== e.charCodeAt(t - 6) || 112 !== e.charCodeAt(t - 7) || 95 !== e.charCodeAt(t - 8) || 95 !== e.charCodeAt(t - 9)) return !1;
+
+	    for (var n = t - 10; n >= 0; n--) if (36 !== e.charCodeAt(n)) return !1;
+
+	    return !0;
+	  }
+
+	  function h(e, t) {
+	    return e === t ? 0 : null === e ? 1 : null === t ? -1 : e > t ? 1 : -1;
+	  }
+
+	  t.toSetString = l ? c : function (e) {
+	    return u(e) ? "$" + e : e;
+	  }, t.fromSetString = l ? c : function (e) {
+	    return u(e) ? e.slice(1) : e;
+	  }, t.compareByOriginalPositions = function (e, t, n) {
+	    var r = h(e.source, t.source);
+	    return 0 !== r || 0 !== (r = e.originalLine - t.originalLine) || 0 !== (r = e.originalColumn - t.originalColumn) || n || 0 !== (r = e.generatedColumn - t.generatedColumn) || 0 !== (r = e.generatedLine - t.generatedLine) ? r : h(e.name, t.name);
+	  }, t.compareByGeneratedPositionsDeflated = function (e, t, n) {
+	    var r = e.generatedLine - t.generatedLine;
+	    return 0 !== r || 0 !== (r = e.generatedColumn - t.generatedColumn) || n || 0 !== (r = h(e.source, t.source)) || 0 !== (r = e.originalLine - t.originalLine) || 0 !== (r = e.originalColumn - t.originalColumn) ? r : h(e.name, t.name);
+	  }, t.compareByGeneratedPositionsInflated = function (e, t) {
+	    var n = e.generatedLine - t.generatedLine;
+	    return 0 !== n || 0 !== (n = e.generatedColumn - t.generatedColumn) || 0 !== (n = h(e.source, t.source)) || 0 !== (n = e.originalLine - t.originalLine) || 0 !== (n = e.originalColumn - t.originalColumn) ? n : h(e.name, t.name);
+	  }, t.parseSourceMapInput = function (e) {
+	    return JSON.parse(e.replace(/^\)]}'[^\n]*\n/, ""));
+	  }, t.computeSourceURL = function (e, t, n) {
+	    if (t = t || "", e && ("/" !== e[e.length - 1] && "/" !== t[0] && (e += "/"), t = e + t), n) {
+	      var r = o(n);
+	      if (!r) throw new Error("sourceMapURL could not be parsed");
+
+	      if (r.path) {
+	        var l = r.path.lastIndexOf("/");
+	        l >= 0 && (r.path = r.path.substring(0, l + 1));
+	      }
+
+	      t = s(a(r), t);
+	    }
+
+	    return i(t);
+	  };
+	}),
+	    rr = (nr.getArg, nr.urlParse, nr.urlGenerate, nr.normalize, nr.join, nr.isAbsolute, nr.relative, nr.toSetString, nr.fromSetString, nr.compareByOriginalPositions, nr.compareByGeneratedPositionsDeflated, nr.compareByGeneratedPositionsInflated, nr.parseSourceMapInput, nr.computeSourceURL, window.Object.prototype.hasOwnProperty),
+	    or = "undefined" != typeof window.Map;
+
+	function ar() {
+	  this._array = [], this._set = or ? new window.Map() : window.Object.create(null);
+	}
+
+	ar.fromArray = function (e, t) {
+	  for (var n = new ar(), r = 0, o = e.length; r < o; r++) n.add(e[r], t);
+
+	  return n;
+	}, ar.prototype.size = function () {
+	  return or ? this._set.size : window.Object.getOwnPropertyNames(this._set).length;
+	}, ar.prototype.add = function (e, t) {
+	  var n = or ? e : nr.toSetString(e),
+	      r = or ? this.has(e) : rr.call(this._set, n),
+	      o = this._array.length;
+	  r && !t || this._array.push(e), r || (or ? this._set.set(e, o) : this._set[n] = o);
+	}, ar.prototype.has = function (e) {
+	  if (or) return this._set.has(e);
+	  var t = nr.toSetString(e);
+	  return rr.call(this._set, t);
+	}, ar.prototype.indexOf = function (e) {
+	  if (or) {
+	    var t = this._set.get(e);
+
+	    if (t >= 0) return t;
+	  } else {
+	    var n = nr.toSetString(e);
+	    if (rr.call(this._set, n)) return this._set[n];
+	  }
+
+	  throw new Error('"' + e + '" is not in the set.');
+	}, ar.prototype.at = function (e) {
+	  if (e >= 0 && e < this._array.length) return this._array[e];
+	  throw new Error("No element indexed by " + e);
+	}, ar.prototype.toArray = function () {
+	  return this._array.slice();
+	};
+	var ir = {
+	  ArraySet: ar
+	};
+
+	function sr() {
+	  this._array = [], this._sorted = !0, this._last = {
+	    generatedLine: -1,
+	    generatedColumn: 0
+	  };
+	}
+
+	sr.prototype.unsortedForEach = function (e, t) {
+	  this._array.forEach(e, t);
+	}, sr.prototype.add = function (e) {
+	  var t, n, r, o, a, i;
+	  t = this._last, n = e, r = t.generatedLine, o = n.generatedLine, a = t.generatedColumn, i = n.generatedColumn, o > r || o == r && i >= a || nr.compareByGeneratedPositionsInflated(t, n) <= 0 ? (this._last = e, this._array.push(e)) : (this._sorted = !1, this._array.push(e));
+	}, sr.prototype.toArray = function () {
+	  return this._sorted || (this._array.sort(nr.compareByGeneratedPositionsInflated), this._sorted = !0), this._array;
+	};
+	var lr = ir.ArraySet,
+	    cr = {
+	  MappingList: sr
+	}.MappingList;
+
+	function ur(e) {
+	  e || (e = {}), this._file = nr.getArg(e, "file", null), this._sourceRoot = nr.getArg(e, "sourceRoot", null), this._skipValidation = nr.getArg(e, "skipValidation", !1), this._sources = new lr(), this._names = new lr(), this._mappings = new cr(), this._sourcesContents = null;
+	}
+
+	ur.prototype._version = 3, ur.fromSourceMap = function (e) {
+	  var t = e.sourceRoot,
+	      n = new ur({
+	    file: e.file,
+	    sourceRoot: t
+	  });
+	  return e.eachMapping(function (e) {
+	    var r = {
+	      generated: {
+	        line: e.generatedLine,
+	        column: e.generatedColumn
+	      }
+	    };
+	    null != e.source && (r.source = e.source, null != t && (r.source = nr.relative(t, r.source)), r.original = {
+	      line: e.originalLine,
+	      column: e.originalColumn
+	    }, null != e.name && (r.name = e.name)), n.addMapping(r);
+	  }), e.sources.forEach(function (r) {
+	    var o = r;
+	    null !== t && (o = nr.relative(t, r)), n._sources.has(o) || n._sources.add(o);
+	    var a = e.sourceContentFor(r);
+	    null != a && n.setSourceContent(r, a);
+	  }), n;
+	}, ur.prototype.addMapping = function (e) {
+	  var t = nr.getArg(e, "generated"),
+	      n = nr.getArg(e, "original", null),
+	      r = nr.getArg(e, "source", null),
+	      o = nr.getArg(e, "name", null);
+	  this._skipValidation || this._validateMapping(t, n, r, o), null != r && (r = String(r), this._sources.has(r) || this._sources.add(r)), null != o && (o = String(o), this._names.has(o) || this._names.add(o)), this._mappings.add({
+	    generatedLine: t.line,
+	    generatedColumn: t.column,
+	    originalLine: null != n && n.line,
+	    originalColumn: null != n && n.column,
+	    source: r,
+	    name: o
+	  });
+	}, ur.prototype.setSourceContent = function (e, t) {
+	  var n = e;
+	  null != this._sourceRoot && (n = nr.relative(this._sourceRoot, n)), null != t ? (this._sourcesContents || (this._sourcesContents = window.Object.create(null)), this._sourcesContents[nr.toSetString(n)] = t) : this._sourcesContents && (delete this._sourcesContents[nr.toSetString(n)], 0 === window.Object.keys(this._sourcesContents).length && (this._sourcesContents = null));
+	}, ur.prototype.applySourceMap = function (e, t, n) {
+	  var r = t;
+
+	  if (null == t) {
+	    if (null == e.file) throw new Error('SourceMapGenerator.prototype.applySourceMap requires either an explicit source file, or the source map\'s "file" property. Both were omitted.');
+	    r = e.file;
+	  }
+
+	  var o = this._sourceRoot;
+	  null != o && (r = nr.relative(o, r));
+	  var a = new lr(),
+	      i = new lr();
+	  this._mappings.unsortedForEach(function (t) {
+	    if (t.source === r && null != t.originalLine) {
+	      var s = e.originalPositionFor({
+	        line: t.originalLine,
+	        column: t.originalColumn
+	      });
+	      null != s.source && (t.source = s.source, null != n && (t.source = nr.join(n, t.source)), null != o && (t.source = nr.relative(o, t.source)), t.originalLine = s.line, t.originalColumn = s.column, null != s.name && (t.name = s.name));
+	    }
+
+	    var l = t.source;
+	    null == l || a.has(l) || a.add(l);
+	    var c = t.name;
+	    null == c || i.has(c) || i.add(c);
+	  }, this), this._sources = a, this._names = i, e.sources.forEach(function (t) {
+	    var r = e.sourceContentFor(t);
+	    null != r && (null != n && (t = nr.join(n, t)), null != o && (t = nr.relative(o, t)), this.setSourceContent(t, r));
+	  }, this);
+	}, ur.prototype._validateMapping = function (e, t, n, r) {
+	  if (t && "number" != typeof t.line && "number" != typeof t.column) throw new Error("original.line and original.column are not numbers -- you probably meant to omit the original mapping entirely and only map the generated position. If so, pass null for the original mapping instead of an object with empty or null values.");
+	  if ((!(e && "line" in e && "column" in e && e.line > 0 && e.column >= 0) || t || n || r) && !(e && "line" in e && "column" in e && t && "line" in t && "column" in t && e.line > 0 && e.column >= 0 && t.line > 0 && t.column >= 0 && n)) throw new Error("Invalid mapping: " + JSON.stringify({
+	    generated: e,
+	    source: n,
+	    original: t,
+	    name: r
+	  }));
+	}, ur.prototype._serializeMappings = function () {
+	  for (var e, t, n, r, o = 0, a = 1, i = 0, s = 0, l = 0, c = 0, u = "", h = this._mappings.toArray(), d = 0, p = h.length; d < p; d++) {
+	    if (e = "", (t = h[d]).generatedLine !== a) for (o = 0; t.generatedLine !== a;) e += ";", a++;else if (d > 0) {
+	      if (!nr.compareByGeneratedPositionsInflated(t, h[d - 1])) continue;
+	      e += ",";
+	    }
+	    e += tr(t.generatedColumn - o), o = t.generatedColumn, null != t.source && (r = this._sources.indexOf(t.source), e += tr(r - c), c = r, e += tr(t.originalLine - 1 - s), s = t.originalLine - 1, e += tr(t.originalColumn - i), i = t.originalColumn, null != t.name && (n = this._names.indexOf(t.name), e += tr(n - l), l = n)), u += e;
+	  }
+
+	  return u;
+	}, ur.prototype._generateSourcesContent = function (e, t) {
+	  return e.map(function (e) {
+	    if (!this._sourcesContents) return null;
+	    null != t && (e = nr.relative(t, e));
+	    var n = nr.toSetString(e);
+	    return window.Object.prototype.hasOwnProperty.call(this._sourcesContents, n) ? this._sourcesContents[n] : null;
+	  }, this);
+	}, ur.prototype.toJSON = function () {
+	  var e = {
+	    version: this._version,
+	    sources: this._sources.toArray(),
+	    names: this._names.toArray(),
+	    mappings: this._serializeMappings()
+	  };
+	  return null != this._file && (e.file = this._file), null != this._sourceRoot && (e.sourceRoot = this._sourceRoot), this._sourcesContents && (e.sourcesContent = this._generateSourcesContent(e.sources, e.sourceRoot)), e;
+	}, ur.prototype.toString = function () {
+	  return JSON.stringify(this.toJSON());
+	};
+	var hr = {
+	  SourceMapGenerator: ur
+	}.SourceMapGenerator,
+	    dr = {
+	  Atrule: !0,
+	  Selector: !0,
+	  Declaration: !0
+	},
+	    pr = window.Object.prototype.hasOwnProperty;
+
+	function mr(e, t) {
+	  var n = e.children,
+	      r = null;
+	  "function" != typeof t ? n.forEach(this.node, this) : n.forEach(function (e) {
+	    null !== r && t.call(this, r), this.node(e), r = e;
+	  }, this);
+	}
+
+	var fr = function (e) {
+	  function t(e) {
+	    if (!pr.call(n, e.type)) throw new Error("Unknown node type: " + e.type);
+	    n[e.type].call(this, e);
+	  }
+
+	  var n = {};
+	  if (e.node) for (var r in e.node) n[r] = e.node[r].generate;
+	  return function (e, n) {
+	    var r = "",
+	        o = {
+	      children: mr,
+	      node: t,
+	      chunk: function (e) {
+	        r += e;
+	      },
+	      result: function () {
+	        return r;
+	      }
+	    };
+	    return n && ("function" == typeof n.decorator && (o = n.decorator(o)), n.sourceMap && (o = function (e) {
+	      var t = new hr(),
+	          n = 1,
+	          r = 0,
+	          o = {
+	        line: 1,
+	        column: 0
+	      },
+	          a = {
+	        line: 0,
+	        column: 0
+	      },
+	          i = !1,
+	          s = {
+	        line: 1,
+	        column: 0
+	      },
+	          l = {
+	        generated: s
+	      },
+	          c = e.node;
+
+	      e.node = function (e) {
+	        if (e.loc && e.loc.start && dr.hasOwnProperty(e.type)) {
+	          var u = e.loc.start.line,
+	              h = e.loc.start.column - 1;
+	          a.line === u && a.column === h || (a.line = u, a.column = h, o.line = n, o.column = r, i && (i = !1, o.line === s.line && o.column === s.column || t.addMapping(l)), i = !0, t.addMapping({
+	            source: e.loc.source,
+	            original: a,
+	            generated: o
+	          }));
+	        }
+
+	        c.call(this, e), i && dr.hasOwnProperty(e.type) && (s.line = n, s.column = r);
+	      };
+
+	      var u = e.chunk;
+
+	      e.chunk = function (e) {
+	        for (var t = 0; t < e.length; t++) 10 === e.charCodeAt(t) ? (n++, r = 0) : r++;
+
+	        u(e);
+	      };
+
+	      var h = e.result;
+	      return e.result = function () {
+	        return i && t.addMapping(l), {
+	          css: h(),
+	          map: t
+	        };
+	      }, e;
+	    }(o))), o.node(e), o.result();
+	  };
+	},
+	    gr = window.Object.prototype.hasOwnProperty,
+	    br = function () {};
+
+	function yr(e) {
+	  return "function" == typeof e ? e : br;
+	}
+
+	function kr(e, t) {
+	  return function (n, r, o) {
+	    n.type === t && e.call(this, n, r, o);
+	  };
+	}
+
+	function vr(e, t) {
+	  var n = t.structure,
+	      r = [];
+
+	  for (var o in n) if (!1 !== gr.call(n, o)) {
+	    var a = n[o],
+	        i = {
+	      name: o,
+	      type: !1,
+	      nullable: !1
+	    };
+	    window.Array.isArray(n[o]) || (a = [n[o]]);
+
+	    for (var s = 0; s < a.length; s++) {
+	      var l = a[s];
+	      null === l ? i.nullable = !0 : "string" == typeof l ? i.type = "node" : window.Array.isArray(l) && (i.type = "list");
+	    }
+
+	    i.type && r.push(i);
+	  }
+
+	  return r.length ? {
+	    context: t.walkContext,
+	    fields: r
+	  } : null;
+	}
+
+	function wr(e, t) {
+	  var n = e.fields.slice(),
+	      r = e.context,
+	      o = "string" == typeof r;
+	  return t && n.reverse(), function (e, a, i) {
+	    var s;
+	    o && (s = a[r], a[r] = e);
+
+	    for (var l = 0; l < n.length; l++) {
+	      var c = n[l],
+	          u = e[c.name];
+	      c.nullable && !u || ("list" === c.type ? t ? u.forEachRight(i) : u.forEach(i) : i(u));
+	    }
+
+	    o && (a[r] = s);
+	  };
+	}
+
+	function xr(e) {
+	  return {
+	    Atrule: {
+	      StyleSheet: e.StyleSheet,
+	      Atrule: e.Atrule,
+	      Rule: e.Rule,
+	      Block: e.Block
+	    },
+	    Rule: {
+	      StyleSheet: e.StyleSheet,
+	      Atrule: e.Atrule,
+	      Rule: e.Rule,
+	      Block: e.Block
+	    },
+	    Declaration: {
+	      StyleSheet: e.StyleSheet,
+	      Atrule: e.Atrule,
+	      Rule: e.Rule,
+	      Block: e.Block,
+	      DeclarationList: e.DeclarationList
+	    }
+	  };
+	}
+
+	var Sr = function (e) {
+	  var t = function (e) {
+	    var t = {};
+
+	    for (var n in e.node) if (gr.call(e.node, n)) {
+	      var r = e.node[n];
+	      if (!r.structure) throw new Error("Missed `structure` field in `" + n + "` node type definition");
+	      t[n] = vr(0, r);
+	    }
+
+	    return t;
+	  }(e),
+	      n = {},
+	      r = {};
+
+	  for (var o in t) gr.call(t, o) && null !== t[o] && (n[o] = wr(t[o], !1), r[o] = wr(t[o], !0));
+
+	  var a = xr(n),
+	      i = xr(r),
+	      s = function (e, o) {
+	    var s = br,
+	        l = br,
+	        c = n,
+	        u = {
+	      root: e,
+	      stylesheet: null,
+	      atrule: null,
+	      atrulePrelude: null,
+	      rule: null,
+	      selector: null,
+	      block: null,
+	      declaration: null,
+	      function: null
+	    };
+	    if ("function" == typeof o) s = o;else if (o && (s = yr(o.enter), l = yr(o.leave), o.reverse && (c = r), o.visit)) {
+	      if (a.hasOwnProperty(o.visit)) c = o.reverse ? i[o.visit] : a[o.visit];else if (!t.hasOwnProperty(o.visit)) throw new Error("Bad value `" + o.visit + "` for `visit` option (should be: " + window.Object.keys(t).join(", ") + ")");
+	      s = kr(s, o.visit), l = kr(l, o.visit);
+	    }
+	    if (s === br && l === br) throw new Error("Neither `enter` nor `leave` walker handler is set or both aren't a function");
+
+	    if (o.reverse) {
+	      var h = s;
+	      s = l, l = h;
+	    }
+
+	    !function e(t, n, r) {
+	      s.call(u, t, n, r), c.hasOwnProperty(t.type) && c[t.type](t, u, e), l.call(u, t, n, r);
+	    }(e);
+	  };
+
+	  return s.find = function (e, t) {
+	    var n = null;
+	    return s(e, function (e, r, o) {
+	      null === n && t.call(this, e, r, o) && (n = e);
+	    }), n;
+	  }, s.findLast = function (e, t) {
+	    var n = null;
+	    return s(e, {
+	      reverse: !0,
+	      enter: function (e, r, o) {
+	        null === n && t.call(this, e, r, o) && (n = e);
+	      }
+	    }), n;
+	  }, s.findAll = function (e, t) {
+	    var n = [];
+	    return s(e, function (e, r, o) {
+	      t.call(this, e, r, o) && n.push(e);
+	    }), n;
+	  }, s;
+	},
+	    Cr = function e(t) {
+	  var n = {};
+
+	  for (var r in t) {
+	    var o = t[r];
+	    o && (window.Array.isArray(o) || o instanceof u ? o = o.map(e) : o.constructor === window.Object && (o = e(o))), n[r] = o;
+	  }
+
+	  return n;
+	},
+	    Ar = window.Object.prototype.hasOwnProperty,
+	    Tr = {
+	  generic: !0,
+	  types: {},
+	  atrules: {},
+	  properties: {},
+	  parseContext: {},
+	  scope: {},
+	  atrule: ["parse"],
+	  pseudo: ["parse"],
+	  node: ["name", "structure", "parse", "generate", "walkContext"]
+	};
+
+	function zr(e) {
+	  return e && e.constructor === window.Object;
+	}
+
+	function Pr(e) {
+	  return zr(e) ? window.Object.assign({}, e) : e;
+	}
+
+	function Er(e, t) {
+	  for (var n in t) Ar.call(t, n) && (zr(e[n]) ? Er(e[n], Pr(t[n])) : e[n] = Pr(t[n]));
+	}
+
+	var Lr = function (e, t) {
+	  return function e(t, n, r) {
+	    for (var o in r) if (!1 !== Ar.call(r, o)) if (!0 === r[o]) o in n && Ar.call(n, o) && (t[o] = Pr(n[o]));else if (r[o]) {
+	      if (zr(r[o])) Er(a = {}, t[o]), Er(a, n[o]), t[o] = a;else if (window.Array.isArray(r[o])) {
+	        var a = {},
+	            i = r[o].reduce(function (e, t) {
+	          return e[t] = !0, e;
+	        }, {});
+
+	        for (var s in t[o]) Ar.call(t[o], s) && (a[s] = {}, t[o] && t[o][s] && e(a[s], t[o][s], i));
+
+	        for (var s in n[o]) Ar.call(n[o], s) && (a[s] || (a[s] = {}), n[o] && n[o][s] && e(a[s], n[o][s], i));
+
+	        t[o] = a;
+	      }
+	    }
+
+	    return t;
+	  }(e, t, Tr);
+	};
+
+	function Or(e) {
+	  var t = Zn(e),
+	      n = Sr(e),
+	      r = fr(e),
+	      o = function (e) {
+	    return {
+	      fromPlainObject: function (t) {
+	        return e(t, {
+	          enter: function (e) {
+	            e.children && e.children instanceof u == !1 && (e.children = new u().fromArray(e.children));
+	          }
+	        }), t;
+	      },
+	      toPlainObject: function (t) {
+	        return e(t, {
+	          leave: function (e) {
+	            e.children && e.children instanceof u && (e.children = e.children.toArray());
+	          }
+	        }), t;
+	      }
+	    };
+	  }(n),
+	      a = {
+	    List: u,
+	    SyntaxError: p,
+	    TokenStream: X,
+	    Lexer: On,
+	    vendorPrefix: le.vendorPrefix,
+	    keyword: le.keyword,
+	    property: le.property,
+	    isCustomProperty: le.isCustomProperty,
+	    definitionSyntax: Dn,
+	    lexer: null,
+	    createLexer: function (e) {
+	      return new On(e, a, a.lexer.structure);
+	    },
+	    tokenize: ze,
+	    parse: t,
+	    walk: n,
+	    generate: r,
+	    find: n.find,
+	    findLast: n.findLast,
+	    findAll: n.findAll,
+	    clone: Cr,
+	    fromPlainObject: o.fromPlainObject,
+	    toPlainObject: o.toPlainObject,
+	    createSyntax: function (e) {
+	      return Or(Lr({}, e));
+	    },
+	    fork: function (t) {
+	      var n = Lr({}, e);
+	      return Or("function" == typeof t ? t(n, window.Object.assign) : Lr(n, t));
+	    }
+	  };
+
+	  return a.lexer = new On({
+	    generic: !0,
+	    types: e.types,
+	    atrules: e.atrules,
+	    properties: e.properties,
+	    node: e.node
+	  }, a), a;
+	}
+
+	var Dr = function (e) {
+	  return Or(Lr({}, e));
+	},
+	    Nr = {
+	  "absolute-size": "xx-small|x-small|small|medium|large|x-large|xx-large",
+	  "alpha-value": "<number>|<percentage>",
+	  "angle-percentage": "<angle>|<percentage>",
+	  "angular-color-hint": "<angle-percentage>",
+	  "angular-color-stop": "<color>&&<color-stop-angle>?",
+	  "angular-color-stop-list": "[<angular-color-stop> [, <angular-color-hint>]?]# , <angular-color-stop>",
+	  "animateable-feature": "scroll-position|contents|<custom-ident>",
+	  attachment: "scroll|fixed|local",
+	  "attr()": "attr( <attr-name> <type-or-unit>? [, <attr-fallback>]? )",
+	  "attr-matcher": "['~'|'|'|'^'|'$'|'*']? '='",
+	  "attr-modifier": "i|s",
+	  "attribute-selector": "'[' <wq-name> ']'|'[' <wq-name> <attr-matcher> [<string-token>|<ident-token>] <attr-modifier>? ']'",
+	  "auto-repeat": "repeat( [auto-fill|auto-fit] , [<line-names>? <fixed-size>]+ <line-names>? )",
+	  "auto-track-list": "[<line-names>? [<fixed-size>|<fixed-repeat>]]* <line-names>? <auto-repeat> [<line-names>? [<fixed-size>|<fixed-repeat>]]* <line-names>?",
+	  "baseline-position": "[first|last]? baseline",
+	  "basic-shape": "<inset()>|<circle()>|<ellipse()>|<polygon()>",
+	  "bg-image": "none|<image>",
+	  "bg-layer": "<bg-image>||<bg-position> [/ <bg-size>]?||<repeat-style>||<attachment>||<box>||<box>",
+	  "bg-position": "[[left|center|right|top|bottom|<length-percentage>]|[left|center|right|<length-percentage>] [top|center|bottom|<length-percentage>]|[center|[left|right] <length-percentage>?]&&[center|[top|bottom] <length-percentage>?]]",
+	  "bg-size": "[<length-percentage>|auto]{1,2}|cover|contain",
+	  "blur()": "blur( <length> )",
+	  "blend-mode": "normal|multiply|screen|overlay|darken|lighten|color-dodge|color-burn|hard-light|soft-light|difference|exclusion|hue|saturation|color|luminosity",
+	  box: "border-box|padding-box|content-box",
+	  "brightness()": "brightness( <number-percentage> )",
+	  "calc()": "calc( <calc-sum> )",
+	  "calc-sum": "<calc-product> [['+'|'-'] <calc-product>]*",
+	  "calc-product": "<calc-value> ['*' <calc-value>|'/' <number>]*",
+	  "calc-value": "<number>|<dimension>|<percentage>|( <calc-sum> )",
+	  "cf-final-image": "<image>|<color>",
+	  "cf-mixing-image": "<percentage>?&&<image>",
+	  "circle()": "circle( [<shape-radius>]? [at <position>]? )",
+	  "clamp()": "clamp( <calc-sum>#{3} )",
+	  "class-selector": "'.' <ident-token>",
+	  "clip-source": "<url>",
+	  color: "<rgb()>|<rgba()>|<hsl()>|<hsla()>|<hex-color>|<named-color>|currentcolor|<deprecated-system-color>",
+	  "color-stop": "<color-stop-length>|<color-stop-angle>",
+	  "color-stop-angle": "<angle-percentage>{1,2}",
+	  "color-stop-length": "<length-percentage>{1,2}",
+	  "color-stop-list": "[<linear-color-stop> [, <linear-color-hint>]?]# , <linear-color-stop>",
+	  combinator: "'>'|'+'|'~'|['||']",
+	  "common-lig-values": "[common-ligatures|no-common-ligatures]",
+	  compat: "searchfield|textarea|push-button|button-bevel|slider-horizontal|checkbox|radio|square-button|menulist|menulist-button|listbox|meter|progress-bar",
+	  "composite-style": "clear|copy|source-over|source-in|source-out|source-atop|destination-over|destination-in|destination-out|destination-atop|xor",
+	  "compositing-operator": "add|subtract|intersect|exclude",
+	  "compound-selector": "[<type-selector>? <subclass-selector>* [<pseudo-element-selector> <pseudo-class-selector>*]*]!",
+	  "compound-selector-list": "<compound-selector>#",
+	  "complex-selector": "<compound-selector> [<combinator>? <compound-selector>]*",
+	  "complex-selector-list": "<complex-selector>#",
+	  "conic-gradient()": "conic-gradient( [from <angle>]? [at <position>]? , <angular-color-stop-list> )",
+	  "contextual-alt-values": "[contextual|no-contextual]",
+	  "content-distribution": "space-between|space-around|space-evenly|stretch",
+	  "content-list": "[<string>|contents|<url>|<quote>|<attr()>|counter( <ident> , <'list-style-type'>? )]+",
+	  "content-position": "center|start|end|flex-start|flex-end",
+	  "content-replacement": "<image>",
+	  "contrast()": "contrast( [<number-percentage>] )",
+	  "counter()": "counter( <custom-ident> , [<counter-style>|none]? )",
+	  "counter-style": "<counter-style-name>|symbols( )",
+	  "counter-style-name": "<custom-ident>",
+	  "counters()": "counters( <custom-ident> , <string> , [<counter-style>|none]? )",
+	  "cross-fade()": "cross-fade( <cf-mixing-image> , <cf-final-image>? )",
+	  "cubic-bezier-timing-function": "ease|ease-in|ease-out|ease-in-out|cubic-bezier( <number> , <number> , <number> , <number> )",
+	  "deprecated-system-color": "ActiveBorder|ActiveCaption|AppWorkspace|Background|ButtonFace|ButtonHighlight|ButtonShadow|ButtonText|CaptionText|GrayText|Highlight|HighlightText|InactiveBorder|InactiveCaption|InactiveCaptionText|InfoBackground|InfoText|Menu|MenuText|Scrollbar|ThreeDDarkShadow|ThreeDFace|ThreeDHighlight|ThreeDLightShadow|ThreeDShadow|Window|WindowFrame|WindowText",
+	  "discretionary-lig-values": "[discretionary-ligatures|no-discretionary-ligatures]",
+	  "display-box": "contents|none",
+	  "display-inside": "flow|flow-root|table|flex|grid|ruby",
+	  "display-internal": "table-row-group|table-header-group|table-footer-group|table-row|table-cell|table-column-group|table-column|table-caption|ruby-base|ruby-text|ruby-base-container|ruby-text-container",
+	  "display-legacy": "inline-block|inline-list-item|inline-table|inline-flex|inline-grid",
+	  "display-listitem": "<display-outside>?&&[flow|flow-root]?&&list-item",
+	  "display-outside": "block|inline|run-in",
+	  "drop-shadow()": "drop-shadow( <length>{2,3} <color>? )",
+	  "east-asian-variant-values": "[jis78|jis83|jis90|jis04|simplified|traditional]",
+	  "east-asian-width-values": "[full-width|proportional-width]",
+	  "element()": "element( <id-selector> )",
+	  "ellipse()": "ellipse( [<shape-radius>{2}]? [at <position>]? )",
+	  "ending-shape": "circle|ellipse",
+	  "env()": "env( <custom-ident> , <declaration-value>? )",
+	  "explicit-track-list": "[<line-names>? <track-size>]+ <line-names>?",
+	  "family-name": "<string>|<custom-ident>+",
+	  "feature-tag-value": "<string> [<integer>|on|off]?",
+	  "feature-type": "@stylistic|@historical-forms|@styleset|@character-variant|@swash|@ornaments|@annotation",
+	  "feature-value-block": "<feature-type> '{' <feature-value-declaration-list> '}'",
+	  "feature-value-block-list": "<feature-value-block>+",
+	  "feature-value-declaration": "<custom-ident> : <integer>+ ;",
+	  "feature-value-declaration-list": "<feature-value-declaration>",
+	  "feature-value-name": "<custom-ident>",
+	  "fill-rule": "nonzero|evenodd",
+	  "filter-function": "<blur()>|<brightness()>|<contrast()>|<drop-shadow()>|<grayscale()>|<hue-rotate()>|<invert()>|<opacity()>|<saturate()>|<sepia()>",
+	  "filter-function-list": "[<filter-function>|<url>]+",
+	  "final-bg-layer": "<'background-color'>||<bg-image>||<bg-position> [/ <bg-size>]?||<repeat-style>||<attachment>||<box>||<box>",
+	  "fit-content()": "fit-content( [<length>|<percentage>] )",
+	  "fixed-breadth": "<length-percentage>",
+	  "fixed-repeat": "repeat( [<positive-integer>] , [<line-names>? <fixed-size>]+ <line-names>? )",
+	  "fixed-size": "<fixed-breadth>|minmax( <fixed-breadth> , <track-breadth> )|minmax( <inflexible-breadth> , <fixed-breadth> )",
+	  "font-stretch-absolute": "normal|ultra-condensed|extra-condensed|condensed|semi-condensed|semi-expanded|expanded|extra-expanded|ultra-expanded|<percentage>",
+	  "font-variant-css21": "[normal|small-caps]",
+	  "font-weight-absolute": "normal|bold|<number>",
+	  "frequency-percentage": "<frequency>|<percentage>",
+	  "general-enclosed": "[<function-token> <any-value> )]|( <ident> <any-value> )",
+	  "generic-family": "serif|sans-serif|cursive|fantasy|monospace|-apple-system",
+	  "generic-name": "serif|sans-serif|cursive|fantasy|monospace",
+	  "geometry-box": "<shape-box>|fill-box|stroke-box|view-box",
+	  gradient: "<linear-gradient()>|<repeating-linear-gradient()>|<radial-gradient()>|<repeating-radial-gradient()>|<conic-gradient()>|<-legacy-gradient>",
+	  "grayscale()": "grayscale( <number-percentage> )",
+	  "grid-line": "auto|<custom-ident>|[<integer>&&<custom-ident>?]|[span&&[<integer>||<custom-ident>]]",
+	  "historical-lig-values": "[historical-ligatures|no-historical-ligatures]",
+	  "hsl()": "hsl( <hue> <percentage> <percentage> [/ <alpha-value>]? )|hsl( <hue> , <percentage> , <percentage> , <alpha-value>? )",
+	  "hsla()": "hsla( <hue> <percentage> <percentage> [/ <alpha-value>]? )|hsla( <hue> , <percentage> , <percentage> , <alpha-value>? )",
+	  hue: "<number>|<angle>",
+	  "hue-rotate()": "hue-rotate( <angle> )",
+	  image: "<url>|<image()>|<image-set()>|<element()>|<cross-fade()>|<gradient>",
+	  "image()": "image( <image-tags>? [<image-src>? , <color>?]! )",
+	  "image-set()": "image-set( <image-set-option># )",
+	  "image-set-option": "[<image>|<string>] <resolution>",
+	  "image-src": "<url>|<string>",
+	  "image-tags": "ltr|rtl",
+	  "inflexible-breadth": "<length>|<percentage>|min-content|max-content|auto",
+	  "inset()": "inset( <length-percentage>{1,4} [round <'border-radius'>]? )",
+	  "invert()": "invert( <number-percentage> )",
+	  "keyframes-name": "<custom-ident>|<string>",
+	  "keyframe-block": "<keyframe-selector># { <declaration-list> }",
+	  "keyframe-block-list": "<keyframe-block>+",
+	  "keyframe-selector": "from|to|<percentage>",
+	  "leader()": "leader( <leader-type> )",
+	  "leader-type": "dotted|solid|space|<string>",
+	  "length-percentage": "<length>|<percentage>",
+	  "line-names": "'[' <custom-ident>* ']'",
+	  "line-name-list": "[<line-names>|<name-repeat>]+",
+	  "line-style": "none|hidden|dotted|dashed|solid|double|groove|ridge|inset|outset",
+	  "line-width": "<length>|thin|medium|thick",
+	  "linear-color-hint": "<length-percentage>",
+	  "linear-color-stop": "<color> <color-stop-length>?",
+	  "linear-gradient()": "linear-gradient( [<angle>|to <side-or-corner>]? , <color-stop-list> )",
+	  "mask-layer": "<mask-reference>||<position> [/ <bg-size>]?||<repeat-style>||<geometry-box>||[<geometry-box>|no-clip]||<compositing-operator>||<masking-mode>",
+	  "mask-position": "[<length-percentage>|left|center|right] [<length-percentage>|top|center|bottom]?",
+	  "mask-reference": "none|<image>|<mask-source>",
+	  "mask-source": "<url>",
+	  "masking-mode": "alpha|luminance|match-source",
+	  "matrix()": "matrix( <number>#{6} )",
+	  "matrix3d()": "matrix3d( <number>#{16} )",
+	  "max()": "max( <calc-sum># )",
+	  "media-and": "<media-in-parens> [and <media-in-parens>]+",
+	  "media-condition": "<media-not>|<media-and>|<media-or>|<media-in-parens>",
+	  "media-condition-without-or": "<media-not>|<media-and>|<media-in-parens>",
+	  "media-feature": "( [<mf-plain>|<mf-boolean>|<mf-range>] )",
+	  "media-in-parens": "( <media-condition> )|<media-feature>|<general-enclosed>",
+	  "media-not": "not <media-in-parens>",
+	  "media-or": "<media-in-parens> [or <media-in-parens>]+",
+	  "media-query": "<media-condition>|[not|only]? <media-type> [and <media-condition-without-or>]?",
+	  "media-query-list": "<media-query>#",
+	  "media-type": "<ident>",
+	  "mf-boolean": "<mf-name>",
+	  "mf-name": "<ident>",
+	  "mf-plain": "<mf-name> : <mf-value>",
+	  "mf-range": "<mf-name> ['<'|'>']? '='? <mf-value>|<mf-value> ['<'|'>']? '='? <mf-name>|<mf-value> '<' '='? <mf-name> '<' '='? <mf-value>|<mf-value> '>' '='? <mf-name> '>' '='? <mf-value>",
+	  "mf-value": "<number>|<dimension>|<ident>|<ratio>",
+	  "min()": "min( <calc-sum># )",
+	  "minmax()": "minmax( [<length>|<percentage>|<flex>|min-content|max-content|auto] , [<length>|<percentage>|<flex>|min-content|max-content|auto] )",
+	  "named-color": "transparent|aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkgrey|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkslategrey|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dimgrey|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|grey|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightgrey|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightslategrey|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|rebeccapurple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|slategrey|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen|<-non-standard-color>",
+	  "namespace-prefix": "<ident>",
+	  "ns-prefix": "[<ident-token>|'*']? '|'",
+	  "number-percentage": "<number>|<percentage>",
+	  "numeric-figure-values": "[lining-nums|oldstyle-nums]",
+	  "numeric-fraction-values": "[diagonal-fractions|stacked-fractions]",
+	  "numeric-spacing-values": "[proportional-nums|tabular-nums]",
+	  nth: "<an-plus-b>|even|odd",
+	  "opacity()": "opacity( [<number-percentage>] )",
+	  "overflow-position": "unsafe|safe",
+	  "outline-radius": "<length>|<percentage>",
+	  "page-body": "<declaration>? [; <page-body>]?|<page-margin-box> <page-body>",
+	  "page-margin-box": "<page-margin-box-type> '{' <declaration-list> '}'",
+	  "page-margin-box-type": "@top-left-corner|@top-left|@top-center|@top-right|@top-right-corner|@bottom-left-corner|@bottom-left|@bottom-center|@bottom-right|@bottom-right-corner|@left-top|@left-middle|@left-bottom|@right-top|@right-middle|@right-bottom",
+	  "page-selector-list": "[<page-selector>#]?",
+	  "page-selector": "<pseudo-page>+|<ident> <pseudo-page>*",
+	  "perspective()": "perspective( <length> )",
+	  "polygon()": "polygon( <fill-rule>? , [<length-percentage> <length-percentage>]# )",
+	  position: "[[left|center|right]||[top|center|bottom]|[left|center|right|<length-percentage>] [top|center|bottom|<length-percentage>]?|[[left|right] <length-percentage>]&&[[top|bottom] <length-percentage>]]",
+	  "pseudo-class-selector": "':' <ident-token>|':' <function-token> <any-value> ')'",
+	  "pseudo-element-selector": "':' <pseudo-class-selector>",
+	  "pseudo-page": ": [left|right|first|blank]",
+	  quote: "open-quote|close-quote|no-open-quote|no-close-quote",
+	  "radial-gradient()": "radial-gradient( [<ending-shape>||<size>]? [at <position>]? , <color-stop-list> )",
+	  "relative-selector": "<combinator>? <complex-selector>",
+	  "relative-selector-list": "<relative-selector>#",
+	  "relative-size": "larger|smaller",
+	  "repeat-style": "repeat-x|repeat-y|[repeat|space|round|no-repeat]{1,2}",
+	  "repeating-linear-gradient()": "repeating-linear-gradient( [<angle>|to <side-or-corner>]? , <color-stop-list> )",
+	  "repeating-radial-gradient()": "repeating-radial-gradient( [<ending-shape>||<size>]? [at <position>]? , <color-stop-list> )",
+	  "rgb()": "rgb( <percentage>{3} [/ <alpha-value>]? )|rgb( <number>{3} [/ <alpha-value>]? )|rgb( <percentage>#{3} , <alpha-value>? )|rgb( <number>#{3} , <alpha-value>? )",
+	  "rgba()": "rgba( <percentage>{3} [/ <alpha-value>]? )|rgba( <number>{3} [/ <alpha-value>]? )|rgba( <percentage>#{3} , <alpha-value>? )|rgba( <number>#{3} , <alpha-value>? )",
+	  "rotate()": "rotate( [<angle>|<zero>] )",
+	  "rotate3d()": "rotate3d( <number> , <number> , <number> , [<angle>|<zero>] )",
+	  "rotateX()": "rotateX( [<angle>|<zero>] )",
+	  "rotateY()": "rotateY( [<angle>|<zero>] )",
+	  "rotateZ()": "rotateZ( [<angle>|<zero>] )",
+	  "saturate()": "saturate( <number-percentage> )",
+	  "scale()": "scale( <number> , <number>? )",
+	  "scale3d()": "scale3d( <number> , <number> , <number> )",
+	  "scaleX()": "scaleX( <number> )",
+	  "scaleY()": "scaleY( <number> )",
+	  "scaleZ()": "scaleZ( <number> )",
+	  "self-position": "center|start|end|self-start|self-end|flex-start|flex-end",
+	  "shape-radius": "<length-percentage>|closest-side|farthest-side",
+	  "skew()": "skew( [<angle>|<zero>] , [<angle>|<zero>]? )",
+	  "skewX()": "skewX( [<angle>|<zero>] )",
+	  "skewY()": "skewY( [<angle>|<zero>] )",
+	  "sepia()": "sepia( <number-percentage> )",
+	  shadow: "inset?&&<length>{2,4}&&<color>?",
+	  "shadow-t": "[<length>{2,3}&&<color>?]",
+	  shape: "rect( <top> , <right> , <bottom> , <left> )|rect( <top> <right> <bottom> <left> )",
+	  "shape-box": "<box>|margin-box",
+	  "side-or-corner": "[left|right]||[top|bottom]",
+	  "single-animation": "<time>||<timing-function>||<time>||<single-animation-iteration-count>||<single-animation-direction>||<single-animation-fill-mode>||<single-animation-play-state>||[none|<keyframes-name>]",
+	  "single-animation-direction": "normal|reverse|alternate|alternate-reverse",
+	  "single-animation-fill-mode": "none|forwards|backwards|both",
+	  "single-animation-iteration-count": "infinite|<number>",
+	  "single-animation-play-state": "running|paused",
+	  "single-transition": "[none|<single-transition-property>]||<time>||<timing-function>||<time>",
+	  "single-transition-property": "all|<custom-ident>",
+	  size: "closest-side|farthest-side|closest-corner|farthest-corner|<length>|<length-percentage>{2}",
+	  "step-position": "jump-start|jump-end|jump-none|jump-both|start|end",
+	  "step-timing-function": "step-start|step-end|steps( <integer> [, <step-position>]? )",
+	  "subclass-selector": "<id-selector>|<class-selector>|<attribute-selector>|<pseudo-class-selector>",
+	  "supports-condition": "not <supports-in-parens>|<supports-in-parens> [and <supports-in-parens>]*|<supports-in-parens> [or <supports-in-parens>]*",
+	  "supports-in-parens": "( <supports-condition> )|<supports-feature>|<general-enclosed>",
+	  "supports-feature": "<supports-decl>|<supports-selector-fn>",
+	  "supports-decl": "( <declaration> )",
+	  "supports-selector-fn": "selector( <complex-selector> )",
+	  symbol: "<string>|<image>|<custom-ident>",
+	  target: "<target-counter()>|<target-counters()>|<target-text()>",
+	  "target-counter()": "target-counter( [<string>|<url>] , <custom-ident> , <counter-style>? )",
+	  "target-counters()": "target-counters( [<string>|<url>] , <custom-ident> , <string> , <counter-style>? )",
+	  "target-text()": "target-text( [<string>|<url>] , [content|before|after|first-letter]? )",
+	  "time-percentage": "<time>|<percentage>",
+	  "timing-function": "linear|<cubic-bezier-timing-function>|<step-timing-function>",
+	  "track-breadth": "<length-percentage>|<flex>|min-content|max-content|auto",
+	  "track-list": "[<line-names>? [<track-size>|<track-repeat>]]+ <line-names>?",
+	  "track-repeat": "repeat( [<positive-integer>] , [<line-names>? <track-size>]+ <line-names>? )",
+	  "track-size": "<track-breadth>|minmax( <inflexible-breadth> , <track-breadth> )|fit-content( [<length>|<percentage>] )",
+	  "transform-function": "<matrix()>|<translate()>|<translateX()>|<translateY()>|<scale()>|<scaleX()>|<scaleY()>|<rotate()>|<skew()>|<skewX()>|<skewY()>|<matrix3d()>|<translate3d()>|<translateZ()>|<scale3d()>|<scaleZ()>|<rotate3d()>|<rotateX()>|<rotateY()>|<rotateZ()>|<perspective()>",
+	  "transform-list": "<transform-function>+",
+	  "translate()": "translate( <length-percentage> , <length-percentage>? )",
+	  "translate3d()": "translate3d( <length-percentage> , <length-percentage> , <length> )",
+	  "translateX()": "translateX( <length-percentage> )",
+	  "translateY()": "translateY( <length-percentage> )",
+	  "translateZ()": "translateZ( <length> )",
+	  "type-or-unit": "string|color|url|integer|number|length|angle|time|frequency|cap|ch|em|ex|ic|lh|rlh|rem|vb|vi|vw|vh|vmin|vmax|mm|Q|cm|in|pt|pc|px|deg|grad|rad|turn|ms|s|Hz|kHz|%",
+	  "type-selector": "<wq-name>|<ns-prefix>? '*'",
+	  "var()": "var( <custom-property-name> , <declaration-value>? )",
+	  "viewport-length": "auto|<length-percentage>",
+	  "wq-name": "<ns-prefix>? <ident-token>",
+	  "-legacy-gradient": "<-webkit-gradient()>|<-legacy-linear-gradient>|<-legacy-repeating-linear-gradient>|<-legacy-radial-gradient>|<-legacy-repeating-radial-gradient>",
+	  "-legacy-linear-gradient": "-moz-linear-gradient( <-legacy-linear-gradient-arguments> )|-webkit-linear-gradient( <-legacy-linear-gradient-arguments> )|-o-linear-gradient( <-legacy-linear-gradient-arguments> )",
+	  "-legacy-repeating-linear-gradient": "-moz-repeating-linear-gradient( <-legacy-linear-gradient-arguments> )|-webkit-repeating-linear-gradient( <-legacy-linear-gradient-arguments> )|-o-repeating-linear-gradient( <-legacy-linear-gradient-arguments> )",
+	  "-legacy-linear-gradient-arguments": "[<angle>|<side-or-corner>]? , <color-stop-list>",
+	  "-legacy-radial-gradient": "-moz-radial-gradient( <-legacy-radial-gradient-arguments> )|-webkit-radial-gradient( <-legacy-radial-gradient-arguments> )|-o-radial-gradient( <-legacy-radial-gradient-arguments> )",
+	  "-legacy-repeating-radial-gradient": "-moz-repeating-radial-gradient( <-legacy-radial-gradient-arguments> )|-webkit-repeating-radial-gradient( <-legacy-radial-gradient-arguments> )|-o-repeating-radial-gradient( <-legacy-radial-gradient-arguments> )",
+	  "-legacy-radial-gradient-arguments": "[<position> ,]? [[[<-legacy-radial-gradient-shape>||<-legacy-radial-gradient-size>]|[<length>|<percentage>]{2}] ,]? <color-stop-list>",
+	  "-legacy-radial-gradient-size": "closest-side|closest-corner|farthest-side|farthest-corner|contain|cover",
+	  "-legacy-radial-gradient-shape": "circle|ellipse",
+	  "-non-standard-font": "-apple-system-body|-apple-system-headline|-apple-system-subheadline|-apple-system-caption1|-apple-system-caption2|-apple-system-footnote|-apple-system-short-body|-apple-system-short-headline|-apple-system-short-subheadline|-apple-system-short-caption1|-apple-system-short-footnote|-apple-system-tall-body",
+	  "-non-standard-color": "-moz-ButtonDefault|-moz-ButtonHoverFace|-moz-ButtonHoverText|-moz-CellHighlight|-moz-CellHighlightText|-moz-Combobox|-moz-ComboboxText|-moz-Dialog|-moz-DialogText|-moz-dragtargetzone|-moz-EvenTreeRow|-moz-Field|-moz-FieldText|-moz-html-CellHighlight|-moz-html-CellHighlightText|-moz-mac-accentdarkestshadow|-moz-mac-accentdarkshadow|-moz-mac-accentface|-moz-mac-accentlightesthighlight|-moz-mac-accentlightshadow|-moz-mac-accentregularhighlight|-moz-mac-accentregularshadow|-moz-mac-chrome-active|-moz-mac-chrome-inactive|-moz-mac-focusring|-moz-mac-menuselect|-moz-mac-menushadow|-moz-mac-menutextselect|-moz-MenuHover|-moz-MenuHoverText|-moz-MenuBarText|-moz-MenuBarHoverText|-moz-nativehyperlinktext|-moz-OddTreeRow|-moz-win-communicationstext|-moz-win-mediatext|-moz-activehyperlinktext|-moz-default-background-color|-moz-default-color|-moz-hyperlinktext|-moz-visitedhyperlinktext|-webkit-activelink|-webkit-focus-ring-color|-webkit-link|-webkit-text",
+	  "-non-standard-image-rendering": "optimize-contrast|-moz-crisp-edges|-o-crisp-edges|-webkit-optimize-contrast",
+	  "-non-standard-overflow": "-moz-scrollbars-none|-moz-scrollbars-horizontal|-moz-scrollbars-vertical|-moz-hidden-unscrollable",
+	  "-non-standard-width": "min-intrinsic|intrinsic|-moz-min-content|-moz-max-content|-webkit-min-content|-webkit-max-content",
+	  "-webkit-gradient()": "-webkit-gradient( <-webkit-gradient-type> , <-webkit-gradient-point> [, <-webkit-gradient-point>|, <-webkit-gradient-radius> , <-webkit-gradient-point>] [, <-webkit-gradient-radius>]? [, <-webkit-gradient-color-stop>]* )",
+	  "-webkit-gradient-color-stop": "from( <color> )|color-stop( [<number-zero-one>|<percentage>] , <color> )|to( <color> )",
+	  "-webkit-gradient-point": "[left|center|right|<length-percentage>] [top|center|bottom|<length-percentage>]",
+	  "-webkit-gradient-radius": "<length>|<percentage>",
+	  "-webkit-gradient-type": "linear|radial",
+	  "-webkit-mask-box-repeat": "repeat|stretch|round",
+	  "-webkit-mask-clip-style": "border|border-box|padding|padding-box|content|content-box|text",
+	  "-ms-filter-function-list": "<-ms-filter-function>+",
+	  "-ms-filter-function": "<-ms-filter-function-progid>|<-ms-filter-function-legacy>",
+	  "-ms-filter-function-progid": "'progid:' [<ident-token> '.']* [<ident-token>|<function-token> <any-value>? )]",
+	  "-ms-filter-function-legacy": "<ident-token>|<function-token> <any-value>? )",
+	  "-ms-filter": "<string>",
+	  age: "child|young|old",
+	  "attr-name": "<wq-name>",
+	  "attr-fallback": "<any-value>",
+	  "border-radius": "<length-percentage>{1,2}",
+	  bottom: "<length>|auto",
+	  "generic-voice": "[<age>? <gender> <integer>?]",
+	  gender: "male|female|neutral",
+	  left: "<length>|auto",
+	  "mask-image": "<mask-reference>#",
+	  "name-repeat": "repeat( [<positive-integer>|auto-fill] , <line-names>+ )",
+	  paint: "none|<color>|<url> [none|<color>]?|context-fill|context-stroke",
+	  "path()": "path( <string> )",
+	  ratio: "<integer> / <integer>",
+	  right: "<length>|auto",
+	  "svg-length": "<percentage>|<length>|<number>",
+	  "svg-writing-mode": "lr-tb|rl-tb|tb-rl|lr|rl|tb",
+	  top: "<length>|auto",
+	  "track-group": "'(' [<string>* <track-minmax> <string>*]+ ')' ['[' <positive-integer> ']']?|<track-minmax>",
+	  "track-list-v0": "[<string>* <track-group> <string>*]+|none",
+	  "track-minmax": "minmax( <track-breadth> , <track-breadth> )|auto|<track-breadth>|fit-content",
+	  x: "<number>",
+	  y: "<number>",
+	  declaration: "<ident-token> : <declaration-value>? ['!' important]?",
+	  "declaration-list": "[<declaration>? ';']* <declaration>?",
+	  url: "url( <string> <url-modifier>* )|<url-token>",
+	  "url-modifier": "<ident>|<function-token> <any-value> )",
+	  "number-zero-one": "<number [0,1]>",
+	  "number-one-or-greater": "<number [1,∞]>",
+	  "positive-integer": "<integer [0,∞]>"
+	},
+	    Rr = {
+	  "--*": "<declaration-value>",
+	  "-ms-accelerator": "false|true",
+	  "-ms-block-progression": "tb|rl|bt|lr",
+	  "-ms-content-zoom-chaining": "none|chained",
+	  "-ms-content-zooming": "none|zoom",
+	  "-ms-content-zoom-limit": "<'-ms-content-zoom-limit-min'> <'-ms-content-zoom-limit-max'>",
+	  "-ms-content-zoom-limit-max": "<percentage>",
+	  "-ms-content-zoom-limit-min": "<percentage>",
+	  "-ms-content-zoom-snap": "<'-ms-content-zoom-snap-type'>||<'-ms-content-zoom-snap-points'>",
+	  "-ms-content-zoom-snap-points": "snapInterval( <percentage> , <percentage> )|snapList( <percentage># )",
+	  "-ms-content-zoom-snap-type": "none|proximity|mandatory",
+	  "-ms-filter": "<string>",
+	  "-ms-flow-from": "[none|<custom-ident>]#",
+	  "-ms-flow-into": "[none|<custom-ident>]#",
+	  "-ms-high-contrast-adjust": "auto|none",
+	  "-ms-hyphenate-limit-chars": "auto|<integer>{1,3}",
+	  "-ms-hyphenate-limit-lines": "no-limit|<integer>",
+	  "-ms-hyphenate-limit-zone": "<percentage>|<length>",
+	  "-ms-ime-align": "auto|after",
+	  "-ms-overflow-style": "auto|none|scrollbar|-ms-autohiding-scrollbar",
+	  "-ms-scrollbar-3dlight-color": "<color>",
+	  "-ms-scrollbar-arrow-color": "<color>",
+	  "-ms-scrollbar-base-color": "<color>",
+	  "-ms-scrollbar-darkshadow-color": "<color>",
+	  "-ms-scrollbar-face-color": "<color>",
+	  "-ms-scrollbar-highlight-color": "<color>",
+	  "-ms-scrollbar-shadow-color": "<color>",
+	  "-ms-scrollbar-track-color": "<color>",
+	  "-ms-scroll-chaining": "chained|none",
+	  "-ms-scroll-limit": "<'-ms-scroll-limit-x-min'> <'-ms-scroll-limit-y-min'> <'-ms-scroll-limit-x-max'> <'-ms-scroll-limit-y-max'>",
+	  "-ms-scroll-limit-x-max": "auto|<length>",
+	  "-ms-scroll-limit-x-min": "<length>",
+	  "-ms-scroll-limit-y-max": "auto|<length>",
+	  "-ms-scroll-limit-y-min": "<length>",
+	  "-ms-scroll-rails": "none|railed",
+	  "-ms-scroll-snap-points-x": "snapInterval( <length-percentage> , <length-percentage> )|snapList( <length-percentage># )",
+	  "-ms-scroll-snap-points-y": "snapInterval( <length-percentage> , <length-percentage> )|snapList( <length-percentage># )",
+	  "-ms-scroll-snap-type": "none|proximity|mandatory",
+	  "-ms-scroll-snap-x": "<'-ms-scroll-snap-type'> <'-ms-scroll-snap-points-x'>",
+	  "-ms-scroll-snap-y": "<'-ms-scroll-snap-type'> <'-ms-scroll-snap-points-y'>",
+	  "-ms-scroll-translation": "none|vertical-to-horizontal",
+	  "-ms-text-autospace": "none|ideograph-alpha|ideograph-numeric|ideograph-parenthesis|ideograph-space",
+	  "-ms-touch-select": "grippers|none",
+	  "-ms-user-select": "none|element|text",
+	  "-ms-wrap-flow": "auto|both|start|end|maximum|clear",
+	  "-ms-wrap-margin": "<length>",
+	  "-ms-wrap-through": "wrap|none",
+	  "-moz-appearance": "none|button|button-arrow-down|button-arrow-next|button-arrow-previous|button-arrow-up|button-bevel|button-focus|caret|checkbox|checkbox-container|checkbox-label|checkmenuitem|dualbutton|groupbox|listbox|listitem|menuarrow|menubar|menucheckbox|menuimage|menuitem|menuitemtext|menulist|menulist-button|menulist-text|menulist-textfield|menupopup|menuradio|menuseparator|meterbar|meterchunk|progressbar|progressbar-vertical|progresschunk|progresschunk-vertical|radio|radio-container|radio-label|radiomenuitem|range|range-thumb|resizer|resizerpanel|scale-horizontal|scalethumbend|scalethumb-horizontal|scalethumbstart|scalethumbtick|scalethumb-vertical|scale-vertical|scrollbarbutton-down|scrollbarbutton-left|scrollbarbutton-right|scrollbarbutton-up|scrollbarthumb-horizontal|scrollbarthumb-vertical|scrollbartrack-horizontal|scrollbartrack-vertical|searchfield|separator|sheet|spinner|spinner-downbutton|spinner-textfield|spinner-upbutton|splitter|statusbar|statusbarpanel|tab|tabpanel|tabpanels|tab-scroll-arrow-back|tab-scroll-arrow-forward|textfield|textfield-multiline|toolbar|toolbarbutton|toolbarbutton-dropdown|toolbargripper|toolbox|tooltip|treeheader|treeheadercell|treeheadersortarrow|treeitem|treeline|treetwisty|treetwistyopen|treeview|-moz-mac-unified-toolbar|-moz-win-borderless-glass|-moz-win-browsertabbar-toolbox|-moz-win-communicationstext|-moz-win-communications-toolbox|-moz-win-exclude-glass|-moz-win-glass|-moz-win-mediatext|-moz-win-media-toolbox|-moz-window-button-box|-moz-window-button-box-maximized|-moz-window-button-close|-moz-window-button-maximize|-moz-window-button-minimize|-moz-window-button-restore|-moz-window-frame-bottom|-moz-window-frame-left|-moz-window-frame-right|-moz-window-titlebar|-moz-window-titlebar-maximized",
+	  "-moz-binding": "<url>|none",
+	  "-moz-border-bottom-colors": "<color>+|none",
+	  "-moz-border-left-colors": "<color>+|none",
+	  "-moz-border-right-colors": "<color>+|none",
+	  "-moz-border-top-colors": "<color>+|none",
+	  "-moz-context-properties": "none|[fill|fill-opacity|stroke|stroke-opacity]#",
+	  "-moz-float-edge": "border-box|content-box|margin-box|padding-box",
+	  "-moz-force-broken-image-icon": "<integer>",
+	  "-moz-image-region": "<shape>|auto",
+	  "-moz-orient": "inline|block|horizontal|vertical",
+	  "-moz-outline-radius": "<outline-radius>{1,4} [/ <outline-radius>{1,4}]?",
+	  "-moz-outline-radius-bottomleft": "<outline-radius>",
+	  "-moz-outline-radius-bottomright": "<outline-radius>",
+	  "-moz-outline-radius-topleft": "<outline-radius>",
+	  "-moz-outline-radius-topright": "<outline-radius>",
+	  "-moz-stack-sizing": "ignore|stretch-to-fit",
+	  "-moz-text-blink": "none|blink",
+	  "-moz-user-focus": "ignore|normal|select-after|select-before|select-menu|select-same|select-all|none",
+	  "-moz-user-input": "auto|none|enabled|disabled",
+	  "-moz-user-modify": "read-only|read-write|write-only",
+	  "-moz-window-dragging": "drag|no-drag",
+	  "-moz-window-shadow": "default|menu|tooltip|sheet|none",
+	  "-webkit-appearance": "none|button|button-bevel|caps-lock-indicator|caret|checkbox|default-button|listbox|listitem|media-fullscreen-button|media-mute-button|media-play-button|media-seek-back-button|media-seek-forward-button|media-slider|media-sliderthumb|menulist|menulist-button|menulist-text|menulist-textfield|push-button|radio|scrollbarbutton-down|scrollbarbutton-left|scrollbarbutton-right|scrollbarbutton-up|scrollbargripper-horizontal|scrollbargripper-vertical|scrollbarthumb-horizontal|scrollbarthumb-vertical|scrollbartrack-horizontal|scrollbartrack-vertical|searchfield|searchfield-cancel-button|searchfield-decoration|searchfield-results-button|searchfield-results-decoration|slider-horizontal|slider-vertical|sliderthumb-horizontal|sliderthumb-vertical|square-button|textarea|textfield",
+	  "-webkit-border-before": "<'border-width'>||<'border-style'>||<'color'>",
+	  "-webkit-border-before-color": "<'color'>",
+	  "-webkit-border-before-style": "<'border-style'>",
+	  "-webkit-border-before-width": "<'border-width'>",
+	  "-webkit-box-reflect": "[above|below|right|left]? <length>? <image>?",
+	  "-webkit-line-clamp": "none|<integer>",
+	  "-webkit-mask": "[<mask-reference>||<position> [/ <bg-size>]?||<repeat-style>||[<box>|border|padding|content|text]||[<box>|border|padding|content]]#",
+	  "-webkit-mask-attachment": "<attachment>#",
+	  "-webkit-mask-clip": "[<box>|border|padding|content|text]#",
+	  "-webkit-mask-composite": "<composite-style>#",
+	  "-webkit-mask-image": "<mask-reference>#",
+	  "-webkit-mask-origin": "[<box>|border|padding|content]#",
+	  "-webkit-mask-position": "<position>#",
+	  "-webkit-mask-position-x": "[<length-percentage>|left|center|right]#",
+	  "-webkit-mask-position-y": "[<length-percentage>|top|center|bottom]#",
+	  "-webkit-mask-repeat": "<repeat-style>#",
+	  "-webkit-mask-repeat-x": "repeat|no-repeat|space|round",
+	  "-webkit-mask-repeat-y": "repeat|no-repeat|space|round",
+	  "-webkit-mask-size": "<bg-size>#",
+	  "-webkit-overflow-scrolling": "auto|touch",
+	  "-webkit-tap-highlight-color": "<color>",
+	  "-webkit-text-fill-color": "<color>",
+	  "-webkit-text-stroke": "<length>||<color>",
+	  "-webkit-text-stroke-color": "<color>",
+	  "-webkit-text-stroke-width": "<length>",
+	  "-webkit-touch-callout": "default|none",
+	  "-webkit-user-modify": "read-only|read-write|read-write-plaintext-only",
+	  "align-content": "normal|<baseline-position>|<content-distribution>|<overflow-position>? <content-position>",
+	  "align-items": "normal|stretch|<baseline-position>|[<overflow-position>? <self-position>]",
+	  "align-self": "auto|normal|stretch|<baseline-position>|<overflow-position>? <self-position>",
+	  all: "initial|inherit|unset|revert",
+	  animation: "<single-animation>#",
+	  "animation-delay": "<time>#",
+	  "animation-direction": "<single-animation-direction>#",
+	  "animation-duration": "<time>#",
+	  "animation-fill-mode": "<single-animation-fill-mode>#",
+	  "animation-iteration-count": "<single-animation-iteration-count>#",
+	  "animation-name": "[none|<keyframes-name>]#",
+	  "animation-play-state": "<single-animation-play-state>#",
+	  "animation-timing-function": "<timing-function>#",
+	  appearance: "none|auto|button|textfield|<compat>",
+	  azimuth: "<angle>|[[left-side|far-left|left|center-left|center|center-right|right|far-right|right-side]||behind]|leftwards|rightwards",
+	  "backdrop-filter": "none|<filter-function-list>",
+	  "backface-visibility": "visible|hidden",
+	  background: "[<bg-layer> ,]* <final-bg-layer>",
+	  "background-attachment": "<attachment>#",
+	  "background-blend-mode": "<blend-mode>#",
+	  "background-clip": "<box>#",
+	  "background-color": "<color>",
+	  "background-image": "<bg-image>#",
+	  "background-origin": "<box>#",
+	  "background-position": "<bg-position>#",
+	  "background-position-x": "[center|[left|right|x-start|x-end]? <length-percentage>?]#",
+	  "background-position-y": "[center|[top|bottom|y-start|y-end]? <length-percentage>?]#",
+	  "background-repeat": "<repeat-style>#",
+	  "background-size": "<bg-size>#",
+	  "block-overflow": "clip|ellipsis|<string>",
+	  "block-size": "<'width'>",
+	  border: "<line-width>||<line-style>||<color>",
+	  "border-block": "<'border-top-width'>||<'border-top-style'>||<'color'>",
+	  "border-block-color": "<'border-top-color'>{1,2}",
+	  "border-block-style": "<'border-top-style'>",
+	  "border-block-width": "<'border-top-width'>",
+	  "border-block-end": "<'border-top-width'>||<'border-top-style'>||<'color'>",
+	  "border-block-end-color": "<'border-top-color'>",
+	  "border-block-end-style": "<'border-top-style'>",
+	  "border-block-end-width": "<'border-top-width'>",
+	  "border-block-start": "<'border-top-width'>||<'border-top-style'>||<'color'>",
+	  "border-block-start-color": "<'border-top-color'>",
+	  "border-block-start-style": "<'border-top-style'>",
+	  "border-block-start-width": "<'border-top-width'>",
+	  "border-bottom": "<line-width>||<line-style>||<color>",
+	  "border-bottom-color": "<'border-top-color'>",
+	  "border-bottom-left-radius": "<length-percentage>{1,2}",
+	  "border-bottom-right-radius": "<length-percentage>{1,2}",
+	  "border-bottom-style": "<line-style>",
+	  "border-bottom-width": "<line-width>",
+	  "border-collapse": "collapse|separate",
+	  "border-color": "<color>{1,4}",
+	  "border-end-end-radius": "<length-percentage>{1,2}",
+	  "border-end-start-radius": "<length-percentage>{1,2}",
+	  "border-image": "<'border-image-source'>||<'border-image-slice'> [/ <'border-image-width'>|/ <'border-image-width'>? / <'border-image-outset'>]?||<'border-image-repeat'>",
+	  "border-image-outset": "[<length>|<number>]{1,4}",
+	  "border-image-repeat": "[stretch|repeat|round|space]{1,2}",
+	  "border-image-slice": "<number-percentage>{1,4}&&fill?",
+	  "border-image-source": "none|<image>",
+	  "border-image-width": "[<length-percentage>|<number>|auto]{1,4}",
+	  "border-inline": "<'border-top-width'>||<'border-top-style'>||<'color'>",
+	  "border-inline-end": "<'border-top-width'>||<'border-top-style'>||<'color'>",
+	  "border-inline-color": "<'border-top-color'>{1,2}",
+	  "border-inline-style": "<'border-top-style'>",
+	  "border-inline-width": "<'border-top-width'>",
+	  "border-inline-end-color": "<'border-top-color'>",
+	  "border-inline-end-style": "<'border-top-style'>",
+	  "border-inline-end-width": "<'border-top-width'>",
+	  "border-inline-start": "<'border-top-width'>||<'border-top-style'>||<'color'>",
+	  "border-inline-start-color": "<'border-top-color'>",
+	  "border-inline-start-style": "<'border-top-style'>",
+	  "border-inline-start-width": "<'border-top-width'>",
+	  "border-left": "<line-width>||<line-style>||<color>",
+	  "border-left-color": "<color>",
+	  "border-left-style": "<line-style>",
+	  "border-left-width": "<line-width>",
+	  "border-radius": "<length-percentage>{1,4} [/ <length-percentage>{1,4}]?",
+	  "border-right": "<line-width>||<line-style>||<color>",
+	  "border-right-color": "<color>",
+	  "border-right-style": "<line-style>",
+	  "border-right-width": "<line-width>",
+	  "border-spacing": "<length> <length>?",
+	  "border-start-end-radius": "<length-percentage>{1,2}",
+	  "border-start-start-radius": "<length-percentage>{1,2}",
+	  "border-style": "<line-style>{1,4}",
+	  "border-top": "<line-width>||<line-style>||<color>",
+	  "border-top-color": "<color>",
+	  "border-top-left-radius": "<length-percentage>{1,2}",
+	  "border-top-right-radius": "<length-percentage>{1,2}",
+	  "border-top-style": "<line-style>",
+	  "border-top-width": "<line-width>",
+	  "border-width": "<line-width>{1,4}",
+	  bottom: "<length>|<percentage>|auto",
+	  "box-align": "start|center|end|baseline|stretch",
+	  "box-decoration-break": "slice|clone",
+	  "box-direction": "normal|reverse|inherit",
+	  "box-flex": "<number>",
+	  "box-flex-group": "<integer>",
+	  "box-lines": "single|multiple",
+	  "box-ordinal-group": "<integer>",
+	  "box-orient": "horizontal|vertical|inline-axis|block-axis|inherit",
+	  "box-pack": "start|center|end|justify",
+	  "box-shadow": "none|<shadow>#",
+	  "box-sizing": "content-box|border-box",
+	  "break-after": "auto|avoid|always|all|avoid-page|page|left|right|recto|verso|avoid-column|column|avoid-region|region",
+	  "break-before": "auto|avoid|always|all|avoid-page|page|left|right|recto|verso|avoid-column|column|avoid-region|region",
+	  "break-inside": "auto|avoid|avoid-page|avoid-column|avoid-region",
+	  "caption-side": "top|bottom|block-start|block-end|inline-start|inline-end",
+	  "caret-color": "auto|<color>",
+	  clear: "none|left|right|both|inline-start|inline-end",
+	  clip: "<shape>|auto",
+	  "clip-path": "<clip-source>|[<basic-shape>||<geometry-box>]|none",
+	  color: "<color>",
+	  "color-adjust": "economy|exact",
+	  "column-count": "<integer>|auto",
+	  "column-fill": "auto|balance|balance-all",
+	  "column-gap": "normal|<length-percentage>",
+	  "column-rule": "<'column-rule-width'>||<'column-rule-style'>||<'column-rule-color'>",
+	  "column-rule-color": "<color>",
+	  "column-rule-style": "<'border-style'>",
+	  "column-rule-width": "<'border-width'>",
+	  "column-span": "none|all",
+	  "column-width": "<length>|auto",
+	  columns: "<'column-width'>||<'column-count'>",
+	  contain: "none|strict|content|[size||layout||style||paint]",
+	  content: "normal|none|[<content-replacement>|<content-list>] [/ <string>]?",
+	  "counter-increment": "[<custom-ident> <integer>?]+|none",
+	  "counter-reset": "[<custom-ident> <integer>?]+|none",
+	  "counter-set": "[<custom-ident> <integer>?]+|none",
+	  cursor: "[[<url> [<x> <y>]? ,]* [auto|default|none|context-menu|help|pointer|progress|wait|cell|crosshair|text|vertical-text|alias|copy|move|no-drop|not-allowed|e-resize|n-resize|ne-resize|nw-resize|s-resize|se-resize|sw-resize|w-resize|ew-resize|ns-resize|nesw-resize|nwse-resize|col-resize|row-resize|all-scroll|zoom-in|zoom-out|grab|grabbing|hand|-webkit-grab|-webkit-grabbing|-webkit-zoom-in|-webkit-zoom-out|-moz-grab|-moz-grabbing|-moz-zoom-in|-moz-zoom-out]]",
+	  direction: "ltr|rtl",
+	  display: "block|contents|flex|flow|flow-root|grid|inline|inline-block|inline-flex|inline-grid|inline-list-item|inline-table|list-item|none|ruby|ruby-base|ruby-base-container|ruby-text|ruby-text-container|run-in|table|table-caption|table-cell|table-column|table-column-group|table-footer-group|table-header-group|table-row|table-row-group|-ms-flexbox|-ms-inline-flexbox|-ms-grid|-ms-inline-grid|-webkit-flex|-webkit-inline-flex|-webkit-box|-webkit-inline-box|-moz-inline-stack|-moz-box|-moz-inline-box",
+	  "empty-cells": "show|hide",
+	  filter: "none|<filter-function-list>|<-ms-filter-function-list>",
+	  flex: "none|[<'flex-grow'> <'flex-shrink'>?||<'flex-basis'>]",
+	  "flex-basis": "content|<'width'>",
+	  "flex-direction": "row|row-reverse|column|column-reverse",
+	  "flex-flow": "<'flex-direction'>||<'flex-wrap'>",
+	  "flex-grow": "<number>",
+	  "flex-shrink": "<number>",
+	  "flex-wrap": "nowrap|wrap|wrap-reverse",
+	  float: "left|right|none|inline-start|inline-end",
+	  font: "[[<'font-style'>||<font-variant-css21>||<'font-weight'>||<'font-stretch'>]? <'font-size'> [/ <'line-height'>]? <'font-family'>]|caption|icon|menu|message-box|small-caption|status-bar",
+	  "font-family": "[<family-name>|<generic-family>]#",
+	  "font-feature-settings": "normal|<feature-tag-value>#",
+	  "font-kerning": "auto|normal|none",
+	  "font-language-override": "normal|<string>",
+	  "font-optical-sizing": "auto|none",
+	  "font-variation-settings": "normal|[<string> <number>]#",
+	  "font-size": "<absolute-size>|<relative-size>|<length-percentage>",
+	  "font-size-adjust": "none|<number>",
+	  "font-stretch": "<font-stretch-absolute>",
+	  "font-style": "normal|italic|oblique <angle>?",
+	  "font-synthesis": "none|[weight||style]",
+	  "font-variant": "normal|none|[<common-lig-values>||<discretionary-lig-values>||<historical-lig-values>||<contextual-alt-values>||stylistic( <feature-value-name> )||historical-forms||styleset( <feature-value-name># )||character-variant( <feature-value-name># )||swash( <feature-value-name> )||ornaments( <feature-value-name> )||annotation( <feature-value-name> )||[small-caps|all-small-caps|petite-caps|all-petite-caps|unicase|titling-caps]||<numeric-figure-values>||<numeric-spacing-values>||<numeric-fraction-values>||ordinal||slashed-zero||<east-asian-variant-values>||<east-asian-width-values>||ruby]",
+	  "font-variant-alternates": "normal|[stylistic( <feature-value-name> )||historical-forms||styleset( <feature-value-name># )||character-variant( <feature-value-name># )||swash( <feature-value-name> )||ornaments( <feature-value-name> )||annotation( <feature-value-name> )]",
+	  "font-variant-caps": "normal|small-caps|all-small-caps|petite-caps|all-petite-caps|unicase|titling-caps",
+	  "font-variant-east-asian": "normal|[<east-asian-variant-values>||<east-asian-width-values>||ruby]",
+	  "font-variant-ligatures": "normal|none|[<common-lig-values>||<discretionary-lig-values>||<historical-lig-values>||<contextual-alt-values>]",
+	  "font-variant-numeric": "normal|[<numeric-figure-values>||<numeric-spacing-values>||<numeric-fraction-values>||ordinal||slashed-zero]",
+	  "font-variant-position": "normal|sub|super",
+	  "font-weight": "<font-weight-absolute>|bolder|lighter",
+	  gap: "<'row-gap'> <'column-gap'>?",
+	  grid: "<'grid-template'>|<'grid-template-rows'> / [auto-flow&&dense?] <'grid-auto-columns'>?|[auto-flow&&dense?] <'grid-auto-rows'>? / <'grid-template-columns'>",
+	  "grid-area": "<grid-line> [/ <grid-line>]{0,3}",
+	  "grid-auto-columns": "<track-size>+",
+	  "grid-auto-flow": "[row|column]||dense",
+	  "grid-auto-rows": "<track-size>+",
+	  "grid-column": "<grid-line> [/ <grid-line>]?",
+	  "grid-column-end": "<grid-line>",
+	  "grid-column-gap": "<length-percentage>",
+	  "grid-column-start": "<grid-line>",
+	  "grid-gap": "<'grid-row-gap'> <'grid-column-gap'>?",
+	  "grid-row": "<grid-line> [/ <grid-line>]?",
+	  "grid-row-end": "<grid-line>",
+	  "grid-row-gap": "<length-percentage>",
+	  "grid-row-start": "<grid-line>",
+	  "grid-template": "none|[<'grid-template-rows'> / <'grid-template-columns'>]|[<line-names>? <string> <track-size>? <line-names>?]+ [/ <explicit-track-list>]?",
+	  "grid-template-areas": "none|<string>+",
+	  "grid-template-columns": "none|<track-list>|<auto-track-list>",
+	  "grid-template-rows": "none|<track-list>|<auto-track-list>",
+	  "hanging-punctuation": "none|[first||[force-end|allow-end]||last]",
+	  height: "[<length>|<percentage>]&&[border-box|content-box]?|available|min-content|max-content|fit-content|auto",
+	  hyphens: "none|manual|auto",
+	  "image-orientation": "from-image|<angle>|[<angle>? flip]",
+	  "image-rendering": "auto|crisp-edges|pixelated|optimizeSpeed|optimizeQuality|<-non-standard-image-rendering>",
+	  "image-resolution": "[from-image||<resolution>]&&snap?",
+	  "ime-mode": "auto|normal|active|inactive|disabled",
+	  "initial-letter": "normal|[<number> <integer>?]",
+	  "initial-letter-align": "[auto|alphabetic|hanging|ideographic]",
+	  "inline-size": "<'width'>",
+	  inset: "<'top'>{1,4}",
+	  "inset-block": "<'top'>{1,2}",
+	  "inset-block-end": "<'top'>",
+	  "inset-block-start": "<'top'>",
+	  "inset-inline": "<'top'>{1,2}",
+	  "inset-inline-end": "<'top'>",
+	  "inset-inline-start": "<'top'>",
+	  isolation: "auto|isolate",
+	  "justify-content": "normal|<content-distribution>|<overflow-position>? [<content-position>|left|right]",
+	  "justify-items": "normal|stretch|<baseline-position>|<overflow-position>? [<self-position>|left|right]|legacy|legacy&&[left|right|center]",
+	  "justify-self": "auto|normal|stretch|<baseline-position>|<overflow-position>? [<self-position>|left|right]",
+	  left: "<length>|<percentage>|auto",
+	  "letter-spacing": "normal|<length-percentage>",
+	  "line-break": "auto|loose|normal|strict",
+	  "line-clamp": "none|<integer>",
+	  "line-height": "normal|<number>|<length>|<percentage>",
+	  "line-height-step": "<length>",
+	  "list-style": "<'list-style-type'>||<'list-style-position'>||<'list-style-image'>",
+	  "list-style-image": "<url>|none",
+	  "list-style-position": "inside|outside",
+	  "list-style-type": "<counter-style>|<string>|none",
+	  margin: "[<length>|<percentage>|auto]{1,4}",
+	  "margin-block": "<'margin-left'>{1,2}",
+	  "margin-block-end": "<'margin-left'>",
+	  "margin-block-start": "<'margin-left'>",
+	  "margin-bottom": "<length>|<percentage>|auto",
+	  "margin-inline": "<'margin-left'>{1,2}",
+	  "margin-inline-end": "<'margin-left'>",
+	  "margin-inline-start": "<'margin-left'>",
+	  "margin-left": "<length>|<percentage>|auto",
+	  "margin-right": "<length>|<percentage>|auto",
+	  "margin-top": "<length>|<percentage>|auto",
+	  mask: "<mask-layer>#",
+	  "mask-border": "<'mask-border-source'>||<'mask-border-slice'> [/ <'mask-border-width'>? [/ <'mask-border-outset'>]?]?||<'mask-border-repeat'>||<'mask-border-mode'>",
+	  "mask-border-mode": "luminance|alpha",
+	  "mask-border-outset": "[<length>|<number>]{1,4}",
+	  "mask-border-repeat": "[stretch|repeat|round|space]{1,2}",
+	  "mask-border-slice": "<number-percentage>{1,4} fill?",
+	  "mask-border-source": "none|<image>",
+	  "mask-border-width": "[<length-percentage>|<number>|auto]{1,4}",
+	  "mask-clip": "[<geometry-box>|no-clip]#",
+	  "mask-composite": "<compositing-operator>#",
+	  "mask-image": "<mask-reference>#",
+	  "mask-mode": "<masking-mode>#",
+	  "mask-origin": "<geometry-box>#",
+	  "mask-position": "<position>#",
+	  "mask-repeat": "<repeat-style>#",
+	  "mask-size": "<bg-size>#",
+	  "mask-type": "luminance|alpha",
+	  "max-block-size": "<'max-width'>",
+	  "max-height": "<length>|<percentage>|none|max-content|min-content|fit-content|fill-available",
+	  "max-inline-size": "<'max-width'>",
+	  "max-lines": "none|<integer>",
+	  "max-width": "<length>|<percentage>|none|max-content|min-content|fit-content|fill-available|<-non-standard-width>",
+	  "min-block-size": "<'min-width'>",
+	  "min-height": "<length>|<percentage>|auto|max-content|min-content|fit-content|fill-available",
+	  "min-inline-size": "<'min-width'>",
+	  "min-width": "<length>|<percentage>|auto|max-content|min-content|fit-content|fill-available|<-non-standard-width>",
+	  "mix-blend-mode": "<blend-mode>",
+	  "object-fit": "fill|contain|cover|none|scale-down",
+	  "object-position": "<position>",
+	  offset: "[<'offset-position'>? [<'offset-path'> [<'offset-distance'>||<'offset-rotate'>]?]?]! [/ <'offset-anchor'>]?",
+	  "offset-anchor": "auto|<position>",
+	  "offset-distance": "<length-percentage>",
+	  "offset-path": "none|ray( [<angle>&&<size>?&&contain?] )|<path()>|<url>|[<basic-shape>||<geometry-box>]",
+	  "offset-position": "auto|<position>",
+	  "offset-rotate": "[auto|reverse]||<angle>",
+	  opacity: "<number-zero-one>",
+	  order: "<integer>",
+	  orphans: "<integer>",
+	  outline: "[<'outline-color'>||<'outline-style'>||<'outline-width'>]",
+	  "outline-color": "<color>|invert",
+	  "outline-offset": "<length>",
+	  "outline-style": "auto|<'border-style'>",
+	  "outline-width": "<line-width>",
+	  overflow: "[visible|hidden|clip|scroll|auto]{1,2}|<-non-standard-overflow>",
+	  "overflow-anchor": "auto|none",
+	  "overflow-block": "visible|hidden|clip|scroll|auto",
+	  "overflow-clip-box": "padding-box|content-box",
+	  "overflow-inline": "visible|hidden|clip|scroll|auto",
+	  "overflow-wrap": "normal|break-word|anywhere",
+	  "overflow-x": "visible|hidden|clip|scroll|auto",
+	  "overflow-y": "visible|hidden|clip|scroll|auto",
+	  "overscroll-behavior": "[contain|none|auto]{1,2}",
+	  "overscroll-behavior-x": "contain|none|auto",
+	  "overscroll-behavior-y": "contain|none|auto",
+	  padding: "[<length>|<percentage>]{1,4}",
+	  "padding-block": "<'padding-left'>{1,2}",
+	  "padding-block-end": "<'padding-left'>",
+	  "padding-block-start": "<'padding-left'>",
+	  "padding-bottom": "<length>|<percentage>",
+	  "padding-inline": "<'padding-left'>{1,2}",
+	  "padding-inline-end": "<'padding-left'>",
+	  "padding-inline-start": "<'padding-left'>",
+	  "padding-left": "<length>|<percentage>",
+	  "padding-right": "<length>|<percentage>",
+	  "padding-top": "<length>|<percentage>",
+	  "page-break-after": "auto|always|avoid|left|right|recto|verso",
+	  "page-break-before": "auto|always|avoid|left|right|recto|verso",
+	  "page-break-inside": "auto|avoid",
+	  "paint-order": "normal|[fill||stroke||markers]",
+	  perspective: "none|<length>",
+	  "perspective-origin": "<position>",
+	  "place-content": "<'align-content'> <'justify-content'>?",
+	  "place-items": "<'align-items'> <'justify-items'>?",
+	  "place-self": "<'align-self'> <'justify-self'>?",
+	  "pointer-events": "auto|none|visiblePainted|visibleFill|visibleStroke|visible|painted|fill|stroke|all|inherit",
+	  position: "static|relative|absolute|sticky|fixed|-webkit-sticky",
+	  quotes: "none|[<string> <string>]+",
+	  resize: "none|both|horizontal|vertical|block|inline",
+	  right: "<length>|<percentage>|auto",
+	  rotate: "none|<angle>|[x|y|z|<number>{3}]&&<angle>",
+	  "row-gap": "normal|<length-percentage>",
+	  "ruby-align": "start|center|space-between|space-around",
+	  "ruby-merge": "separate|collapse|auto",
+	  "ruby-position": "over|under|inter-character",
+	  scale: "none|<number>{1,3}",
+	  "scrollbar-color": "auto|dark|light|<color>{2}",
+	  "scrollbar-width": "auto|thin|none",
+	  "scroll-behavior": "auto|smooth",
+	  "scroll-margin": "<length>{1,4}",
+	  "scroll-margin-block": "<length>{1,2}",
+	  "scroll-margin-block-start": "<length>",
+	  "scroll-margin-block-end": "<length>",
+	  "scroll-margin-bottom": "<length>",
+	  "scroll-margin-inline": "<length>{1,2}",
+	  "scroll-margin-inline-start": "<length>",
+	  "scroll-margin-inline-end": "<length>",
+	  "scroll-margin-left": "<length>",
+	  "scroll-margin-right": "<length>",
+	  "scroll-margin-top": "<length>",
+	  "scroll-padding": "[auto|<length-percentage>]{1,4}",
+	  "scroll-padding-block": "[auto|<length-percentage>]{1,2}",
+	  "scroll-padding-block-start": "auto|<length-percentage>",
+	  "scroll-padding-block-end": "auto|<length-percentage>",
+	  "scroll-padding-bottom": "auto|<length-percentage>",
+	  "scroll-padding-inline": "[auto|<length-percentage>]{1,2}",
+	  "scroll-padding-inline-start": "auto|<length-percentage>",
+	  "scroll-padding-inline-end": "auto|<length-percentage>",
+	  "scroll-padding-left": "auto|<length-percentage>",
+	  "scroll-padding-right": "auto|<length-percentage>",
+	  "scroll-padding-top": "auto|<length-percentage>",
+	  "scroll-snap-align": "[none|start|end|center]{1,2}",
+	  "scroll-snap-coordinate": "none|<position>#",
+	  "scroll-snap-destination": "<position>",
+	  "scroll-snap-points-x": "none|repeat( <length-percentage> )",
+	  "scroll-snap-points-y": "none|repeat( <length-percentage> )",
+	  "scroll-snap-stop": "normal|always",
+	  "scroll-snap-type": "none|[x|y|block|inline|both] [mandatory|proximity]?",
+	  "scroll-snap-type-x": "none|mandatory|proximity",
+	  "scroll-snap-type-y": "none|mandatory|proximity",
+	  "shape-image-threshold": "<number>",
+	  "shape-margin": "<length-percentage>",
+	  "shape-outside": "none|<shape-box>||<basic-shape>|<image>",
+	  "tab-size": "<integer>|<length>",
+	  "table-layout": "auto|fixed",
+	  "text-align": "start|end|left|right|center|justify|match-parent",
+	  "text-align-last": "auto|start|end|left|right|center|justify",
+	  "text-combine-upright": "none|all|[digits <integer>?]",
+	  "text-decoration": "<'text-decoration-line'>||<'text-decoration-style'>||<'text-decoration-color'>",
+	  "text-decoration-color": "<color>",
+	  "text-decoration-line": "none|[underline||overline||line-through||blink]",
+	  "text-decoration-skip": "none|[objects||[spaces|[leading-spaces||trailing-spaces]]||edges||box-decoration]",
+	  "text-decoration-skip-ink": "auto|none",
+	  "text-decoration-style": "solid|double|dotted|dashed|wavy",
+	  "text-emphasis": "<'text-emphasis-style'>||<'text-emphasis-color'>",
+	  "text-emphasis-color": "<color>",
+	  "text-emphasis-position": "[over|under]&&[right|left]",
+	  "text-emphasis-style": "none|[[filled|open]||[dot|circle|double-circle|triangle|sesame]]|<string>",
+	  "text-indent": "<length-percentage>&&hanging?&&each-line?",
+	  "text-justify": "auto|inter-character|inter-word|none",
+	  "text-orientation": "mixed|upright|sideways",
+	  "text-overflow": "[clip|ellipsis|<string>]{1,2}",
+	  "text-rendering": "auto|optimizeSpeed|optimizeLegibility|geometricPrecision",
+	  "text-shadow": "none|<shadow-t>#",
+	  "text-size-adjust": "none|auto|<percentage>",
+	  "text-transform": "none|capitalize|uppercase|lowercase|full-width|full-size-kana",
+	  "text-underline-position": "auto|[under||[left|right]]",
+	  top: "<length>|<percentage>|auto",
+	  "touch-action": "auto|none|[[pan-x|pan-left|pan-right]||[pan-y|pan-up|pan-down]||pinch-zoom]|manipulation",
+	  transform: "none|<transform-list>",
+	  "transform-box": "border-box|fill-box|view-box",
+	  "transform-origin": "[<length-percentage>|left|center|right|top|bottom]|[[<length-percentage>|left|center|right]&&[<length-percentage>|top|center|bottom]] <length>?",
+	  "transform-style": "flat|preserve-3d",
+	  transition: "<single-transition>#",
+	  "transition-delay": "<time>#",
+	  "transition-duration": "<time>#",
+	  "transition-property": "none|<single-transition-property>#",
+	  "transition-timing-function": "<timing-function>#",
+	  translate: "none|<length-percentage> [<length-percentage> <length>?]?",
+	  "unicode-bidi": "normal|embed|isolate|bidi-override|isolate-override|plaintext|-moz-isolate|-moz-isolate-override|-moz-plaintext|-webkit-isolate",
+	  "user-select": "auto|text|none|contain|all",
+	  "vertical-align": "baseline|sub|super|text-top|text-bottom|middle|top|bottom|<percentage>|<length>",
+	  visibility: "visible|hidden|collapse",
+	  "white-space": "normal|pre|nowrap|pre-wrap|pre-line",
+	  widows: "<integer>",
+	  width: "[<length>|<percentage>]&&[border-box|content-box]?|available|min-content|max-content|fit-content|auto",
+	  "will-change": "auto|<animateable-feature>#",
+	  "word-break": "normal|break-all|keep-all|break-word",
+	  "word-spacing": "normal|<length-percentage>",
+	  "word-wrap": "normal|break-word",
+	  "writing-mode": "horizontal-tb|vertical-rl|vertical-lr|sideways-rl|sideways-lr|<svg-writing-mode>",
+	  "z-index": "auto|<integer>",
+	  zoom: "normal|reset|<number>|<percentage>",
+	  "-moz-background-clip": "padding|border",
+	  "-moz-border-radius-bottomleft": "<'border-bottom-left-radius'>",
+	  "-moz-border-radius-bottomright": "<'border-bottom-right-radius'>",
+	  "-moz-border-radius-topleft": "<'border-top-left-radius'>",
+	  "-moz-border-radius-topright": "<'border-bottom-right-radius'>",
+	  "-moz-control-character-visibility": "visible|hidden",
+	  "-moz-osx-font-smoothing": "auto|grayscale",
+	  "-moz-user-select": "none|text|all|-moz-none",
+	  "-ms-flex-align": "start|end|center|baseline|stretch",
+	  "-ms-flex-item-align": "auto|start|end|center|baseline|stretch",
+	  "-ms-flex-line-pack": "start|end|center|justify|distribute|stretch",
+	  "-ms-flex-negative": "<'flex-shrink'>",
+	  "-ms-flex-pack": "start|end|center|justify|distribute",
+	  "-ms-flex-order": "<integer>",
+	  "-ms-flex-positive": "<'flex-grow'>",
+	  "-ms-flex-preferred-size": "<'flex-basis'>",
+	  "-ms-interpolation-mode": "nearest-neighbor|bicubic",
+	  "-ms-grid-column-align": "start|end|center|stretch",
+	  "-ms-grid-columns": "<track-list-v0>",
+	  "-ms-grid-row-align": "start|end|center|stretch",
+	  "-ms-grid-rows": "<track-list-v0>",
+	  "-ms-hyphenate-limit-last": "none|always|column|page|spread",
+	  "-webkit-background-clip": "[<box>|border|padding|content|text]#",
+	  "-webkit-column-break-after": "always|auto|avoid",
+	  "-webkit-column-break-before": "always|auto|avoid",
+	  "-webkit-column-break-inside": "always|auto|avoid",
+	  "-webkit-font-smoothing": "auto|none|antialiased|subpixel-antialiased",
+	  "-webkit-mask-box-image": "[<url>|<gradient>|none] [<length-percentage>{4} <-webkit-mask-box-repeat>{2}]?",
+	  "-webkit-print-color-adjust": "economy|exact",
+	  "-webkit-text-security": "none|circle|disc|square",
+	  "-webkit-user-drag": "none|element|auto",
+	  "-webkit-user-select": "auto|none|text|all",
+	  "alignment-baseline": "auto|baseline|before-edge|text-before-edge|middle|central|after-edge|text-after-edge|ideographic|alphabetic|hanging|mathematical",
+	  "baseline-shift": "baseline|sub|super|<svg-length>",
+	  behavior: "<url>+",
+	  "clip-rule": "nonzero|evenodd",
+	  cue: "<'cue-before'> <'cue-after'>?",
+	  "cue-after": "<url> <decibel>?|none",
+	  "cue-before": "<url> <decibel>?|none",
+	  "dominant-baseline": "auto|use-script|no-change|reset-size|ideographic|alphabetic|hanging|mathematical|central|middle|text-after-edge|text-before-edge",
+	  fill: "<paint>",
+	  "fill-opacity": "<number-zero-one>",
+	  "fill-rule": "nonzero|evenodd",
+	  "glyph-orientation-horizontal": "<angle>",
+	  "glyph-orientation-vertical": "<angle>",
+	  kerning: "auto|<svg-length>",
+	  marker: "none|<url>",
+	  "marker-end": "none|<url>",
+	  "marker-mid": "none|<url>",
+	  "marker-start": "none|<url>",
+	  pause: "<'pause-before'> <'pause-after'>?",
+	  "pause-after": "<time>|none|x-weak|weak|medium|strong|x-strong",
+	  "pause-before": "<time>|none|x-weak|weak|medium|strong|x-strong",
+	  rest: "<'rest-before'> <'rest-after'>?",
+	  "rest-after": "<time>|none|x-weak|weak|medium|strong|x-strong",
+	  "rest-before": "<time>|none|x-weak|weak|medium|strong|x-strong",
+	  "shape-rendering": "auto|optimizeSpeed|crispEdges|geometricPrecision",
+	  src: "[<url> [format( <string># )]?|local( <family-name> )]#",
+	  speak: "auto|none|normal",
+	  "speak-as": "normal|spell-out||digits||[literal-punctuation|no-punctuation]",
+	  stroke: "<paint>",
+	  "stroke-dasharray": "none|[<svg-length>+]#",
+	  "stroke-dashoffset": "<svg-length>",
+	  "stroke-linecap": "butt|round|square",
+	  "stroke-linejoin": "miter|round|bevel",
+	  "stroke-miterlimit": "<number-one-or-greater>",
+	  "stroke-opacity": "<number-zero-one>",
+	  "stroke-width": "<svg-length>",
+	  "text-anchor": "start|middle|end",
+	  "unicode-range": "<urange>#",
+	  "voice-balance": "<number>|left|center|right|leftwards|rightwards",
+	  "voice-duration": "auto|<time>",
+	  "voice-family": "[[<family-name>|<generic-voice>] ,]* [<family-name>|<generic-voice>]|preserve",
+	  "voice-pitch": "<frequency>&&absolute|[[x-low|low|medium|high|x-high]||[<frequency>|<semitones>|<percentage>]]",
+	  "voice-range": "<frequency>&&absolute|[[x-low|low|medium|high|x-high]||[<frequency>|<semitones>|<percentage>]]",
+	  "voice-rate": "[normal|x-slow|slow|medium|fast|x-fast]||<percentage>",
+	  "voice-stress": "normal|strong|moderate|none|reduced",
+	  "voice-volume": "silent|[[x-soft|soft|medium|loud|x-loud]||<decibel>]"
+	},
+	    Ir = {
+	  generic: !0,
+	  types: Nr,
+	  properties: Rr
+	},
+	    Br = window.Object.freeze({
+	  generic: !0,
+	  types: Nr,
+	  properties: Rr,
+	  default: Ir
+	}),
+	    Mr = ze.cmpChar,
+	    jr = ze.isDigit,
+	    _r = ze.TYPE,
+	    Fr = _r.WhiteSpace,
+	    Ur = _r.Comment,
+	    qr = _r.Ident,
+	    Wr = _r.Number,
+	    Yr = _r.Dimension;
+
+	function Vr(e, t) {
+	  var n = this.scanner.tokenStart + e,
+	      r = this.scanner.source.charCodeAt(n);
+
+	  for (43 !== r && 45 !== r || (t && this.error("Number sign is not allowed"), n++); n < this.scanner.tokenEnd; n++) jr(this.scanner.source.charCodeAt(n)) || this.error("Integer is expected", n);
+	}
+
+	function Hr(e) {
+	  return Vr.call(this, 0, e);
+	}
+
+	function $r(e, t) {
+	  if (!Mr(this.scanner.source, this.scanner.tokenStart + e, t)) {
+	    var n = "";
+
+	    switch (t) {
+	      case 110:
+	        n = "N is expected";
+	        break;
+
+	      case 45:
+	        n = "HyphenMinus is expected";
+	    }
+
+	    this.error(n, this.scanner.tokenStart + e);
+	  }
+	}
+
+	function Gr() {
+	  for (var e = 0, t = 0, n = this.scanner.tokenType; n === Fr || n === Ur;) n = this.scanner.lookupType(++e);
+
+	  if (n !== Wr) {
+	    if (!this.scanner.isDelim(43, e) && !this.scanner.isDelim(45, e)) return null;
+	    t = this.scanner.isDelim(43, e) ? 43 : 45;
+
+	    do {
+	      n = this.scanner.lookupType(++e);
+	    } while (n === Fr || n === Ur);
+
+	    n !== Wr && (this.scanner.skip(e), Hr.call(this, !0));
+	  }
+
+	  return e > 0 && this.scanner.skip(e), 0 === t && 43 !== (n = this.scanner.source.charCodeAt(this.scanner.tokenStart)) && 45 !== n && this.error("Number sign is expected"), Hr.call(this, 0 !== t), 45 === t ? "-" + this.consume(Wr) : this.consume(Wr);
+	}
+
+	var Kr = {
+	  name: "AnPlusB",
+	  structure: {
+	    a: [String, null],
+	    b: [String, null]
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart,
+	        t = null,
+	        n = null;
+	    if (this.scanner.tokenType === Wr) Hr.call(this, !1), n = this.consume(Wr);else if (this.scanner.tokenType === qr && Mr(this.scanner.source, this.scanner.tokenStart, 45)) switch (t = "-1", $r.call(this, 1, 110), this.scanner.getTokenLength()) {
+	      case 2:
+	        this.scanner.next(), n = Gr.call(this);
+	        break;
+
+	      case 3:
+	        $r.call(this, 2, 45), this.scanner.next(), this.scanner.skipSC(), Hr.call(this, !0), n = "-" + this.consume(Wr);
+	        break;
+
+	      default:
+	        $r.call(this, 2, 45), Vr.call(this, 3, !0), this.scanner.next(), n = this.scanner.substrToCursor(e + 2);
+	    } else if (this.scanner.tokenType === qr || this.scanner.isDelim(43) && this.scanner.lookupType(1) === qr) {
+	      var r = 0;
+
+	      switch (t = "1", this.scanner.isDelim(43) && (r = 1, this.scanner.next()), $r.call(this, 0, 110), this.scanner.getTokenLength()) {
+	        case 1:
+	          this.scanner.next(), n = Gr.call(this);
+	          break;
+
+	        case 2:
+	          $r.call(this, 1, 45), this.scanner.next(), this.scanner.skipSC(), Hr.call(this, !0), n = "-" + this.consume(Wr);
+	          break;
+
+	        default:
+	          $r.call(this, 1, 45), Vr.call(this, 2, !0), this.scanner.next(), n = this.scanner.substrToCursor(e + r + 1);
+	      }
+	    } else if (this.scanner.tokenType === Yr) {
+	      for (var o = this.scanner.source.charCodeAt(this.scanner.tokenStart), a = (r = 43 === o || 45 === o, this.scanner.tokenStart + r); a < this.scanner.tokenEnd && jr(this.scanner.source.charCodeAt(a)); a++);
+
+	      a === this.scanner.tokenStart + r && this.error("Integer is expected", this.scanner.tokenStart + r), $r.call(this, a - this.scanner.tokenStart, 110), t = this.scanner.source.substring(e, a), a + 1 === this.scanner.tokenEnd ? (this.scanner.next(), n = Gr.call(this)) : ($r.call(this, a - this.scanner.tokenStart + 1, 45), a + 2 === this.scanner.tokenEnd ? (this.scanner.next(), this.scanner.skipSC(), Hr.call(this, !0), n = "-" + this.consume(Wr)) : (Vr.call(this, a - this.scanner.tokenStart + 2, !0), this.scanner.next(), n = this.scanner.substrToCursor(a + 1)));
+	    } else this.error();
+	    return null !== t && 43 === t.charCodeAt(0) && (t = t.substr(1)), null !== n && 43 === n.charCodeAt(0) && (n = n.substr(1)), {
+	      type: "AnPlusB",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      a: t,
+	      b: n
+	    };
+	  },
+	  generate: function (e) {
+	    var t = null !== e.a && void 0 !== e.a,
+	        n = null !== e.b && void 0 !== e.b;
+	    t ? (this.chunk("+1" === e.a ? "+n" : "1" === e.a ? "n" : "-1" === e.a ? "-n" : e.a + "n"), n && ("-" === (n = String(e.b)).charAt(0) || "+" === n.charAt(0) ? (this.chunk(n.charAt(0)), this.chunk(n.substr(1))) : (this.chunk("+"), this.chunk(n)))) : this.chunk(String(e.b));
+	  }
+	},
+	    Xr = ze.TYPE,
+	    Qr = Xr.WhiteSpace,
+	    Zr = Xr.Semicolon,
+	    Jr = Xr.LeftCurlyBracket,
+	    eo = Xr.Delim;
+
+	function to() {
+	  return this.scanner.tokenIndex > 0 && this.scanner.lookupType(-1) === Qr ? this.scanner.tokenIndex > 1 ? this.scanner.getTokenStart(this.scanner.tokenIndex - 1) : this.scanner.firstCharOffset : this.scanner.tokenStart;
+	}
+
+	function no() {
+	  return 0;
+	}
+
+	var ro = {
+	  name: "Raw",
+	  structure: {
+	    value: String
+	  },
+	  parse: function (e, t, n) {
+	    var r,
+	        o = this.scanner.getTokenStart(e);
+	    return this.scanner.skip(this.scanner.getRawLength(e, t || no)), r = n && this.scanner.tokenStart > o ? to.call(this) : this.scanner.tokenStart, {
+	      type: "Raw",
+	      loc: this.getLocation(o, r),
+	      value: this.scanner.source.substring(o, r)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.value);
+	  },
+	  mode: {
+	    default: no,
+	    leftCurlyBracket: function (e) {
+	      return e === Jr ? 1 : 0;
+	    },
+	    leftCurlyBracketOrSemicolon: function (e) {
+	      return e === Jr || e === Zr ? 1 : 0;
+	    },
+	    exclamationMarkOrSemicolon: function (e, t, n) {
+	      return e === eo && 33 === t.charCodeAt(n) || e === Zr ? 1 : 0;
+	    },
+	    semicolonIncluded: function (e) {
+	      return e === Zr ? 2 : 0;
+	    }
+	  }
+	},
+	    oo = ze.TYPE,
+	    ao = ro.mode,
+	    io = oo.AtKeyword,
+	    so = oo.Semicolon,
+	    lo = oo.LeftCurlyBracket,
+	    co = oo.RightCurlyBracket;
+
+	function uo(e) {
+	  return this.Raw(e, ao.leftCurlyBracketOrSemicolon, !0);
+	}
+
+	function ho() {
+	  for (var e, t = 1; e = this.scanner.lookupType(t); t++) {
+	    if (e === co) return !0;
+	    if (e === lo || e === io) return !1;
+	  }
+
+	  return !1;
+	}
+
+	var po = {
+	  name: "Atrule",
+	  structure: {
+	    name: String,
+	    prelude: ["AtrulePrelude", "Raw", null],
+	    block: ["Block", null]
+	  },
+	  parse: function () {
+	    var e,
+	        t,
+	        n = this.scanner.tokenStart,
+	        r = null,
+	        o = null;
+
+	    switch (this.eat(io), t = (e = this.scanner.substrToCursor(n + 1)).toLowerCase(), this.scanner.skipSC(), !1 === this.scanner.eof && this.scanner.tokenType !== lo && this.scanner.tokenType !== so && (this.parseAtrulePrelude ? "AtrulePrelude" === (r = this.parseWithFallback(this.AtrulePrelude.bind(this, e), uo)).type && null === r.children.head && (r = null) : r = uo.call(this, this.scanner.tokenIndex), this.scanner.skipSC()), this.scanner.tokenType) {
+	      case so:
+	        this.scanner.next();
+	        break;
+
+	      case lo:
+	        o = this.atrule.hasOwnProperty(t) && "function" == typeof this.atrule[t].block ? this.atrule[t].block.call(this) : this.Block(ho.call(this));
+	    }
+
+	    return {
+	      type: "Atrule",
+	      loc: this.getLocation(n, this.scanner.tokenStart),
+	      name: e,
+	      prelude: r,
+	      block: o
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("@"), this.chunk(e.name), null !== e.prelude && (this.chunk(" "), this.node(e.prelude)), e.block ? this.node(e.block) : this.chunk(";");
+	  },
+	  walkContext: "atrule"
+	},
+	    mo = ze.TYPE,
+	    fo = mo.Semicolon,
+	    go = mo.LeftCurlyBracket,
+	    bo = {
+	  name: "AtrulePrelude",
+	  structure: {
+	    children: [[]]
+	  },
+	  parse: function (e) {
+	    var t = null;
+	    return null !== e && (e = e.toLowerCase()), this.scanner.skipSC(), t = this.atrule.hasOwnProperty(e) && "function" == typeof this.atrule[e].prelude ? this.atrule[e].prelude.call(this) : this.readSequence(this.scope.AtrulePrelude), this.scanner.skipSC(), !0 !== this.scanner.eof && this.scanner.tokenType !== go && this.scanner.tokenType !== fo && this.error("Semicolon or block is expected"), null === t && (t = this.createList()), {
+	      type: "AtrulePrelude",
+	      loc: this.getLocationFromList(t),
+	      children: t
+	    };
+	  },
+	  generate: function (e) {
+	    this.children(e);
+	  },
+	  walkContext: "atrulePrelude"
+	},
+	    yo = ze.TYPE,
+	    ko = yo.Ident,
+	    vo = yo.String,
+	    wo = yo.Colon,
+	    xo = yo.LeftSquareBracket,
+	    So = yo.RightSquareBracket;
+
+	function Co() {
+	  this.scanner.eof && this.error("Unexpected end of input");
+	  var e = this.scanner.tokenStart,
+	      t = !1,
+	      n = !0;
+	  return this.scanner.isDelim(42) ? (t = !0, n = !1, this.scanner.next()) : this.scanner.isDelim(124) || this.eat(ko), this.scanner.isDelim(124) ? 61 !== this.scanner.source.charCodeAt(this.scanner.tokenStart + 1) ? (this.scanner.next(), this.eat(ko)) : t && this.error("Identifier is expected", this.scanner.tokenEnd) : t && this.error("Vertical line is expected"), n && this.scanner.tokenType === wo && (this.scanner.next(), this.eat(ko)), {
+	    type: "Identifier",
+	    loc: this.getLocation(e, this.scanner.tokenStart),
+	    name: this.scanner.substrToCursor(e)
+	  };
+	}
+
+	function Ao() {
+	  var e = this.scanner.tokenStart,
+	      t = this.scanner.source.charCodeAt(e);
+	  return 61 !== t && 126 !== t && 94 !== t && 36 !== t && 42 !== t && 124 !== t && this.error("Attribute selector (=, ~=, ^=, $=, *=, |=) is expected"), this.scanner.next(), 61 !== t && (this.scanner.isDelim(61) || this.error("Equal sign is expected"), this.scanner.next()), this.scanner.substrToCursor(e);
+	}
+
+	var To = {
+	  name: "AttributeSelector",
+	  structure: {
+	    name: "Identifier",
+	    matcher: [String, null],
+	    value: ["String", "Identifier", null],
+	    flags: [String, null]
+	  },
+	  parse: function () {
+	    var e,
+	        t = this.scanner.tokenStart,
+	        n = null,
+	        r = null,
+	        o = null;
+	    return this.eat(xo), this.scanner.skipSC(), e = Co.call(this), this.scanner.skipSC(), this.scanner.tokenType !== So && (this.scanner.tokenType !== ko && (n = Ao.call(this), this.scanner.skipSC(), r = this.scanner.tokenType === vo ? this.String() : this.Identifier(), this.scanner.skipSC()), this.scanner.tokenType === ko && (o = this.scanner.getTokenValue(), this.scanner.next(), this.scanner.skipSC())), this.eat(So), {
+	      type: "AttributeSelector",
+	      loc: this.getLocation(t, this.scanner.tokenStart),
+	      name: e,
+	      matcher: n,
+	      value: r,
+	      flags: o
+	    };
+	  },
+	  generate: function (e) {
+	    var t = " ";
+	    this.chunk("["), this.node(e.name), null !== e.matcher && (this.chunk(e.matcher), null !== e.value && (this.node(e.value), "String" === e.value.type && (t = ""))), null !== e.flags && (this.chunk(t), this.chunk(e.flags)), this.chunk("]");
+	  }
+	},
+	    zo = ze.TYPE,
+	    Po = ro.mode,
+	    Eo = zo.WhiteSpace,
+	    Lo = zo.Comment,
+	    Oo = zo.Semicolon,
+	    Do = zo.AtKeyword,
+	    No = zo.LeftCurlyBracket,
+	    Ro = zo.RightCurlyBracket;
+
+	function Io(e) {
+	  return this.Raw(e, null, !0);
+	}
+
+	function Bo() {
+	  return this.parseWithFallback(this.Rule, Io);
+	}
+
+	function Mo(e) {
+	  return this.Raw(e, Po.semicolonIncluded, !0);
+	}
+
+	function jo() {
+	  if (this.scanner.tokenType === Oo) return Mo.call(this, this.scanner.tokenIndex);
+	  var e = this.parseWithFallback(this.Declaration, Mo);
+	  return this.scanner.tokenType === Oo && this.scanner.next(), e;
+	}
+
+	var _o = {
+	  name: "Block",
+	  structure: {
+	    children: [["Atrule", "Rule", "Declaration"]]
+	  },
+	  parse: function (e) {
+	    var t = e ? jo : Bo,
+	        n = this.scanner.tokenStart,
+	        r = this.createList();
+	    this.eat(No);
+
+	    e: for (; !this.scanner.eof;) switch (this.scanner.tokenType) {
+	      case Ro:
+	        break e;
+
+	      case Eo:
+	      case Lo:
+	        this.scanner.next();
+	        break;
+
+	      case Do:
+	        r.push(this.parseWithFallback(this.Atrule, Io));
+	        break;
+
+	      default:
+	        r.push(t.call(this));
+	    }
+
+	    return this.scanner.eof || this.eat(Ro), {
+	      type: "Block",
+	      loc: this.getLocation(n, this.scanner.tokenStart),
+	      children: r
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("{"), this.children(e, function (e) {
+	      "Declaration" === e.type && this.chunk(";");
+	    }), this.chunk("}");
+	  },
+	  walkContext: "block"
+	},
+	    Fo = ze.TYPE,
+	    Uo = Fo.LeftSquareBracket,
+	    qo = Fo.RightSquareBracket,
+	    Wo = {
+	  name: "Brackets",
+	  structure: {
+	    children: [[]]
+	  },
+	  parse: function (e, t) {
+	    var n,
+	        r = this.scanner.tokenStart;
+	    return this.eat(Uo), n = e.call(this, t), this.scanner.eof || this.eat(qo), {
+	      type: "Brackets",
+	      loc: this.getLocation(r, this.scanner.tokenStart),
+	      children: n
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("["), this.children(e), this.chunk("]");
+	  }
+	},
+	    Yo = ze.TYPE.CDC,
+	    Vo = {
+	  name: "CDC",
+	  structure: [],
+	  parse: function () {
+	    var e = this.scanner.tokenStart;
+	    return this.eat(Yo), {
+	      type: "CDC",
+	      loc: this.getLocation(e, this.scanner.tokenStart)
+	    };
+	  },
+	  generate: function () {
+	    this.chunk("--\x3e");
+	  }
+	},
+	    Ho = ze.TYPE.CDO,
+	    $o = {
+	  name: "CDO",
+	  structure: [],
+	  parse: function () {
+	    var e = this.scanner.tokenStart;
+	    return this.eat(Ho), {
+	      type: "CDO",
+	      loc: this.getLocation(e, this.scanner.tokenStart)
+	    };
+	  },
+	  generate: function () {
+	    this.chunk("\x3c!--");
+	  }
+	},
+	    Go = ze.TYPE.Ident,
+	    Ko = {
+	  name: "ClassSelector",
+	  structure: {
+	    name: String
+	  },
+	  parse: function () {
+	    return this.scanner.isDelim(46) || this.error("Full stop is expected"), this.scanner.next(), {
+	      type: "ClassSelector",
+	      loc: this.getLocation(this.scanner.tokenStart - 1, this.scanner.tokenEnd),
+	      name: this.consume(Go)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("."), this.chunk(e.name);
+	  }
+	},
+	    Xo = ze.TYPE.Ident,
+	    Qo = {
+	  name: "Combinator",
+	  structure: {
+	    name: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart;
+
+	    switch (this.scanner.source.charCodeAt(this.scanner.tokenStart)) {
+	      case 62:
+	      case 43:
+	      case 126:
+	        this.scanner.next();
+	        break;
+
+	      case 47:
+	        this.scanner.next(), this.scanner.tokenType === Xo && !1 !== this.scanner.lookupValue(0, "deep") || this.error("Identifier `deep` is expected"), this.scanner.next(), this.scanner.isDelim(47) || this.error("Solidus is expected"), this.scanner.next();
+	        break;
+
+	      default:
+	        this.error("Combinator is expected");
+	    }
+
+	    return {
+	      type: "Combinator",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      name: this.scanner.substrToCursor(e)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.name);
+	  }
+	},
+	    Zo = ze.TYPE.Comment,
+	    Jo = {
+	  name: "Comment",
+	  structure: {
+	    value: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart,
+	        t = this.scanner.tokenEnd;
+	    return this.eat(Zo), t - e + 2 >= 2 && 42 === this.scanner.source.charCodeAt(t - 2) && 47 === this.scanner.source.charCodeAt(t - 1) && (t -= 2), {
+	      type: "Comment",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      value: this.scanner.source.substring(e + 2, t)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("/*"), this.chunk(e.value), this.chunk("*/");
+	  }
+	},
+	    ea = le.isCustomProperty,
+	    ta = ze.TYPE,
+	    na = ro.mode,
+	    ra = ta.Ident,
+	    oa = ta.Hash,
+	    aa = ta.Colon,
+	    ia = ta.Semicolon,
+	    sa = ta.Delim;
+
+	function la(e) {
+	  return this.Raw(e, na.exclamationMarkOrSemicolon, !0);
+	}
+
+	function ca(e) {
+	  return this.Raw(e, na.exclamationMarkOrSemicolon, !1);
+	}
+
+	function ua() {
+	  var e = this.scanner.tokenIndex,
+	      t = this.Value();
+	  return "Raw" !== t.type && !1 === this.scanner.eof && this.scanner.tokenType !== ia && !1 === this.scanner.isDelim(33) && !1 === this.scanner.isBalanceEdge(e) && this.error(), t;
+	}
+
+	var ha = {
+	  name: "Declaration",
+	  structure: {
+	    important: [Boolean, String],
+	    property: String,
+	    value: ["Value", "Raw"]
+	  },
+	  parse: function () {
+	    var e,
+	        t = this.scanner.tokenStart,
+	        n = this.scanner.tokenIndex,
+	        r = da.call(this),
+	        o = ea(r),
+	        a = o ? this.parseCustomProperty : this.parseValue,
+	        i = o ? ca : la,
+	        s = !1;
+	    return this.scanner.skipSC(), this.eat(aa), o || this.scanner.skipSC(), e = a ? this.parseWithFallback(ua, i) : i.call(this, this.scanner.tokenIndex), this.scanner.isDelim(33) && (s = pa.call(this), this.scanner.skipSC()), !1 === this.scanner.eof && this.scanner.tokenType !== ia && !1 === this.scanner.isBalanceEdge(n) && this.error(), {
+	      type: "Declaration",
+	      loc: this.getLocation(t, this.scanner.tokenStart),
+	      important: s,
+	      property: r,
+	      value: e
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.property), this.chunk(":"), this.node(e.value), e.important && this.chunk(!0 === e.important ? "!important" : "!" + e.important);
+	  },
+	  walkContext: "declaration"
+	};
+
+	function da() {
+	  var e = this.scanner.tokenStart;
+	  if (this.scanner.tokenType === sa) switch (this.scanner.source.charCodeAt(this.scanner.tokenStart)) {
+	    case 42:
+	    case 36:
+	    case 43:
+	    case 35:
+	    case 38:
+	      this.scanner.next();
+	      break;
+
+	    case 47:
+	      this.scanner.next(), this.scanner.isDelim(47) && this.scanner.next();
+	  }
+	  return this.scanner.tokenType === oa ? this.eat(oa) : this.eat(ra), this.scanner.substrToCursor(e);
+	}
+
+	function pa() {
+	  this.eat(sa), this.scanner.skipSC();
+	  var e = this.consume(ra);
+	  return "important" === e || e;
+	}
+
+	var ma = ze.TYPE,
+	    fa = ro.mode,
+	    ga = ma.WhiteSpace,
+	    ba = ma.Comment,
+	    ya = ma.Semicolon;
+
+	function ka(e) {
+	  return this.Raw(e, fa.semicolonIncluded, !0);
+	}
+
+	var va = {
+	  name: "DeclarationList",
+	  structure: {
+	    children: [["Declaration"]]
+	  },
+	  parse: function () {
+	    for (var e = this.createList(); !this.scanner.eof;) switch (this.scanner.tokenType) {
+	      case ga:
+	      case ba:
+	      case ya:
+	        this.scanner.next();
+	        break;
+
+	      default:
+	        e.push(this.parseWithFallback(this.Declaration, ka));
+	    }
+
+	    return {
+	      type: "DeclarationList",
+	      loc: this.getLocationFromList(e),
+	      children: e
+	    };
+	  },
+	  generate: function (e) {
+	    this.children(e, function (e) {
+	      "Declaration" === e.type && this.chunk(";");
+	    });
+	  }
+	},
+	    wa = q.consumeNumber,
+	    xa = ze.TYPE.Dimension,
+	    Sa = {
+	  name: "Dimension",
+	  structure: {
+	    value: String,
+	    unit: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart,
+	        t = wa(this.scanner.source, e);
+	    return this.eat(xa), {
+	      type: "Dimension",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      value: this.scanner.source.substring(e, t),
+	      unit: this.scanner.source.substring(t, this.scanner.tokenStart)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.value), this.chunk(e.unit);
+	  }
+	},
+	    Ca = ze.TYPE.RightParenthesis,
+	    Aa = {
+	  name: "Function",
+	  structure: {
+	    name: String,
+	    children: [[]]
+	  },
+	  parse: function (e, t) {
+	    var n,
+	        r = this.scanner.tokenStart,
+	        o = this.consumeFunctionName(),
+	        a = o.toLowerCase();
+	    return n = t.hasOwnProperty(a) ? t[a].call(this, t) : e.call(this, t), this.scanner.eof || this.eat(Ca), {
+	      type: "Function",
+	      loc: this.getLocation(r, this.scanner.tokenStart),
+	      name: o,
+	      children: n
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.name), this.chunk("("), this.children(e), this.chunk(")");
+	  },
+	  walkContext: "function"
+	},
+	    Ta = ze.TYPE.Hash,
+	    za = {
+	  name: "HexColor",
+	  structure: {
+	    value: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart;
+	    return this.eat(Ta), {
+	      type: "HexColor",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      value: this.scanner.substrToCursor(e + 1)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("#"), this.chunk(e.value);
+	  }
+	},
+	    Pa = ze.TYPE.Ident,
+	    Ea = {
+	  name: "Identifier",
+	  structure: {
+	    name: String
+	  },
+	  parse: function () {
+	    return {
+	      type: "Identifier",
+	      loc: this.getLocation(this.scanner.tokenStart, this.scanner.tokenEnd),
+	      name: this.consume(Pa)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.name);
+	  }
+	},
+	    La = ze.TYPE.Hash,
+	    Oa = {
+	  name: "IdSelector",
+	  structure: {
+	    name: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart;
+	    return this.eat(La), {
+	      type: "IdSelector",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      name: this.scanner.substrToCursor(e + 1)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("#"), this.chunk(e.name);
+	  }
+	},
+	    Da = ze.TYPE,
+	    Na = Da.Ident,
+	    Ra = Da.Number,
+	    Ia = Da.Dimension,
+	    Ba = Da.LeftParenthesis,
+	    Ma = Da.RightParenthesis,
+	    ja = Da.Colon,
+	    _a = Da.Delim,
+	    Fa = {
+	  name: "MediaFeature",
+	  structure: {
+	    name: String,
+	    value: ["Identifier", "Number", "Dimension", "Ratio", null]
+	  },
+	  parse: function () {
+	    var e,
+	        t = this.scanner.tokenStart,
+	        n = null;
+
+	    if (this.eat(Ba), this.scanner.skipSC(), e = this.consume(Na), this.scanner.skipSC(), this.scanner.tokenType !== Ma) {
+	      switch (this.eat(ja), this.scanner.skipSC(), this.scanner.tokenType) {
+	        case Ra:
+	          n = this.lookupNonWSType(1) === _a ? this.Ratio() : this.Number();
+	          break;
+
+	        case Ia:
+	          n = this.Dimension();
+	          break;
+
+	        case Na:
+	          n = this.Identifier();
+	          break;
+
+	        default:
+	          this.error("Number, dimension, ratio or identifier is expected");
+	      }
+
+	      this.scanner.skipSC();
+	    }
+
+	    return this.eat(Ma), {
+	      type: "MediaFeature",
+	      loc: this.getLocation(t, this.scanner.tokenStart),
+	      name: e,
+	      value: n
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("("), this.chunk(e.name), null !== e.value && (this.chunk(":"), this.node(e.value)), this.chunk(")");
+	  }
+	},
+	    Ua = ze.TYPE,
+	    qa = Ua.WhiteSpace,
+	    Wa = Ua.Comment,
+	    Ya = Ua.Ident,
+	    Va = Ua.LeftParenthesis,
+	    Ha = {
+	  name: "MediaQuery",
+	  structure: {
+	    children: [["Identifier", "MediaFeature", "WhiteSpace"]]
+	  },
+	  parse: function () {
+	    this.scanner.skipSC();
+	    var e = this.createList(),
+	        t = null,
+	        n = null;
+
+	    e: for (; !this.scanner.eof;) {
+	      switch (this.scanner.tokenType) {
+	        case Wa:
+	          this.scanner.next();
+	          continue;
+
+	        case qa:
+	          n = this.WhiteSpace();
+	          continue;
+
+	        case Ya:
+	          t = this.Identifier();
+	          break;
+
+	        case Va:
+	          t = this.MediaFeature();
+	          break;
+
+	        default:
+	          break e;
+	      }
+
+	      null !== n && (e.push(n), n = null), e.push(t);
+	    }
+
+	    return null === t && this.error("Identifier or parenthesis is expected"), {
+	      type: "MediaQuery",
+	      loc: this.getLocationFromList(e),
+	      children: e
+	    };
+	  },
+	  generate: function (e) {
+	    this.children(e);
+	  }
+	},
+	    $a = ze.TYPE.Comma,
+	    Ga = {
+	  name: "MediaQueryList",
+	  structure: {
+	    children: [["MediaQuery"]]
+	  },
+	  parse: function (e) {
+	    var t = this.createList();
+
+	    for (this.scanner.skipSC(); !this.scanner.eof && (t.push(this.MediaQuery(e)), this.scanner.tokenType === $a);) this.scanner.next();
+
+	    return {
+	      type: "MediaQueryList",
+	      loc: this.getLocationFromList(t),
+	      children: t
+	    };
+	  },
+	  generate: function (e) {
+	    this.children(e, function () {
+	      this.chunk(",");
+	    });
+	  }
+	},
+	    Ka = ze.TYPE.Number,
+	    Xa = {
+	  name: "Number",
+	  structure: {
+	    value: String
+	  },
+	  parse: function () {
+	    return {
+	      type: "Number",
+	      loc: this.getLocation(this.scanner.tokenStart, this.scanner.tokenEnd),
+	      value: this.consume(Ka)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.value);
+	  }
+	},
+	    Qa = {
+	  name: "Operator",
+	  structure: {
+	    value: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart;
+	    return this.scanner.next(), {
+	      type: "Operator",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      value: this.scanner.substrToCursor(e)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.value);
+	  }
+	},
+	    Za = ze.TYPE,
+	    Ja = Za.LeftParenthesis,
+	    ei = Za.RightParenthesis,
+	    ti = {
+	  name: "Parentheses",
+	  structure: {
+	    children: [[]]
+	  },
+	  parse: function (e, t) {
+	    var n,
+	        r = this.scanner.tokenStart;
+	    return this.eat(Ja), n = e.call(this, t), this.scanner.eof || this.eat(ei), {
+	      type: "Parentheses",
+	      loc: this.getLocation(r, this.scanner.tokenStart),
+	      children: n
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("("), this.children(e), this.chunk(")");
+	  }
+	},
+	    ni = q.consumeNumber,
+	    ri = ze.TYPE.Percentage,
+	    oi = {
+	  name: "Percentage",
+	  structure: {
+	    value: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart,
+	        t = ni(this.scanner.source, e);
+	    return this.eat(ri), {
+	      type: "Percentage",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      value: this.scanner.source.substring(e, t)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.value), this.chunk("%");
+	  }
+	},
+	    ai = ze.TYPE,
+	    ii = ai.Ident,
+	    si = ai.Function,
+	    li = ai.Colon,
+	    ci = ai.RightParenthesis,
+	    ui = {
+	  name: "PseudoClassSelector",
+	  structure: {
+	    name: String,
+	    children: [["Raw"], null]
+	  },
+	  parse: function () {
+	    var e,
+	        t,
+	        n = this.scanner.tokenStart,
+	        r = null;
+	    return this.eat(li), this.scanner.tokenType === si ? (t = (e = this.consumeFunctionName()).toLowerCase(), this.pseudo.hasOwnProperty(t) ? (this.scanner.skipSC(), r = this.pseudo[t].call(this), this.scanner.skipSC()) : (r = this.createList()).push(this.Raw(this.scanner.tokenIndex, null, !1)), this.eat(ci)) : e = this.consume(ii), {
+	      type: "PseudoClassSelector",
+	      loc: this.getLocation(n, this.scanner.tokenStart),
+	      name: e,
+	      children: r
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(":"), this.chunk(e.name), null !== e.children && (this.chunk("("), this.children(e), this.chunk(")"));
+	  },
+	  walkContext: "function"
+	},
+	    hi = ze.TYPE,
+	    di = hi.Ident,
+	    pi = hi.Function,
+	    mi = hi.Colon,
+	    fi = hi.RightParenthesis,
+	    gi = {
+	  name: "PseudoElementSelector",
+	  structure: {
+	    name: String,
+	    children: [["Raw"], null]
+	  },
+	  parse: function () {
+	    var e,
+	        t,
+	        n = this.scanner.tokenStart,
+	        r = null;
+	    return this.eat(mi), this.eat(mi), this.scanner.tokenType === pi ? (t = (e = this.consumeFunctionName()).toLowerCase(), this.pseudo.hasOwnProperty(t) ? (this.scanner.skipSC(), r = this.pseudo[t].call(this), this.scanner.skipSC()) : (r = this.createList()).push(this.Raw(this.scanner.tokenIndex, null, !1)), this.eat(fi)) : e = this.consume(di), {
+	      type: "PseudoElementSelector",
+	      loc: this.getLocation(n, this.scanner.tokenStart),
+	      name: e,
+	      children: r
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("::"), this.chunk(e.name), null !== e.children && (this.chunk("("), this.children(e), this.chunk(")"));
+	  },
+	  walkContext: "function"
+	},
+	    bi = ze.isDigit,
+	    yi = ze.TYPE,
+	    ki = yi.Number,
+	    vi = yi.Delim;
+
+	function wi() {
+	  this.scanner.skipWS();
+
+	  for (var e = this.consume(ki), t = 0; t < e.length; t++) {
+	    var n = e.charCodeAt(t);
+	    bi(n) || 46 === n || this.error("Unsigned number is expected", this.scanner.tokenStart - e.length + t);
+	  }
+
+	  return 0 === Number(e) && this.error("Zero number is not allowed", this.scanner.tokenStart - e.length), e;
+	}
+
+	var xi = {
+	  name: "Ratio",
+	  structure: {
+	    left: String,
+	    right: String
+	  },
+	  parse: function () {
+	    var e,
+	        t = this.scanner.tokenStart,
+	        n = wi.call(this);
+	    return this.scanner.skipWS(), this.scanner.isDelim(47) || this.error("Solidus is expected"), this.eat(vi), e = wi.call(this), {
+	      type: "Ratio",
+	      loc: this.getLocation(t, this.scanner.tokenStart),
+	      left: n,
+	      right: e
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.left), this.chunk("/"), this.chunk(e.right);
+	  }
+	},
+	    Si = ze.TYPE,
+	    Ci = ro.mode,
+	    Ai = Si.LeftCurlyBracket;
+
+	function Ti(e) {
+	  return this.Raw(e, Ci.leftCurlyBracket, !0);
+	}
+
+	function zi() {
+	  var e = this.SelectorList();
+	  return "Raw" !== e.type && !1 === this.scanner.eof && this.scanner.tokenType !== Ai && this.error(), e;
+	}
+
+	var Pi = {
+	  name: "Rule",
+	  structure: {
+	    prelude: ["SelectorList", "Raw"],
+	    block: ["Block"]
+	  },
+	  parse: function () {
+	    var e,
+	        t,
+	        n = this.scanner.tokenIndex,
+	        r = this.scanner.tokenStart;
+	    return e = this.parseRulePrelude ? this.parseWithFallback(zi, Ti) : Ti.call(this, n), t = this.Block(!0), {
+	      type: "Rule",
+	      loc: this.getLocation(r, this.scanner.tokenStart),
+	      prelude: e,
+	      block: t
+	    };
+	  },
+	  generate: function (e) {
+	    this.node(e.prelude), this.node(e.block);
+	  },
+	  walkContext: "rule"
+	},
+	    Ei = ze.TYPE.Comma,
+	    Li = {
+	  name: "SelectorList",
+	  structure: {
+	    children: [["Selector", "Raw"]]
+	  },
+	  parse: function () {
+	    for (var e = this.createList(); !this.scanner.eof && (e.push(this.Selector()), this.scanner.tokenType === Ei);) this.scanner.next();
+
+	    return {
+	      type: "SelectorList",
+	      loc: this.getLocationFromList(e),
+	      children: e
+	    };
+	  },
+	  generate: function (e) {
+	    this.children(e, function () {
+	      this.chunk(",");
+	    });
+	  },
+	  walkContext: "selector"
+	},
+	    Oi = ze.TYPE.String,
+	    Di = {
+	  name: "String",
+	  structure: {
+	    value: String
+	  },
+	  parse: function () {
+	    return {
+	      type: "String",
+	      loc: this.getLocation(this.scanner.tokenStart, this.scanner.tokenEnd),
+	      value: this.consume(Oi)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.value);
+	  }
+	},
+	    Ni = ze.TYPE,
+	    Ri = Ni.WhiteSpace,
+	    Ii = Ni.Comment,
+	    Bi = Ni.AtKeyword,
+	    Mi = Ni.CDO,
+	    ji = Ni.CDC;
+
+	function _i(e) {
+	  return this.Raw(e, null, !1);
+	}
+
+	var Fi = {
+	  name: "StyleSheet",
+	  structure: {
+	    children: [["Comment", "CDO", "CDC", "Atrule", "Rule", "Raw"]]
+	  },
+	  parse: function () {
+	    for (var e, t = this.scanner.tokenStart, n = this.createList(); !this.scanner.eof;) {
+	      switch (this.scanner.tokenType) {
+	        case Ri:
+	          this.scanner.next();
+	          continue;
+
+	        case Ii:
+	          if (33 !== this.scanner.source.charCodeAt(this.scanner.tokenStart + 2)) {
+	            this.scanner.next();
+	            continue;
+	          }
+
+	          e = this.Comment();
+	          break;
+
+	        case Mi:
+	          e = this.CDO();
+	          break;
+
+	        case ji:
+	          e = this.CDC();
+	          break;
+
+	        case Bi:
+	          e = this.parseWithFallback(this.Atrule, _i);
+	          break;
+
+	        default:
+	          e = this.parseWithFallback(this.Rule, _i);
+	      }
+
+	      n.push(e);
+	    }
+
+	    return {
+	      type: "StyleSheet",
+	      loc: this.getLocation(t, this.scanner.tokenStart),
+	      children: n
+	    };
+	  },
+	  generate: function (e) {
+	    this.children(e);
+	  },
+	  walkContext: "stylesheet"
+	},
+	    Ui = ze.TYPE.Ident;
+
+	function qi() {
+	  this.scanner.tokenType !== Ui && !1 === this.scanner.isDelim(42) && this.error("Identifier or asterisk is expected"), this.scanner.next();
+	}
+
+	var Wi = {
+	  name: "TypeSelector",
+	  structure: {
+	    name: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart;
+	    return this.scanner.isDelim(124) ? (this.scanner.next(), qi.call(this)) : (qi.call(this), this.scanner.isDelim(124) && (this.scanner.next(), qi.call(this))), {
+	      type: "TypeSelector",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      name: this.scanner.substrToCursor(e)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.name);
+	  }
+	},
+	    Yi = ze.isHexDigit,
+	    Vi = ze.cmpChar,
+	    Hi = ze.TYPE,
+	    $i = ze.NAME,
+	    Gi = Hi.Ident,
+	    Ki = Hi.Number,
+	    Xi = Hi.Dimension;
+
+	function Qi(e, t) {
+	  for (var n = this.scanner.tokenStart + e, r = 0; n < this.scanner.tokenEnd; n++) {
+	    var o = this.scanner.source.charCodeAt(n);
+	    if (45 === o && t && 0 !== r) return 0 === Qi.call(this, e + r + 1, !1) && this.error(), -1;
+	    Yi(o) || this.error(t && 0 !== r ? "HyphenMinus" + (r < 6 ? " or hex digit" : "") + " is expected" : r < 6 ? "Hex digit is expected" : "Unexpected input", n), ++r > 6 && this.error("Too many hex digits", n);
+	  }
+
+	  return this.scanner.next(), r;
+	}
+
+	function Zi(e) {
+	  for (var t = 0; this.scanner.isDelim(63);) ++t > e && this.error("Too many question marks"), this.scanner.next();
+	}
+
+	function Ji(e) {
+	  this.scanner.source.charCodeAt(this.scanner.tokenStart) !== e && this.error($i[e] + " is expected");
+	}
+
+	function es() {
+	  var e = 0;
+	  return this.scanner.isDelim(43) ? (this.scanner.next(), this.scanner.tokenType === Gi ? void ((e = Qi.call(this, 0, !0)) > 0 && Zi.call(this, 6 - e)) : this.scanner.isDelim(63) ? (this.scanner.next(), void Zi.call(this, 5)) : void this.error("Hex digit or question mark is expected")) : this.scanner.tokenType === Ki ? (Ji.call(this, 43), e = Qi.call(this, 1, !0), this.scanner.isDelim(63) ? void Zi.call(this, 6 - e) : this.scanner.tokenType === Xi || this.scanner.tokenType === Ki ? (Ji.call(this, 45), void Qi.call(this, 1, !1)) : void 0) : this.scanner.tokenType === Xi ? (Ji.call(this, 43), void ((e = Qi.call(this, 1, !0)) > 0 && Zi.call(this, 6 - e))) : void this.error();
+	}
+
+	var ts,
+	    ns = {
+	  name: "UnicodeRange",
+	  structure: {
+	    value: String
+	  },
+	  parse: function () {
+	    var e = this.scanner.tokenStart;
+	    return Vi(this.scanner.source, e, 117) || this.error("U is expected"), Vi(this.scanner.source, e + 1, 43) || this.error("Plus sign is expected"), this.scanner.next(), es.call(this), {
+	      type: "UnicodeRange",
+	      loc: this.getLocation(e, this.scanner.tokenStart),
+	      value: this.scanner.substrToCursor(e)
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk(e.value);
+	  }
+	},
+	    rs = ze.isWhiteSpace,
+	    os = ze.cmpStr,
+	    as = ze.TYPE,
+	    is = as.Function,
+	    ss = as.Url,
+	    ls = as.RightParenthesis,
+	    cs = {
+	  name: "Url",
+	  structure: {
+	    value: ["String", "Raw"]
+	  },
+	  parse: function () {
+	    var e,
+	        t = this.scanner.tokenStart;
+
+	    switch (this.scanner.tokenType) {
+	      case ss:
+	        for (var n = t + 4, r = this.scanner.tokenEnd - 1; n < r && rs(this.scanner.source.charCodeAt(n));) n++;
+
+	        for (; n < r && rs(this.scanner.source.charCodeAt(r - 1));) r--;
+
+	        e = {
+	          type: "Raw",
+	          loc: this.getLocation(n, r),
+	          value: this.scanner.source.substring(n, r)
+	        }, this.eat(ss);
+	        break;
+
+	      case is:
+	        os(this.scanner.source, this.scanner.tokenStart, this.scanner.tokenEnd, "url(") || this.error("Function name must be `url`"), this.eat(is), this.scanner.skipSC(), e = this.String(), this.scanner.skipSC(), this.eat(ls);
+	        break;
+
+	      default:
+	        this.error("Url or Function is expected");
+	    }
+
+	    return {
+	      type: "Url",
+	      loc: this.getLocation(t, this.scanner.tokenStart),
+	      value: e
+	    };
+	  },
+	  generate: function (e) {
+	    this.chunk("url"), this.chunk("("), this.node(e.value), this.chunk(")");
+	  }
+	},
+	    us = ze.TYPE.WhiteSpace,
+	    hs = window.Object.freeze({
+	  type: "WhiteSpace",
+	  loc: null,
+	  value: " "
+	}),
+	    ds = {
+	  AnPlusB: Kr,
+	  Atrule: po,
+	  AtrulePrelude: bo,
+	  AttributeSelector: To,
+	  Block: _o,
+	  Brackets: Wo,
+	  CDC: Vo,
+	  CDO: $o,
+	  ClassSelector: Ko,
+	  Combinator: Qo,
+	  Comment: Jo,
+	  Declaration: ha,
+	  DeclarationList: va,
+	  Dimension: Sa,
+	  Function: Aa,
+	  HexColor: za,
+	  Identifier: Ea,
+	  IdSelector: Oa,
+	  MediaFeature: Fa,
+	  MediaQuery: Ha,
+	  MediaQueryList: Ga,
+	  Nth: {
+	    name: "Nth",
+	    structure: {
+	      nth: ["AnPlusB", "Identifier"],
+	      selector: ["SelectorList", null]
+	    },
+	    parse: function (e) {
+	      this.scanner.skipSC();
+	      var t,
+	          n = this.scanner.tokenStart,
+	          r = n,
+	          o = null;
+	      return t = this.scanner.lookupValue(0, "odd") || this.scanner.lookupValue(0, "even") ? this.Identifier() : this.AnPlusB(), this.scanner.skipSC(), e && this.scanner.lookupValue(0, "of") ? (this.scanner.next(), o = this.SelectorList(), this.needPositions && (r = this.getLastListNode(o.children).loc.end.offset)) : this.needPositions && (r = t.loc.end.offset), {
+	        type: "Nth",
+	        loc: this.getLocation(n, r),
+	        nth: t,
+	        selector: o
+	      };
+	    },
+	    generate: function (e) {
+	      this.node(e.nth), null !== e.selector && (this.chunk(" of "), this.node(e.selector));
+	    }
+	  },
+	  Number: Xa,
+	  Operator: Qa,
+	  Parentheses: ti,
+	  Percentage: oi,
+	  PseudoClassSelector: ui,
+	  PseudoElementSelector: gi,
+	  Ratio: xi,
+	  Raw: ro,
+	  Rule: Pi,
+	  Selector: {
+	    name: "Selector",
+	    structure: {
+	      children: [["TypeSelector", "IdSelector", "ClassSelector", "AttributeSelector", "PseudoClassSelector", "PseudoElementSelector", "Combinator", "WhiteSpace"]]
+	    },
+	    parse: function () {
+	      var e = this.readSequence(this.scope.Selector);
+	      return null === this.getFirstListNode(e) && this.error("Selector is expected"), {
+	        type: "Selector",
+	        loc: this.getLocationFromList(e),
+	        children: e
+	      };
+	    },
+	    generate: function (e) {
+	      this.children(e);
+	    }
+	  },
+	  SelectorList: Li,
+	  String: Di,
+	  StyleSheet: Fi,
+	  TypeSelector: Wi,
+	  UnicodeRange: ns,
+	  Url: cs,
+	  Value: {
+	    name: "Value",
+	    structure: {
+	      children: [[]]
+	    },
+	    parse: function () {
+	      var e = this.scanner.tokenStart,
+	          t = this.readSequence(this.scope.Value);
+	      return {
+	        type: "Value",
+	        loc: this.getLocation(e, this.scanner.tokenStart),
+	        children: t
+	      };
+	    },
+	    generate: function (e) {
+	      this.children(e);
+	    }
+	  },
+	  WhiteSpace: {
+	    name: "WhiteSpace",
+	    structure: {
+	      value: String
+	    },
+	    parse: function () {
+	      return this.eat(us), hs;
+	    },
+	    generate: function (e) {
+	      this.chunk(e.value);
+	    }
+	  }
+	},
+	    ps = (ts = Br) && ts.default || ts,
+	    ms = {
+	  generic: !0,
+	  types: ps.types,
+	  atrules: ps.atrules,
+	  properties: ps.properties,
+	  node: ds
+	},
+	    fs = ze.cmpChar,
+	    gs = ze.cmpStr,
+	    bs = ze.TYPE,
+	    ys = bs.Ident,
+	    ks = bs.String,
+	    vs = bs.Number,
+	    ws = bs.Function,
+	    xs = bs.Url,
+	    Ss = bs.Hash,
+	    Cs = bs.Dimension,
+	    As = bs.Percentage,
+	    Ts = bs.LeftParenthesis,
+	    zs = bs.LeftSquareBracket,
+	    Ps = bs.Comma,
+	    Es = bs.Delim,
+	    Ls = function (e) {
+	  switch (this.scanner.tokenType) {
+	    case Ss:
+	      return this.HexColor();
+
+	    case Ps:
+	      return e.space = null, e.ignoreWSAfter = !0, this.Operator();
+
+	    case Ts:
+	      return this.Parentheses(this.readSequence, e.recognizer);
+
+	    case zs:
+	      return this.Brackets(this.readSequence, e.recognizer);
+
+	    case ks:
+	      return this.String();
+
+	    case Cs:
+	      return this.Dimension();
+
+	    case As:
+	      return this.Percentage();
+
+	    case vs:
+	      return this.Number();
+
+	    case ws:
+	      return gs(this.scanner.source, this.scanner.tokenStart, this.scanner.tokenEnd, "url(") ? this.Url() : this.Function(this.readSequence, e.recognizer);
+
+	    case xs:
+	      return this.Url();
+
+	    case ys:
+	      return fs(this.scanner.source, this.scanner.tokenStart, 117) && fs(this.scanner.source, this.scanner.tokenStart + 1, 43) ? this.UnicodeRange() : this.Identifier();
+
+	    case Es:
+	      var t = this.scanner.source.charCodeAt(this.scanner.tokenStart);
+	      if (47 === t || 42 === t || 43 === t || 45 === t) return this.Operator();
+	      35 === t && this.error("Hex or identifier is expected", this.scanner.tokenStart + 1);
+	  }
+	},
+	    Os = {
+	  getNode: Ls
+	},
+	    Ds = ze.TYPE,
+	    Ns = Ds.Delim,
+	    Rs = Ds.Ident,
+	    Is = Ds.Dimension,
+	    Bs = Ds.Percentage,
+	    Ms = Ds.Number,
+	    js = Ds.Hash,
+	    _s = Ds.Colon,
+	    Fs = Ds.LeftSquareBracket;
+
+	var Us = {
+	  getNode: function (e) {
+	    switch (this.scanner.tokenType) {
+	      case Fs:
+	        return this.AttributeSelector();
+
+	      case js:
+	        return this.IdSelector();
+
+	      case _s:
+	        return this.scanner.lookupType(1) === _s ? this.PseudoElementSelector() : this.PseudoClassSelector();
+
+	      case Rs:
+	        return this.TypeSelector();
+
+	      case Ms:
+	      case Bs:
+	        return this.Percentage();
+
+	      case Is:
+	        46 === this.scanner.source.charCodeAt(this.scanner.tokenStart) && this.error("Identifier is expected", this.scanner.tokenStart + 1);
+	        break;
+
+	      case Ns:
+	        switch (this.scanner.source.charCodeAt(this.scanner.tokenStart)) {
+	          case 43:
+	          case 62:
+	          case 126:
+	            return e.space = null, e.ignoreWSAfter = !0, this.Combinator();
+
+	          case 47:
+	            return this.Combinator();
+
+	          case 46:
+	            return this.ClassSelector();
+
+	          case 42:
+	          case 124:
+	            return this.TypeSelector();
+
+	          case 35:
+	            return this.IdSelector();
+	        }
+
+	    }
+	  }
+	},
+	    qs = function () {
+	  this.scanner.skipSC();
+	  var e = this.createSingleNodeList(this.IdSelector());
+	  return this.scanner.skipSC(), e;
+	},
+	    Ws = ze.TYPE,
+	    Ys = ro.mode,
+	    Vs = Ws.Comma,
+	    Hs = {
+	  AtrulePrelude: Os,
+	  Selector: Us,
+	  Value: {
+	    getNode: Ls,
+	    "-moz-element": qs,
+	    element: qs,
+	    expression: function () {
+	      return this.createSingleNodeList(this.Raw(this.scanner.tokenIndex, null, !1));
+	    },
+	    var: function () {
+	      var e = this.createList();
+	      return this.scanner.skipSC(), e.push(this.Identifier()), this.scanner.skipSC(), this.scanner.tokenType === Vs && (e.push(this.Operator()), e.push(this.parseCustomProperty ? this.Value(null) : this.Raw(this.scanner.tokenIndex, Ys.exclamationMarkOrSemicolon, !1))), e;
+	    }
+	  }
+	},
+	    $s = ze.TYPE,
+	    Gs = $s.String,
+	    Ks = $s.Ident,
+	    Xs = $s.Url,
+	    Qs = $s.Function,
+	    Zs = $s.LeftParenthesis,
+	    Js = {
+	  parse: {
+	    prelude: function () {
+	      var e = this.createList();
+
+	      switch (this.scanner.skipSC(), this.scanner.tokenType) {
+	        case Gs:
+	          e.push(this.String());
+	          break;
+
+	        case Xs:
+	        case Qs:
+	          e.push(this.Url());
+	          break;
+
+	        default:
+	          this.error("String or url() is expected");
+	      }
+
+	      return this.lookupNonWSType(0) !== Ks && this.lookupNonWSType(0) !== Zs || (e.push(this.WhiteSpace()), e.push(this.MediaQueryList())), e;
+	    },
+	    block: null
+	  }
+	},
+	    el = ze.TYPE,
+	    tl = el.WhiteSpace,
+	    nl = el.Comment,
+	    rl = el.Ident,
+	    ol = el.Function,
+	    al = el.Colon,
+	    il = el.LeftParenthesis;
+
+	function sl() {
+	  return this.createSingleNodeList(this.Raw(this.scanner.tokenIndex, null, !1));
+	}
+
+	function ll() {
+	  return this.scanner.skipSC(), this.scanner.tokenType === rl && this.lookupNonWSType(1) === al ? this.createSingleNodeList(this.Declaration()) : cl.call(this);
+	}
+
+	function cl() {
+	  var e,
+	      t = this.createList(),
+	      n = null;
+	  this.scanner.skipSC();
+
+	  e: for (; !this.scanner.eof;) {
+	    switch (this.scanner.tokenType) {
+	      case tl:
+	        n = this.WhiteSpace();
+	        continue;
+
+	      case nl:
+	        this.scanner.next();
+	        continue;
+
+	      case ol:
+	        e = this.Function(sl, this.scope.AtrulePrelude);
+	        break;
+
+	      case rl:
+	        e = this.Identifier();
+	        break;
+
+	      case il:
+	        e = this.Parentheses(ll, this.scope.AtrulePrelude);
+	        break;
+
+	      default:
+	        break e;
+	    }
+
+	    null !== n && (t.push(n), n = null), t.push(e);
+	  }
+
+	  return t;
+	}
+
+	var ul = {
+	  parse: function () {
+	    return this.createSingleNodeList(this.SelectorList());
+	  }
+	},
+	    hl = {
+	  parse: function () {
+	    return this.createSingleNodeList(this.Nth(!0));
+	  }
+	},
+	    dl = {
+	  parse: function () {
+	    return this.createSingleNodeList(this.Nth(!1));
+	  }
+	};
+	var pl = Dr(function () {
+	  for (var e = {}, t = 0; t < arguments.length; t++) {
+	    var n = arguments[t];
+
+	    for (var r in n) e[r] = n[r];
+	  }
+
+	  return e;
+	}(ms, {
+	  parseContext: {
+	    default: "StyleSheet",
+	    stylesheet: "StyleSheet",
+	    atrule: "Atrule",
+	    atrulePrelude: function (e) {
+	      return this.AtrulePrelude(e.atrule ? String(e.atrule) : null);
+	    },
+	    mediaQueryList: "MediaQueryList",
+	    mediaQuery: "MediaQuery",
+	    rule: "Rule",
+	    selectorList: "SelectorList",
+	    selector: "Selector",
+	    block: function () {
+	      return this.Block(!0);
+	    },
+	    declarationList: "DeclarationList",
+	    declaration: "Declaration",
+	    value: "Value"
+	  },
+	  scope: Hs,
+	  atrule: {
+	    "font-face": {
+	      parse: {
+	        prelude: null,
+	        block: function () {
+	          return this.Block(!0);
+	        }
+	      }
+	    },
+	    import: Js,
+	    media: {
+	      parse: {
+	        prelude: function () {
+	          return this.createSingleNodeList(this.MediaQueryList());
+	        },
+	        block: function () {
+	          return this.Block(!1);
+	        }
+	      }
+	    },
+	    page: {
+	      parse: {
+	        prelude: function () {
+	          return this.createSingleNodeList(this.SelectorList());
+	        },
+	        block: function () {
+	          return this.Block(!0);
+	        }
+	      }
+	    },
+	    supports: {
+	      parse: {
+	        prelude: function () {
+	          var e = cl.call(this);
+	          return null === this.getFirstListNode(e) && this.error("Condition is expected"), e;
+	        },
+	        block: function () {
+	          return this.Block(!1);
+	        }
+	      }
+	    }
+	  },
+	  pseudo: {
+	    dir: {
+	      parse: function () {
+	        return this.createSingleNodeList(this.Identifier());
+	      }
+	    },
+	    has: {
+	      parse: function () {
+	        return this.createSingleNodeList(this.SelectorList());
+	      }
+	    },
+	    lang: {
+	      parse: function () {
+	        return this.createSingleNodeList(this.Identifier());
+	      }
+	    },
+	    matches: ul,
+	    not: ul,
+	    "nth-child": hl,
+	    "nth-last-child": hl,
+	    "nth-last-of-type": dl,
+	    "nth-of-type": dl,
+	    slotted: {
+	      parse: function () {
+	        return this.createSingleNodeList(this.Selector());
+	      }
+	    }
+	  },
+	  node: ds
+	}, {
+	  node: ds
+	}));
+	const ml = new window.Map([["background", new window.Set(["background-color", "background-position", "background-position-x", "background-position-y", "background-size", "background-repeat", "background-repeat-x", "background-repeat-y", "background-clip", "background-origin", "background-attachment", "background-image"])], ["background-position", new window.Set(["background-position-x", "background-position-y"])], ["background-repeat", new window.Set(["background-repeat-x", "background-repeat-y"])], ["font", new window.Set(["font-style", "font-variant-caps", "font-weight", "font-stretch", "font-size", "line-height", "font-family", "font-size-adjust", "font-kerning", "font-optical-sizing", "font-variant-alternates", "font-variant-east-asian", "font-variant-ligatures", "font-variant-numeric", "font-variant-position", "font-language-override", "font-feature-settings", "font-variation-settings"])], ["font-variant", new window.Set(["font-variant-caps", "font-variant-numeric", "font-variant-alternates", "font-variant-ligatures", "font-variant-east-asian"])], ["outline", new window.Set(["outline-width", "outline-style", "outline-color"])], ["border", new window.Set(["border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "border-top-style", "border-right-style", "border-bottom-style", "border-left-style", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color", "border-image-source", "border-image-slice", "border-image-width", "border-image-outset", "border-image-repeat"])], ["border-width", new window.Set(["border-top-width", "border-right-width", "border-bottom-width", "border-left-width"])], ["border-style", new window.Set(["border-top-style", "border-right-style", "border-bottom-style", "border-left-style"])], ["border-color", new window.Set(["border-top-color", "border-right-color", "border-bottom-color", "border-left-color"])], ["border-block", new window.Set(["border-block-start-width", "border-block-end-width", "border-block-start-style", "border-block-end-style", "border-block-start-color", "border-block-end-color"])], ["border-block-start", new window.Set(["border-block-start-width", "border-block-start-style", "border-block-start-color"])], ["border-block-end", new window.Set(["border-block-end-width", "border-block-end-style", "border-block-end-color"])], ["border-inline", new window.Set(["border-inline-start-width", "border-inline-end-width", "border-inline-start-style", "border-inline-end-style", "border-inline-start-color", "border-inline-end-color"])], ["border-inline-start", new window.Set(["border-inline-start-width", "border-inline-start-style", "border-inline-start-color"])], ["border-inline-end", new window.Set(["border-inline-end-width", "border-inline-end-style", "border-inline-end-color"])], ["border-image", new window.Set(["border-image-source", "border-image-slice", "border-image-width", "border-image-outset", "border-image-repeat"])], ["border-radius", new window.Set(["border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"])], ["padding", new window.Set(["padding-top", "padding-right", "padding-bottom", "padding-left"])], ["padding-block", new window.Set(["padding-block-start", "padding-block-end"])], ["padding-inline", new window.Set(["padding-inline-start", "padding-inline-end"])], ["margin", new window.Set(["margin-top", "margin-right", "margin-bottom", "margin-left"])], ["margin-block", new window.Set(["margin-block-start", "margin-block-end"])], ["margin-inline", new window.Set(["margin-inline-start", "margin-inline-end"])], ["inset", new window.Set(["top", "right", "bottom", "left"])], ["inset-block", new window.Set(["inset-block-start", "inset-block-end"])], ["inset-inline", new window.Set(["inset-inline-start", "inset-inline-end"])], ["flex", new window.Set(["flex-grow", "flex-shrink", "flex-basis"])], ["flex-flow", new window.Set(["flex-direction", "flex-wrap"])], ["gap", new window.Set(["row-gap", "column-gap"])], ["transition", new window.Set(["transition-duration", "transition-timing-function", "transition-delay", "transition-property"])], ["grid", new window.Set(["grid-template-rows", "grid-template-columns", "grid-template-areas", "grid-auto-flow", "grid-auto-columns", "grid-auto-rows"])], ["grid-template", new window.Set(["grid-template-rows", "grid-template-columns", "grid-template-areas"])], ["grid-row", new window.Set(["grid-row-start", "grid-row-end"])], ["grid-column", new window.Set(["grid-column-start", "grid-column-end"])], ["grid-gap", new window.Set(["grid-row-gap", "grid-column-gap"])], ["place-content", new window.Set(["align-content", "justify-content"])], ["place-items", new window.Set(["align-items", "justify-items"])], ["place-self", new window.Set(["align-self", "justify-self"])], ["columns", new window.Set(["column-width", "column-count"])], ["column-rule", new window.Set(["column-rule-width", "column-rule-style", "column-rule-color"])], ["list-style", new window.Set(["list-style-type", "list-style-position", "list-style-image"])], ["offset", new window.Set(["offset-position", "offset-path", "offset-distance", "offset-rotate", "offset-anchor"])], ["overflow", new window.Set(["overflow-x", "overflow-y"])], ["overscroll-behavior", new window.Set(["overscroll-behavior-x", "overscroll-behavior-y"])], ["scroll-margin", new window.Set(["scroll-margin-top", "scroll-margin-right", "scroll-margin-bottom", "scroll-margin-left"])], ["scroll-padding", new window.Set(["scroll-padding-top", "scroll-padding-right", "scroll-padding-bottom", "scroll-padding-left"])], ["text-decaration", new window.Set(["text-decoration-line", "text-decoration-style", "text-decoration-color"])], ["text-stroke", new window.Set(["text-stroke-color", "text-stroke-width"])], ["animation", new window.Set(["animation-duration", "animation-timing-function", "animation-delay", "animation-iteration-count", "animation-direction", "animation-fill-mode", "animation-play-state", "animation-name"])], ["mask", new window.Set(["mask-image", "mask-mode", "mask-repeat-x", "mask-repeat-y", "mask-position-x", "mask-position-y", "mask-clip", "mask-origin", "mask-size", "mask-composite"])], ["mask-repeat", new window.Set(["mask-repeat-x", "mask-repeat-y"])], ["mask-position", new window.Set(["mask-position-x", "mask-position-y"])], ["perspective-origin", new window.Set(["perspective-origin-x", "perspective-origin-y"])], ["transform-origin", new window.Set(["transform-origin-x", "transform-origin-y", "transform-origin-z"])]]),
+	      fl = new window.Map([kl("animation", "moz"), kl("border-image", "moz"), kl("mask", "moz"), kl("transition", "moz"), kl("columns", "moz"), kl("text-stroke", "moz"), kl("column-rule", "moz"), ["-moz-border-end", new window.Set(["-moz-border-end-color", "-moz-border-end-style", "-moz-border-end-width"])], ["-moz-border-start", new window.Set(["-moz-border-start-color", "-moz-border-start-style", "-moz-border-start-width"])], ["-moz-outline-radius", new window.Set(["-moz-outline-radius-topleft", "-moz-outline-radius-topright", "-moz-outline-radius-bottomright", "-moz-outline-radius-bottomleft"])]]),
+	      gl = new window.Map([kl("animation", "webkit"), kl("border-radius", "webkit"), kl("column-rule", "webkit"), kl("columns", "webkit"), kl("flex", "webkit"), kl("flex-flow", "webkit"), kl("mask", "webkit"), kl("text-stroke", "webkit"), kl("perspective-origin", "webkit"), kl("transform-origin", "webkit"), kl("transition", "webkit"), ["-webkit-border-start", new window.Set(["-webkit-border-start-color", "-webkit-border-start-style", "-webkit-border-start-width"])], ["-webkit-border-before", new window.Set(["-webkit-border-before-color", "-webkit-border-before-style", "-webkit-border-before-width"])], ["-webkit-border-end", new window.Set(["-webkit-border-end-color", "-webkit-border-end-style", "-webkit-border-end-width"])], ["-webkit-border-after", new window.Set(["-webkit-border-after-color", "-webkit-border-after-style", "-webkit-border-after-width"])]]),
+	      bl = new window.Map([["background-position-x", "background-position"], ["background-position-y", "background-position"], ["background-repeat-x", "background-repeat"], ["background-repeat-y", "background-repeat"]]);
+	fl.forEach((e, t) => ml.set(t, e)), gl.forEach((e, t) => ml.set(t, e));
+	const yl = new window.Set(window.Array.from(ml.values()).reduce((e, t) => e.concat(window.Array.from(t)), []));
+
+	function kl(e, t) {
+	  const n = ml.get(e);
+	  if (n) return [`-${t}-${e}`, new window.Set(window.Array.from(n, e => `-${t}-${e}`))];
+	}
+
+	function vl(e, t) {
+	  const n = ml.get(e);
+	  return !!n && n.has(t);
+	}
+
+	var wl = {
+	  isShorthandFor: vl,
+	  hasShorthand: function (e) {
+	    return yl.has(e);
+	  },
+	  hasShorthandWithin: function (e, t) {
+	    return t.some(t => vl(t, e));
+	  },
+	  preferredShorthand: function (e) {
+	    return bl.get(e);
+	  }
+	};
+	const {
+	  preferredShorthand: xl
+	} = wl,
+	      Sl = {
+	  [2]: {
+	    atrule: "charset",
+	    prelude: "charset"
+	  },
+	  [3]: {
+	    atrule: "import",
+	    prelude: "import"
+	  },
+	  [10]: {
+	    atrule: "namespace",
+	    prelude: "namespace"
+	  },
+	  [1]: {
+	    prelude: "selector",
+	    block: "style"
+	  },
+	  [8]: {
+	    prelude: "key",
+	    block: "style"
+	  },
+	  [6]: {
+	    atrule: "page",
+	    prelude: "selector",
+	    block: "style"
+	  },
+	  [5]: {
+	    atrule: "font-face",
+	    block: "style"
+	  },
+	  [4]: {
+	    atrule: "media",
+	    prelude: "condition",
+	    block: "nested"
+	  },
+	  [12]: {
+	    atrule: "supports",
+	    prelude: "condition",
+	    block: "nested"
+	  },
+	  [13]: {
+	    atrule: "document",
+	    prelude: "condition",
+	    block: "nested"
+	  },
+	  [7]: {
+	    atrule: "keyframes",
+	    prelude: "name",
+	    block: "nested"
+	  }
+	};
+
+	var Cl = function e(t) {
+	  return window.Array.from(t, t => {
+	    const n = Sl[t.type],
+	          r = {};
+
+	    if (n.atrule) {
+	      r.type = "Atrule";
+	      const [e, o] = t.cssText.match(new RegExp("^@(-\\w+-)?" + n.atrule));
+	      r.name = o ? o + n.atrule : n.atrule;
+	    } else r.type = "Rule";
+
+	    let o;
+
+	    if ("selector" === n.prelude ? o = t.selectorText : "key" === n.prelude ? o = t.keyText : "condition" === n.prelude ? o = t.conditionText : "name" === n.prelude ? o = t.name : "import" === n.prelude ? o = `url("${t.href}") ${t.media.mediaText}` : "namespace" === n.prelude ? o = `${t.prefix} url("${t.namespaceURI}")` : "charset" === n.prelude && (o = `"${t.encoding}"`), o) {
+	      const e = n.atrule ? {
+	        context: "atrulePrelude",
+	        atrule: n.atrule
+	      } : {
+	        context: "selectorList"
+	      };
+	      r.prelude = pl.toPlainObject(pl.parse(o, e));
+	    } else r.prelude = null;
+
+	    if ("style" === n.block) {
+	      const e = window.Array.from(t.style).reduce((e, n) => {
+	        const r = xl(n) || n;
+	        return e.set(r, {
+	          type: "Declaration",
+	          important: Boolean(t.style.getPropertyPriority(r)),
+	          property: r,
+	          value: {
+	            type: "Raw",
+	            value: t.style.getPropertyValue(r)
+	          }
+	        }), e;
+	      }, new window.Map());
+	      r.block = {
+	        type: "Block",
+	        children: window.Array.from(e.values())
+	      };
+	    } else "nested" === n.block ? r.block = {
+	      type: "Block",
+	      children: e(t.cssRules)
+	    } : r.block = null;
+
+	    return r;
+	  });
+	};
+
+	var Al = function (e) {
+	  const t = pl.parse(e, {
+	    context: "stylesheet",
+	    parseAtrulePrelude: !0,
+	    parseRulePrelude: !0,
+	    parseValue: !1,
+	    parseCustomProperty: !1
+	  });
+	  return pl.walk(t, {
+	    visit: "TypeSelector",
+
+	    enter(e, t) {
+	      "from" === e.name ? t.data = {
+	        type: "Percentage",
+	        value: "0"
+	      } : "to" === e.name && (t.data = {
+	        type: "Percentage",
+	        value: "100"
+	      });
+	    }
+
+	  }), pl.walk(t, {
+	    visit: "AtrulePrelude",
+
+	    enter(e) {
+	      if (["import", "namespace"].includes(this.atrule.name)) {
+	        const t = e.children.toArray(),
+	              n = "import" === e.name ? 0 : t.length - 1,
+	              r = t[n];
+	        let o;
+	        "String" === r.type ? o = r.value.slice(1, -1) : "Url" === r.type && ("String" === r.value.type ? o = r.value.value.slice(1, -1) : "Raw" === r.value.type && (o = r.value.value)), o && (t[n] = {
+	          type: "Url",
+	          value: {
+	            type: "String",
+	            value: `"${o}"`
+	          }
+	        }, e.children.fromArray(t));
+	      }
+	    }
+
+	  }), pl.toPlainObject(t);
+	};
+
+	const {
+	  isShorthandFor: Tl,
+	  hasShorthandWithin: zl
+	} = wl,
+	      Pl = {
+	  "word-wrap": "overflow-wrap",
+	  clip: "clip-path"
+	};
+
+	function El(e, t) {
+	  const n = new window.Map();
+	  e.forEach(({
+	    type: e,
+	    property: t,
+	    important: r,
+	    value: {
+	      value: o
+	    } = {}
+	  }) => {
+	    if ("Declaration" !== e) return;
+	    let a = n.get(t);
+	    a || (a = new window.Map(), n.set(t, a)), a.set(o, r);
+	  }), t.forEach(({
+	    type: e,
+	    property: t,
+	    important: r,
+	    value: {
+	      value: o
+	    } = {}
+	  }) => {
+	    if ("Declaration" !== e) return;
+	    if (zl(t, window.Array.from(n.keys()))) return;
+	    let a = n.get(t);
+	    a ? a.has(o) ? a.get(o) !== r && a.forEach((e, t) => a.set(t, r)) : a.clear() : (a = new window.Map(), n.set(t, a)), a.set(o, r);
+	  });
+	  const r = [];
+	  return n.forEach((e, t) => {
+	    e.forEach((e, n) => r.push({
+	      type: "Declaration",
+	      property: t,
+	      value: {
+	        type: "Raw",
+	        value: n
+	      },
+	      important: e
+	    }));
+	  }), r;
+	}
+
+	function Ll(e) {
+	  return "Rule" === e.type || /^(-\w+-)?(page|font-face)$/.test(e.name);
+	}
+
+	function Ol(e, t, n, r) {
+	  for (let o = t; o < n; ++o) r(e[o], o, e);
+	}
+
+	var Dl = function e(t, n) {
+	  let r = 0;
+	  const o = [];
+	  return t.forEach(t => {
+	    const a = {};
+	    a.type = t.type, a.name = t.name, a.prelude = t.prelude, a.block = t.block;
+
+	    const i = function (e, t, n) {
+	      return function (e, t, n) {
+	        for (let r = t; r < e.length; ++r) if (n(e[r], r, e)) return r;
+
+	        return -1;
+	      }(e, t, e => {
+	        return e.type === n.type && e.name === n.name && (o = e.prelude, a = n.prelude, !o && !a || o.type === a.type && function e(t, n) {
+	          return !Array.isArray(t) && !Array.isArray(n) || window.Array.isArray(t) && window.Array.isArray(n) && t.length === n.length && t.every((t, r) => {
+	            const o = n[r];
+	            return t.type === o.type && t.name === o.name && (t.value === o.value || t.value.type === o.value.type && t.value.value === o.value.value) && e(t.children, o.children);
+	          });
+	        }(o.children, a.children)) && (!Ll(n) || (t = e.block.children, (r = n.block.children).reduce((e, n) => {
+	          var r;
+	          return e + ("Declaration" === n.type && (r = n.property, /^(-\w+-)/.test(r) || t.some(e => function (e, t) {
+	            const n = Pl[e] || e,
+	                  r = Pl[t] || t;
+	            return n === r || Tl(r, n) || Tl(n, r);
+	          }(e.property, n.property))) ? 1 : 0);
+	        }, 0) >= r.length));
+	        var t, r, o, a;
+	      });
+	    }(n, r, t);
+
+	    i > r && Ol(n, r, i, e => o.push(e)), i >= 0 && (r = i + 1, !function (e) {
+	      return "Atrule" === e.type && /^(-\w+-)?(media|supports|document|keyframes)$/.test(e.name);
+	    }(t) ? Ll(t) && (a.block = {
+	      type: "Block",
+	      children: El(t.block.children, n[i].block.children)
+	    }) : a.block = {
+	      type: "Block",
+	      children: e(t.block.children, n[i].block.children)
+	    }), o.push(a);
+	  }, []), r < n.length && Ol(n, r, n.length, e => o.push(e)), o;
+	},
+	    Nl = () => {};
+
+	var Rl = function (e) {
+	  const t = window.Array.from(e.attributes).map(t => "id" === t.name ? "#" + t.value : "class" === t.name ? window.Array.from(e.classList).map(e => "." + e).join("") : `[${t.name}="${t.value}"]`).join("");
+	  return `${e.nodeName}${t}`;
+	};
+
+	var Il = function (e, t = Nl) {
+	  t("[processInlineCss] processing inline css for", Rl(e));
+
+	  try {
+	    const n = Al(e.textContent);
+	    t("[processInlineCss] created AST for textContent");
+	    const r = Cl(e.sheet.cssRules);
+	    t("[processInlineCss] created AST for CSSOM");
+	    const o = Dl(n.children, r);
+	    t("[processInlineCss] merged AST");
+	    const a = pl.generate(pl.fromPlainObject({
+	      type: "StyleSheet",
+	      children: o
+	    }));
+	    return t("[processInlineCss] generated cssText of length", a.length), a;
+	  } catch (n) {
+	    return t("[processInlineCss] error while processing inline css:", n.message, n), e.textContent;
+	  }
+	};
+
+	var Bl = function (e) {
+	  const t = /url\((?!['"]?:)['"]?([^'")]*)['"]?\)/g,
+	        n = [];
+	  let r;
+
+	  for (; null !== (r = t.exec(e));) n.push(r[1]);
+
+	  return n;
+	};
+
+	var Ml = function (e) {
+	  const t = e.getAttribute("style");
+	  if (t) return Bl(t);
+	};
+
+	const jl = /(\S+)(?:\s+[\d.]+[wx])?(?:,|$)/g;
+
+	var _l = function (e) {
+	  const t = (e.matches || e.msMatchesSelector).bind(e);
+	  let n = [];
+
+	  if (t("img[srcset],source[srcset]") && (n = n.concat(function (e, t, n) {
+	    const r = [],
+	          o = new RegExp(e.source, e.flags),
+	          a = o.global;
+	    let i;
+
+	    for (; (i = o.exec(t)) && (r.push(n(i)), a););
+
+	    return r;
+	  }(jl, e.getAttribute("srcset"), e => e[1]))), t('img[src],source[src],input[type="image"][src],audio[src],video[src]') && n.push(e.getAttribute("src")), t("image,use")) {
+	    const t = e.getAttribute("href") || e.getAttribute("xlink:href");
+	    t && "#" !== t[0] && n.push(t);
+	  }
+
+	  t("object") && e.getAttribute("data") && n.push(e.getAttribute("data")), t('link[rel~="stylesheet"], link[as="stylesheet"]') && n.push(e.getAttribute("href")), t("video[poster]") && n.push(e.getAttribute("poster"));
+	  const r = Ml(e);
+	  return r && (n = n.concat(r)), n;
+	};
+
+	var Fl = function (e) {
+	  const t = Cl(e.cssRules);
+	  return pl.generate(pl.fromPlainObject({
+	    type: "StyleSheet",
+	    children: t
+	  }));
+	};
+
+	const Ul = new window.Set(["date", "datetime-local", "email", "month", "number", "password", "search", "tel", "text", "time", "url", "week"]),
+	      ql = /^on[a-z]+$/;
+
+	function Wl({
+	  attributes: e = {}
+	}) {
+	  return window.Object.keys(e).filter(t => e[t] && e[t].name);
+	}
+
+	function Yl(e, t, n) {
+	  const r = e.find(e => e.name === t);
+	  r ? r.value = n : e.push({
+	    name: t,
+	    value: n
+	  });
+	}
+
+	function Vl(e) {
+	  return window.Array.from(e.adoptedStyleSheets).map(Fl);
+	}
+
+	var Hl = function (e, a, i = Nl) {
+	  const s = [{
+	    nodeType: Node.DOCUMENT_NODE
+	  }],
+	        l = [e],
+	        c = [],
+	        u = [];
+	  let h = [];
+	  return s[0].childNodeIndexes = d(s, e.childNodes), e.adoptedStyleSheets && e.adoptedStyleSheets.length > 0 && (s[0].exp_adoptedStyleSheets = Vl(e)), {
+	    cdt: s,
+	    docRoots: l,
+	    canvasElements: c,
+	    inlineFrames: u,
+	    linkUrls: h
+	  };
+
+	  function d(e, s) {
+	    if (!s || 0 === s.length) return null;
+	    const p = [];
+	    return window.Array.prototype.forEach.call(s, s => {
+	      const m = function e(s, p) {
+	        let m, f, g;
+	        const {
+	          nodeType: b
+	        } = p;
+	        [Node.ELEMENT_NODE, Node.DOCUMENT_FRAGMENT_NODE].includes(b) ? "SCRIPT" !== p.nodeName ? ("STYLE" === p.nodeName && p.sheet && p.sheet.cssRules.length && (s.push(function (e, t) {
+	          return {
+	            nodeType: Node.TEXT_NODE,
+	            nodeValue: Il(e, t)
+	          };
+	        }(p, i)), f = [s.length - 1]), "TEXTAREA" === p.tagName && p.value !== p.textContent && (s.push(function (e) {
+	          return {
+	            nodeType: Node.TEXT_NODE,
+	            nodeValue: e.value
+	          };
+	        }(p)), f = [s.length - 1]), m = function (e) {
+	          const t = {
+	            nodeType: e.nodeType,
+	            nodeName: e.nodeName,
+	            attributes: Wl(e).map(t => {
+	              let n = e.attributes[t].value;
+	              const a = e.attributes[t].name;
+	              return /^blob:/.test(n) ? n = n.replace(/^blob:/, "") : ql.test(a) ? n = "" : "IFRAME" === e.nodeName && r(e) && "src" === a && "about:blank" !== e.contentDocument.location.href && e.contentDocument.location.href !== o(n, e.ownerDocument.location.href) && (n = e.contentDocument.location.href), {
+	                name: a,
+	                value: n
+	              };
+	            })
+	          };
+
+	          if ("INPUT" === e.tagName && ["checkbox", "radio"].includes(e.type)) {
+	            if (e.attributes.checked && !e.checked) {
+	              const e = t.attributes.findIndex(e => "checked" === e.name);
+	              t.attributes.splice(e, 1);
+	            }
+
+	            !e.attributes.checked && e.checked && t.attributes.push({
+	              name: "checked"
+	            });
+	          }
+
+	          "INPUT" === e.tagName && Ul.has(e.type) && (e.attributes.value && e.attributes.value.value) !== e.value && Yl(t.attributes, "value", e.value);
+	          "OPTION" === e.tagName && e.parentElement.selectedOptions && window.Array.from(e.parentElement.selectedOptions).indexOf(e) > -1 && Yl(t.attributes, "selected", "");
+	          "STYLE" === e.tagName && e.sheet && e.sheet.disabled && t.attributes.push({
+	            name: "data-applitools-disabled",
+	            value: ""
+	          });
+	          "LINK" === e.tagName && "text/css" === e.type && e.sheet && e.sheet.disabled && Yl(t.attributes, "disabled", "");
+	          return t;
+	        }(p), m.childNodeIndexes = f || (p.childNodes.length ? d(s, p.childNodes) : []), p.shadowRoot && ("undefined" == typeof window || "function" == typeof p.attachShadow && /native code/.test(p.attachShadow.toString()) ? (m.shadowRootIndex = e(s, p.shadowRoot), l.push(p.shadowRoot)) : m.childNodeIndexes = m.childNodeIndexes.concat(d(s, p.shadowRoot.childNodes))), "CANVAS" === p.nodeName && (g = o(`applitools-canvas-${t()}.png`, a), m.attributes.push({
+	          name: "data-applitools-src",
+	          value: g
+	        }), c.push({
+	          element: p,
+	          url: g
+	        })), "IFRAME" === p.nodeName && r(p) && n(p) && (g = o("?applitools-iframe=" + t(), a), m.attributes.push({
+	          name: "data-applitools-src",
+	          value: g
+	        }), u.push({
+	          element: p,
+	          url: g
+	        })), p.adoptedStyleSheets && p.adoptedStyleSheets.length > 0 && (m.exp_adoptedStyleSheets = Vl(p))) : m = function (e) {
+	          return {
+	            nodeType: Node.ELEMENT_NODE,
+	            nodeName: "SCRIPT",
+	            attributes: Wl(e).map(t => {
+	              const n = e.attributes[t].name;
+	              return {
+	                name: n,
+	                value: ql.test(n) ? "" : e.attributes[t].value
+	              };
+	            }).filter(e => "src" !== e.name),
+	            childNodeIndexes: []
+	          };
+	        }(p) : b === Node.TEXT_NODE ? m = function (e) {
+	          return {
+	            nodeType: Node.TEXT_NODE,
+	            nodeValue: e.nodeValue
+	          };
+	        }(p) : b === Node.DOCUMENT_TYPE_NODE && (m = function (e) {
+	          return {
+	            nodeType: Node.DOCUMENT_TYPE_NODE,
+	            nodeName: e.nodeName
+	          };
+	        }(p));
+
+	        if (m) {
+	          if (b === Node.ELEMENT_NODE) {
+	            const e = _l(p);
+
+	            e.length > 0 && (h = h.concat(e));
+	          }
+
+	          return s.push(m), s.length - 1;
+	        }
+
+	        return null;
+	      }(e, s);
+
+	      null !== m && p.push(m);
+	    }), p;
+	  }
+	};
+
+	var $l = function (e) {
+	  const t = [];
+	  return new window.Set(e).forEach(e => e && t.push(e)), t;
+	};
+
+	var Gl = function (e) {
+	  return e.reduce(({
+	    resourceUrls: e,
+	    blobsObj: t
+	  }, {
+	    resourceUrls: n,
+	    blobsObj: r
+	  }) => ({
+	    resourceUrls: $l(e.concat(n)),
+	    blobsObj: window.Object.assign(t, r)
+	  }), {
+	    resourceUrls: [],
+	    blobsObj: {}
+	  });
+	};
+
+	var Kl = function ({
+	  processResource: e,
+	  aggregateResourceUrlsAndBlobs: t
+	}) {
+	  return function n({
+	    documents: r,
+	    urls: o,
+	    forceCreateStyle: a = !1,
+	    skipResources: i
+	  }) {
+	    return Promise.all(o.map(t => e({
+	      url: t,
+	      documents: r,
+	      getResourceUrlsAndBlobs: n,
+	      forceCreateStyle: a,
+	      skipResources: i
+	    }))).then(e => t(e));
+	  };
+	};
+
+	var Xl = function (e) {
+	  return /^(blob|https?):/.test(e);
+	};
+
+	var Ql = function (e) {
+	  const t = e && e.match(/(^[^#]*)/),
+	        n = t && t[1] || e;
+	  return n && n.replace(/\?\s*$/, "?") || e;
+	};
+
+	var Zl = function (e) {
+	  return e.reduce((e, t) => e.concat(t), []);
+	};
+
+	var Jl = function ({
+	  fetchUrl: e,
+	  findStyleSheetByUrl: t,
+	  getCorsFreeStyleSheet: n,
+	  extractResourcesFromStyleSheet: r,
+	  extractResourcesFromSvg: a,
+	  sessionCache: i,
+	  cache: s = {},
+	  log: l = Nl
+	}) {
+	  return function ({
+	    url: c,
+	    documents: u,
+	    getResourceUrlsAndBlobs: h,
+	    forceCreateStyle: d = !1,
+	    skipResources: p
+	  }) {
+	    if (!s[c]) if (i && i.getItem(c)) {
+	      const e = function e(t) {
+	        const n = i.getItem(t);
+	        return [t].concat(n ? $l(Zl(n.map(e))) : []);
+	      }(c);
+
+	      l("doProcessResource from sessionStorage", c, "deps:", e.slice(1)), s[c] = Promise.resolve({
+	        resourceUrls: e
+	      });
+	    } else if (p && p.indexOf(c) > -1 || /https:\/\/fonts.googleapis.com/.test(c)) l("not processing resource from skip list (or google font):", c), s[c] = Promise.resolve({
+	      resourceUrls: [c]
+	    });else {
+	      const f = Date.now();
+
+	      s[c] = function (s) {
+	        l("fetching", s);
+	        const c = Date.now();
+	        return e(s).catch(e => {
+	          if (function (e) {
+	            const t = e.message && (e.message.includes("Failed to fetch") || e.message.includes("Network request failed")),
+	                  n = e.name && e.name.includes("TypeError");
+	            return t && n;
+	          }(e)) return {
+	            probablyCORS: !0,
+	            url: s
+	          };
+	          if (e.isTimeout) return {
+	            isTimeout: !0,
+	            url: s
+	          };
+	          throw e;
+	        }).then(({
+	          url: e,
+	          type: s,
+	          value: m,
+	          probablyCORS: f,
+	          errorStatusCode: g,
+	          isTimeout: b
+	        }) => {
+	          if (f) return l("not fetched due to CORS", `[${Date.now() - c}ms]`, e), i && i.setItem(e, []), {
+	            resourceUrls: [e]
+	          };
+
+	          if (g) {
+	            const t = {
+	              [e]: {
+	                errorStatusCode: g
+	              }
+	            };
+	            return i && i.setItem(e, []), {
+	              blobsObj: t
+	            };
+	          }
+
+	          if (b) return l("not fetched due to timeout, returning error status code 504 (Gateway timeout)"), i && i.setItem(e, []), {
+	            blobsObj: {
+	              [e]: {
+	                errorStatusCode: 504
+	              }
+	            }
+	          };
+	          l(`fetched [${Date.now() - c}ms] ${e} bytes: ${m.byteLength}`);
+	          const y = {
+	            [e]: {
+	              type: s,
+	              value: m
+	            }
+	          };
+	          let k;
+
+	          if (/text\/css/.test(s)) {
+	            let o = t(e, u);
+
+	            if (o || d) {
+	              const {
+	                corsFreeStyleSheet: e,
+	                cleanStyleSheet: t
+	              } = n(m, o);
+	              k = r(e), t();
+	            }
+	          } else if (/image\/svg/.test(s)) try {
+	            k = a(m), d = !!k;
+	          } catch (e) {
+	            l("could not parse svg content", e);
+	          }
+
+	          if (k) {
+	            const t = k.map(t => o(t, e.replace(/^blob:/, ""))).map(Ql).filter(Xl);
+	            return i && i.setItem(e, t), h({
+	              documents: u,
+	              urls: t,
+	              forceCreateStyle: d,
+	              skipResources: p
+	            }).then(({
+	              resourceUrls: e,
+	              blobsObj: t
+	            }) => ({
+	              resourceUrls: e,
+	              blobsObj: window.Object.assign(t, y)
+	            }));
+	          }
+
+	          return i && i.setItem(e, []), {
+	            blobsObj: y
+	          };
+	        }).catch(e => (l("error while fetching", s, e, e ? `message=${e.message} | name=${e.name}` : ""), i && m(), {}));
+	      }(c).then(e => (l("doProcessResource", `[${Date.now() - f}ms]`, c), e));
+	    }
+	    return s[c];
+
+	    function m() {
+	      l("clearing from sessionStorage:", c), i.keys().forEach(e => {
+	        const t = i.getItem(e);
+	        i.setItem(e, t.filter(e => e !== c));
+	      }), l("cleared from sessionStorage:", c);
+	    }
+	  };
+	};
+
+	var ec = function ({
+	  parser: e,
+	  decoder: t,
+	  extractResourceUrlsFromStyleTags: n
+	}) {
+	  return function (r) {
+	    const o = (t || new TextDecoder("utf-8")).decode(r),
+	          a = (e || new DOMParser()).parseFromString(o, "image/svg+xml"),
+	          i = window.Array.from(a.querySelectorAll("img[srcset]")).map(e => e.getAttribute("srcset").split(", ").map(e => e.trim().split(/\s+/)[0])).reduce((e, t) => e.concat(t), []),
+	          s = window.Array.from(a.querySelectorAll("img[src]")).map(e => e.getAttribute("src")),
+	          l = window.Array.from(a.querySelectorAll('image,use,link[rel="stylesheet"]')).map(e => e.getAttribute("href") || e.getAttribute("xlink:href")),
+	          c = window.Array.from(a.getElementsByTagName("object")).map(e => e.getAttribute("data")),
+	          u = n(a, !1),
+	          h = function (e) {
+	      return Zl(window.Array.from(e.querySelectorAll("*[style]")).map(e => e.style.cssText).map(Bl).filter(Boolean));
+	    }(a);
+
+	    return i.concat(s).concat(l).concat(c).concat(u).concat(h).filter(e => "#" !== e[0]);
+	  };
+	};
+
+	var tc = function ({
+	  fetch: e = window.fetch,
+	  AbortController: t = window.AbortController,
+	  timeout: n = 1e4
+	}) {
+	  return function (r) {
+	    return new Promise((o, a) => {
+	      const i = new t(),
+	            s = setTimeout(() => {
+	        const e = new Error("fetchUrl timeout reached");
+	        e.isTimeout = !0, a(e), i.abort();
+	      }, n);
+	      return e(r, {
+	        cache: "force-cache",
+	        credentials: "same-origin",
+	        signal: i.signal
+	      }).then(e => (clearTimeout(s), 200 === e.status ? e.arrayBuffer().then(t => ({
+	        url: r,
+	        type: e.headers.get("Content-Type"),
+	        value: t
+	      })) : {
+	        url: r,
+	        errorStatusCode: e.status
+	      })).then(o).catch(e => a(e));
+	    });
+	  };
+	};
+
+	var nc = function (e) {
+	  const t = new URL(e);
+	  return t.username && (t.username = ""), t.password && (t.password = ""), t.href;
+	};
+
+	var rc = function ({
+	  styleSheetCache: e
+	}) {
+	  return function (t, n) {
+	    const r = Zl(n.map(e => {
+	      try {
+	        return window.Array.from(e.styleSheets);
+	      } catch (e) {
+	        return [];
+	      }
+	    }));
+	    return e[t] || r.find(e => {
+	      const n = e.href && Ql(e.href);
+	      return n && nc(n) === t;
+	    });
+	  };
+	};
+
+	var oc = function ({
+	  styleSheetCache: e,
+	  CSSRule: t = window.CSSRule
+	}) {
+	  return function n(r) {
+	    return $l(window.Array.from(r.cssRules || []).reduce((r, o) => {
+	      const a = {
+	        [t.IMPORT_RULE]: () => (o.styleSheet && (e[o.styleSheet.href] = o.styleSheet), o.href),
+	        [t.FONT_FACE_RULE]: () => Bl(o.cssText),
+	        [t.SUPPORTS_RULE]: () => n(o),
+	        [t.MEDIA_RULE]: () => n(o),
+	        [t.STYLE_RULE]: () => {
+	          let e = [];
+
+	          for (let t = 0, n = o.style.length; t < n; t++) {
+	            const n = o.style[t];
+	            let r = o.style.getPropertyValue(n);
+	            (/^\s*var\s*\(/.test(r) || /^--/.test(n)) && (r = r.replace(/(\\[0-9a-fA-F]{1,6}\s?)/g, e => String.fromCodePoint(parseInt(e.substr(1).trim(), 16))).replace(/\\([^0-9a-fA-F])/g, "$1"));
+	            const a = Bl(r);
+	            e = e.concat(a);
+	          }
+
+	          return e;
+	        }
+	      }[o.type],
+	            i = a && a() || [];
+	      return r.concat(i);
+	    }, [])).filter(e => "#" !== e[0]);
+	  };
+	};
+
+	var ac = function (e) {
+	  return function (t, n = !0) {
+	    return $l(window.Array.from(t.querySelectorAll("style")).reduce((r, o) => {
+	      const a = n ? window.Array.from(t.styleSheets).find(e => e.ownerNode === o) : o.sheet;
+	      return a ? r.concat(e(a)) : r;
+	    }, []));
+	  };
+	};
+
+	var ic = function (e) {
+	  const t = new TextDecoder("utf-8").decode(e),
+	        n = document.head || document.querySelectorAll("head")[0],
+	        r = document.createElement("style");
+	  return r.type = "text/css", r.setAttribute("data-desc", "Applitools tmp variable created by DOM SNAPSHOT"), n.appendChild(r), r.styleSheet ? r.styleSheet.cssText = t : r.appendChild(document.createTextNode(t)), r.sheet;
+	};
+
+	var sc = function (e, t, n = Nl) {
+	  let r;
+	  if (t) try {
+	    t.cssRules, r = t;
+	  } catch (o) {
+	    n(`[dom-snapshot] could not access cssRules for ${t.href} ${o}\ncreating temp style for access.`), r = ic(e);
+	  } else r = ic(e);
+	  return {
+	    corsFreeStyleSheet: r,
+	    cleanStyleSheet: function () {
+	      r !== t && r.ownerNode.parentNode.removeChild(r.ownerNode);
+	    }
+	  };
+	};
+
+	var lc = function (e) {
+	  for (var t = window.atob(e), n = t.length, r = new Uint8Array(n), o = 0; o < n; o++) r[o] = t.charCodeAt(o);
+
+	  return r.buffer;
+	};
+
+	var cc = function (e) {
+	  return e.map(({
+	    url: e,
+	    element: t
+	  }) => {
+	    const n = t.toDataURL("image/png");
+	    return {
+	      url: e,
+	      type: "image/png",
+	      value: lc(n.split(",")[1])
+	    };
+	  });
+	};
+
+	var uc = function (e = [document]) {
+	  return Zl(e.map(e => window.Array.from(e.querySelectorAll('iframe[src]:not([src=""]),iframe[srcdoc]:not([srcdoc=""])')))).filter(e => r(e) && !n(e)).map(e => e.contentDocument);
+	};
+
+	var hc = function (e) {
+	  const t = e.querySelectorAll("base")[0] && e.querySelectorAll("base")[0].href;
+	  if (t && (n = t) && !/^(about:blank|javascript:void|blob:)/.test(n)) return t;
+	  var n;
+	};
+
+	var dc = function (e) {
+	  return e && e.replace(/(\\[0-9a-fA-F]{1,6}\s?)/g, e => {
+	    const t = parseInt(e.substr(1).trim(), 16);
+	    return String.fromCodePoint(t);
+	  }) || e;
+	};
+
+	var pc = function (e) {
+	  return function () {
+	    const t = ["[dom-snapshot]", `[+${Date.now() - e}ms]`].concat(window.Array.from(arguments));
+	    console.log.apply(console, t);
+	  };
+	};
+
+	var mc = function ({
+	  log: e,
+	  sessionStorage: t
+	}) {
+	  let n;
+
+	  try {
+	    const e = (t = t || window.sessionStorage).getItem("__process_resource");
+	    n = e ? JSON.parse(e) : {};
+	  } catch (t) {
+	    e("error creating session cache", t);
+	  }
+
+	  return {
+	    getItem: function (e) {
+	      if (n) return n[e];
+	    },
+	    setItem: function (t, r) {
+	      n && (e("saving to in-memory sessionStorage, key:", t, "value:", r), n[t] = r);
+	    },
+	    keys: function () {
+	      return n ? window.Object.keys(n) : [];
+	    },
+	    persist: function () {
+	      n && t.setItem("__process_resource", JSON.stringify(n));
+	    }
+	  };
+	};
+
+	function fc(e) {
+	  return window.Object.keys(e).map(t => window.Object.assign({
+	    url: t.replace(/^blob:/, "")
+	  }, e[t]));
+	}
+
+	function gc(e) {
+	  return e && Xl(e);
+	}
+
+	var bc = function (e = document, {
+	  showLogs: t,
+	  useSessionCache: n,
+	  dontFetchResources: r,
+	  fetchTimeout: a,
+	  skipResources: i
+	} = {}) {
+	  /* MARKER FOR TEST - DO NOT DELETE */
+	  const s = t ? pc(Date.now()) : Nl;
+	  s("processPage start"), s("skipResources length: " + (i && i.length));
+	  const l = n && mc({
+	    log: s
+	  }),
+	        c = {},
+	        u = oc({
+	    styleSheetCache: c
+	  }),
+	        h = rc({
+	    styleSheetCache: c
+	  }),
+	        d = ac(u),
+	        p = ec({
+	    extractResourceUrlsFromStyleTags: d
+	  }),
+	        m = tc({
+	    timeout: a
+	  }),
+	        f = Jl({
+	    fetchUrl: m,
+	    findStyleSheetByUrl: h,
+	    getCorsFreeStyleSheet: sc,
+	    extractResourcesFromStyleSheet: u,
+	    extractResourcesFromSvg: p,
+	    absolutizeUrl: o,
+	    log: s,
+	    sessionCache: l
+	  }),
+	        g = Kl({
+	    processResource: f,
+	    aggregateResourceUrlsAndBlobs: Gl
+	  });
+	  return function e(t, n = t.location.href) {
+	    const a = hc(t) || n,
+	          {
+	      cdt: c,
+	      docRoots: u,
+	      canvasElements: h,
+	      inlineFrames: p,
+	      linkUrls: m
+	    } = Hl(t, a, s),
+	          f = Zl(u.map(e => d(e))),
+	          b = (C = a, function (e) {
+	      try {
+	        return o(e, C);
+	      } catch (e) {}
+	    }),
+	          y = $l(window.Array.from(m).concat(window.Array.from(f))).map(dc).map(b).map(Ql).filter(gc),
+	          k = r ? Promise.resolve({
+	      resourceUrls: y,
+	      blobsObj: {}
+	    }) : g({
+	      documents: u,
+	      urls: y,
+	      skipResources: i
+	    }).then(e => (l && l.persist(), e)),
+	          v = cc(h),
+	          w = uc(u).map(t => e(t)),
+	          x = p.map(({
+	      element: t,
+	      url: n
+	    }) => e(t.contentDocument, n)),
+	          S = t.defaultView && t.defaultView.frameElement && t.defaultView.frameElement.getAttribute("src");
+	    var C;
+	    return Promise.all([k].concat(w).concat(x)).then(function (e) {
+	      const {
+	        resourceUrls: t,
+	        blobsObj: r
+	      } = e[0],
+	            o = e.slice(1);
+	      return {
+	        cdt: c,
+	        url: n,
+	        srcAttr: S,
+	        resourceUrls: t.map(e => e.replace(/^blob:/, "")),
+	        blobs: fc(r).concat(v),
+	        frames: o
+	      };
+	    });
+	  }(e).then(e => (s("processPage end"), e.scriptVersion = "4.0.4", e));
+	};
+
+	function yc(t) {
+	  return t.blobs = t.blobs.map(t => t.value ? window.Object.assign(t, {
+	    value: e(t.value)
+	  }) : t), t.frames.forEach(yc), t;
+	}
+
+	var kc = function () {
+	  return bc.apply(this, arguments).then(yc);
+	};
+
+	var processPageAndSerializeCjs = kc;
+
+	return processPageAndSerializeCjs;
 
 }());
   return processPageAndSerialize(...args)

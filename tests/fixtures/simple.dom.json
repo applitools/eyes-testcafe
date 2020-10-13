@@ -1,0 +1,93 @@
+{
+  "cdt": [
+    {
+      "nodeType": 9,
+      "childNodeIndexes": [
+        1,
+        9
+      ]
+    },
+    {
+      "nodeType": 10,
+      "nodeName": "html"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "LINK",
+      "attributes": [
+        {
+          "name": "rel",
+          "value": "stylesheet"
+        },
+        {
+          "name": "href",
+          "value": "simple.css"
+        }
+      ],
+      "childNodeIndexes": []
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "HEAD",
+      "attributes": [],
+      "childNodeIndexes": [
+        2
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 3,
+      "nodeValue": "hi there"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "DIV",
+      "attributes": [],
+      "childNodeIndexes": [
+        5
+      ]
+    },
+    {
+      "nodeType": 3,
+      "nodeValue": "\n"
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "BODY",
+      "attributes": [],
+      "childNodeIndexes": [
+        6,
+        7
+      ]
+    },
+    {
+      "nodeType": 1,
+      "nodeName": "HTML",
+      "attributes": [
+        {
+          "name": "lang",
+          "value": "en"
+        }
+      ],
+      "childNodeIndexes": [
+        3,
+        4,
+        8
+      ]
+    }
+  ],
+  "url": "http://applitools.github.io/demo/DomSnapshot/simple.html",
+  "srcAttr": null,
+  "resourceUrls": [],
+  "blobs": [
+    {
+      "url": "http://applitools.github.io/demo/DomSnapshot/simple.css",
+      "type": "text/css; charset=utf-8",
+      "value": "ZGl2IHsgY29sb3I6IHJlZDsgfQ=="
+    }
+  ],
+  "frames": []
+}

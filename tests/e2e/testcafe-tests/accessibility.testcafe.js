@@ -1,8 +1,8 @@
 /* global fixture, test */
 import path from 'path';
-import Eyes from '../../src/eyes';
+import Eyes from '../../../';
 const {expect} = require('chai');
-const configPath = path.resolve(__dirname, '../fixtures/applitools.config.js');
+const configPath = path.resolve(__dirname, '../../fixtures/applitools.config.js');
 const eyes = new Eyes({configPath});
 const fetch = require('node-fetch');
 

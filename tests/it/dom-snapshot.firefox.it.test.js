@@ -7,7 +7,7 @@ const createTestCafe = require('testcafe');
 const testPath = resolve(__dirname, 'testcafe-tests/*.testcafe.js');
 const testServer = require('../util/testServer');
 
-describe('Eyes e2e tests', () => {
+describe('Eyes integration tests', () => {
   let closeTestServer;
   before(async () => {
     const server = await testServer({port: 7272});
@@ -27,7 +27,7 @@ describe('Eyes e2e tests', () => {
         const runner = testcafe.createRunner();
         return runner
           .src([testPath])
-          .browsers(['chrome:headless'])
+          .browsers(['firefox:headless'])
           .run();
       })
       .then(_failedCount => {
