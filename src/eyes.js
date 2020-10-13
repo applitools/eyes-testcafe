@@ -73,7 +73,7 @@ class Eyes {
     this._logger.log(
       `[checkWindow] checking for test '${this._currentTestName()}' with ${JSON.stringify(args)}`,
     );
-    return this._currentTest.eyes.checkWindow({...result, ...args});
+    return this._currentTest.eyes.checkWindow({url: result.url, snapshot: result, ...args});
   }
 
   async waitForResults(rejectOnErrors = true) {
