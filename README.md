@@ -103,6 +103,7 @@ test('Cookies', async t => {
     - [The `applitools.config.js` file](#Method-3-The-applitoolsconfigjs-file)
 - [Configuring the browser](#Configuring-the-browser)
   - [Device emulation](#Device-emulation)
+  - [iOS device](#iOS-device)
 - [Troubleshooting](#Troubleshooting)
 
 <br/><br/><br/>
@@ -571,7 +572,7 @@ To enable chrome's device emulation, it's possible to send a device name and scr
 
 ```js
 eyes.open({
-  ...
+  // ...
   browser: {
     deviceName: 'iPhone X',
     screenOrientation: 'landscape',
@@ -592,7 +593,7 @@ In addition, it's possible to use chrome's device emulation with custom viewport
 
 ```js
 eyes.open({
-  ...
+  // ...
   browser: {
     width: 800,
     height: 600,
@@ -602,6 +603,29 @@ eyes.open({
   }
 }
 ```
+
+### iOS device
+
+```js
+eyes.open({
+  // ...
+  browser: {
+    iosDeviceInfo: {
+      deviceName: 'iPhone XR',
+      screenOrientation: 'landscape', // optional, default: 'portrait'
+      iosVersion: 'latest' // optional, default: undefined (i.e. the default is determined by the Ultrafast grid)
+    },
+  }
+})
+```
+
+The list of devices is available at https://github.com/applitools/eyes.sdk.javascript1/blob/master/packages/eyes-sdk-core/lib/config/IosDeviceName.js
+
+Possible values for `iosVersion` are:
+
+- `'latest'` - the latest iOS version that's supported by the UFG
+- `'latest-1'` - one version prior to the latest version
+- `undefined` - the UFG's default
 ___
 ## Troubleshooting
 
